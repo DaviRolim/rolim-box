@@ -7,11 +7,11 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	default: async ({ locals, cookies }) => {
-		if (locals.session) {
-			await auth.invalidateSession(locals.session.id);
+	default: async (event) => {
+		if (event.locals.session) {
+			await auth.invalidateSession(event.locals.session.id);
 		}
-		auth.deleteSessionTokenCookie({ cookies } as any);
+		auth.deleteSessionTokenCookie(event);
 		throw redirect(302, '/login');
 	}
 };

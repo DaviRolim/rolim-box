@@ -13,11 +13,13 @@
 ## Task 1: Install Dependencies
 
 **Files:**
+
 - Modify: `package.json`
 
 **Step 1: Install password hashing and IndexedDB libraries**
 
 Run:
+
 ```bash
 bun add @node-rs/argon2 idb
 ```
@@ -25,9 +27,11 @@ bun add @node-rs/argon2 idb
 **Step 2: Verify installation**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -42,6 +46,7 @@ git commit -m "chore: add argon2 and idb dependencies"
 ## Task 2: Update Database Schema
 
 **Files:**
+
 - Modify: `src/lib/server/db/schema.ts`
 
 **Step 1: Replace schema with full Phase 1 schema**
@@ -128,17 +133,21 @@ export type Section = typeof section.$inferSelect;
 **Step 2: Verify schema compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Generate and push migration**
 
 Run:
+
 ```bash
 bun run db:push
 ```
+
 Expected: Tables created/updated in Turso
 
 **Step 4: Commit**
@@ -153,6 +162,7 @@ git commit -m "feat: add workspace, wod, and section tables to schema"
 ## Task 3: Update Auth Service for Email/Password
 
 **Files:**
+
 - Modify: `src/lib/server/auth.ts`
 
 **Step 1: Update auth.ts with password hashing and user creation**
@@ -333,9 +343,11 @@ export function deleteSessionTokenCookie(event: RequestEvent): void {
 **Step 2: Verify auth compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -350,6 +362,7 @@ git commit -m "feat: add email/password auth with argon2 and workspace creation"
 ## Task 4: Update App Types
 
 **Files:**
+
 - Modify: `src/app.d.ts`
 
 **Step 1: Update App.Locals type definition**
@@ -373,9 +386,11 @@ export {};
 **Step 2: Verify types**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -390,12 +405,14 @@ git commit -m "chore: clean up app.d.ts type definitions"
 ## Task 5: Create Registration Page
 
 **Files:**
+
 - Create: `src/routes/(auth)/register/+page.svelte`
 - Create: `src/routes/(auth)/register/+page.server.ts`
 
 **Step 1: Create register directory**
 
 Run:
+
 ```bash
 mkdir -p src/routes/\(auth\)/register
 ```
@@ -519,9 +536,11 @@ Create `src/routes/(auth)/register/+page.svelte`:
 **Step 4: Verify page compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 5: Commit**
@@ -536,12 +555,14 @@ git commit -m "feat: add registration page with email/password"
 ## Task 6: Create Login Page
 
 **Files:**
+
 - Create: `src/routes/(auth)/login/+page.svelte`
 - Create: `src/routes/(auth)/login/+page.server.ts`
 
 **Step 1: Create login directory**
 
 Run:
+
 ```bash
 mkdir -p src/routes/\(auth\)/login
 ```
@@ -665,9 +686,11 @@ Create `src/routes/(auth)/login/+page.svelte`:
 **Step 4: Verify page compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 5: Commit**
@@ -682,6 +705,7 @@ git commit -m "feat: add login page with email/password"
 ## Task 7: Create Auth Layout (Redirect if Logged In)
 
 **Files:**
+
 - Create: `src/routes/(auth)/+layout.server.ts`
 
 **Step 1: Create auth layout server load**
@@ -702,9 +726,11 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 **Step 2: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -719,12 +745,14 @@ git commit -m "feat: add auth layout to redirect logged-in users"
 ## Task 8: Create Protected App Layout
 
 **Files:**
+
 - Create: `src/routes/(app)/+layout.svelte`
 - Create: `src/routes/(app)/+layout.server.ts`
 
 **Step 1: Create app directory**
 
 Run:
+
 ```bash
 mkdir -p src/routes/\(app\)
 ```
@@ -768,10 +796,7 @@ Create `src/routes/(app)/+layout.svelte`:
 			<div class="flex items-center gap-4">
 				<span class="text-sm text-gray-400">{data.user?.email}</span>
 				<form action="/logout" method="POST">
-					<button
-						type="submit"
-						class="text-sm text-gray-400 transition hover:text-white"
-					>
+					<button type="submit" class="text-sm text-gray-400 transition hover:text-white">
 						Logout
 					</button>
 				</form>
@@ -788,9 +813,11 @@ Create `src/routes/(app)/+layout.svelte`:
 **Step 4: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 5: Commit**
@@ -805,6 +832,7 @@ git commit -m "feat: add protected app layout with header and logout"
 ## Task 9: Create Dashboard Page
 
 **Files:**
+
 - Create: `src/routes/(app)/+page.svelte`
 
 **Step 1: Create dashboard page**
@@ -842,9 +870,11 @@ Create `src/routes/(app)/+page.svelte`:
 **Step 2: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -859,11 +889,13 @@ git commit -m "feat: add dashboard page placeholder"
 ## Task 10: Create Logout Action
 
 **Files:**
+
 - Create: `src/routes/logout/+page.server.ts`
 
 **Step 1: Create logout directory**
 
 Run:
+
 ```bash
 mkdir -p src/routes/logout
 ```
@@ -895,9 +927,11 @@ export const actions: Actions = {
 **Step 3: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 4: Commit**
@@ -912,6 +946,7 @@ git commit -m "feat: add logout action"
 ## Task 11: Update Root Page to Redirect
 
 **Files:**
+
 - Modify: `src/routes/+page.svelte`
 - Create: `src/routes/+page.server.ts`
 
@@ -946,6 +981,7 @@ Replace entire contents of `src/routes/+page.svelte`:
 Since we want `/` to redirect and dashboard to be at `/dashboard`, let's move the app page:
 
 Run:
+
 ```bash
 mkdir -p src/routes/\(app\)/dashboard
 mv src/routes/\(app\)/+page.svelte src/routes/\(app\)/dashboard/+page.svelte
@@ -954,9 +990,11 @@ mv src/routes/\(app\)/+page.svelte src/routes/\(app\)/dashboard/+page.svelte
 **Step 4: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 5: Commit**
@@ -971,6 +1009,7 @@ git commit -m "feat: add root redirect and move dashboard to /dashboard"
 ## Task 12: Add Tailwind Brand Colors
 
 **Files:**
+
 - Modify: `src/routes/layout.css`
 
 **Step 1: Add brand color tokens to Tailwind config**
@@ -984,33 +1023,35 @@ Replace entire contents of `src/routes/layout.css`:
 
 @theme {
 	/* Primary - Dark Purple */
-	--color-primary-900: #2D1B4E;
-	--color-primary-800: #3D2663;
-	--color-primary-700: #4A2C6F;
-	--color-primary-600: #5C3A87;
-	--color-primary-500: #6E489F;
+	--color-primary-900: #2d1b4e;
+	--color-primary-800: #3d2663;
+	--color-primary-700: #4a2c6f;
+	--color-primary-600: #5c3a87;
+	--color-primary-500: #6e489f;
 
 	/* Secondary - Black */
-	--color-secondary-900: #0A0A0A;
-	--color-secondary-800: #1A1A1A;
-	--color-secondary-700: #2A2A2A;
+	--color-secondary-900: #0a0a0a;
+	--color-secondary-800: #1a1a1a;
+	--color-secondary-700: #2a2a2a;
 
 	/* Accent - Pink */
-	--color-accent-500: #E91E8C;
-	--color-accent-400: #FF6B9D;
-	--color-accent-300: #FF8FB3;
+	--color-accent-500: #e91e8c;
+	--color-accent-400: #ff6b9d;
+	--color-accent-300: #ff8fb3;
 
 	/* Muted - Light Purple */
-	--color-muted: #8B7AB8;
+	--color-muted: #8b7ab8;
 }
 ```
 
 **Step 2: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -1025,6 +1066,7 @@ git commit -m "feat: add RolimBox brand colors to Tailwind theme"
 ## Task 13: Add PWA Manifest
 
 **Files:**
+
 - Create: `static/manifest.json`
 
 **Step 1: Create PWA manifest**
@@ -1067,12 +1109,14 @@ git commit -m "feat: add PWA manifest"
 ## Task 14: Add PWA Icons (Placeholder)
 
 **Files:**
+
 - Create: `static/icons/icon-192.png`
 - Create: `static/icons/icon-512.png`
 
 **Step 1: Create icons directory**
 
 Run:
+
 ```bash
 mkdir -p static/icons
 ```
@@ -1080,6 +1124,7 @@ mkdir -p static/icons
 **Step 2: Create placeholder icons using ImageMagick (or skip if not available)**
 
 Run:
+
 ```bash
 # Create simple placeholder icons - purple squares with "RB" text
 # If ImageMagick not available, create manually or use any 192x192 and 512x512 PNG
@@ -1107,6 +1152,7 @@ git commit -m "feat: add PWA placeholder icons"
 ## Task 15: Add Service Worker
 
 **Files:**
+
 - Create: `static/sw.js`
 
 **Step 1: Create service worker**
@@ -1115,17 +1161,10 @@ Create `static/sw.js`:
 
 ```javascript
 const CACHE_NAME = 'rolimbox-v1';
-const STATIC_ASSETS = [
-	'/',
-	'/manifest.json',
-	'/icons/icon-192.png',
-	'/icons/icon-512.png'
-];
+const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
-	event.waitUntil(
-		caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-	);
+	event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
 	self.skipWaiting();
 });
 
@@ -1133,9 +1172,7 @@ self.addEventListener('activate', (event) => {
 	event.waitUntil(
 		caches.keys().then((cacheNames) => {
 			return Promise.all(
-				cacheNames
-					.filter((name) => name !== CACHE_NAME)
-					.map((name) => caches.delete(name))
+				cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
 			);
 		})
 	);
@@ -1147,29 +1184,32 @@ self.addEventListener('fetch', (event) => {
 	if (event.request.method !== 'GET') return;
 
 	// Network-first for API and dynamic routes
-	if (event.request.url.includes('/api/') ||
-	    event.request.url.includes('/login') ||
-	    event.request.url.includes('/register') ||
-	    event.request.url.includes('/logout')) {
-		event.respondWith(
-			fetch(event.request).catch(() => caches.match(event.request))
-		);
+	if (
+		event.request.url.includes('/api/') ||
+		event.request.url.includes('/login') ||
+		event.request.url.includes('/register') ||
+		event.request.url.includes('/logout')
+	) {
+		event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 		return;
 	}
 
 	// Cache-first for static assets
 	event.respondWith(
 		caches.match(event.request).then((cached) => {
-			return cached || fetch(event.request).then((response) => {
-				// Cache successful responses
-				if (response.status === 200) {
-					const responseClone = response.clone();
-					caches.open(CACHE_NAME).then((cache) => {
-						cache.put(event.request, responseClone);
-					});
-				}
-				return response;
-			});
+			return (
+				cached ||
+				fetch(event.request).then((response) => {
+					// Cache successful responses
+					if (response.status === 200) {
+						const responseClone = response.clone();
+						caches.open(CACHE_NAME).then((cache) => {
+							cache.put(event.request, responseClone);
+						});
+					}
+					return response;
+				})
+			);
 		})
 	);
 });
@@ -1187,6 +1227,7 @@ git commit -m "feat: add service worker for offline caching"
 ## Task 16: Update Root Layout with PWA Meta Tags
 
 **Files:**
+
 - Modify: `src/routes/+layout.svelte`
 
 **Step 1: Add PWA meta tags and service worker registration**
@@ -1223,9 +1264,11 @@ Replace entire contents of `src/routes/+layout.svelte`:
 **Step 2: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 3: Commit**
@@ -1240,11 +1283,13 @@ git commit -m "feat: add PWA meta tags and service worker registration"
 ## Task 17: Create IndexedDB Cache Layer
 
 **Files:**
+
 - Create: `src/lib/db/indexeddb.ts`
 
 **Step 1: Create db directory**
 
 Run:
+
 ```bash
 mkdir -p src/lib/db
 ```
@@ -1421,9 +1466,11 @@ export async function clearAllCachedData(): Promise<void> {
 **Step 3: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 4: Commit**
@@ -1438,11 +1485,13 @@ git commit -m "feat: add IndexedDB cache layer for offline support"
 ## Task 18: Create Online/Offline Sync Store
 
 **Files:**
+
 - Create: `src/lib/stores/sync.svelte.ts`
 
 **Step 1: Create stores directory**
 
 Run:
+
 ```bash
 mkdir -p src/lib/stores
 ```
@@ -1483,9 +1532,11 @@ export const syncStore = new SyncStore();
 **Step 3: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 4: Commit**
@@ -1500,11 +1551,13 @@ git commit -m "feat: add online/offline sync store"
 ## Task 19: Create Offline Banner Component
 
 **Files:**
+
 - Create: `src/lib/components/OfflineBanner.svelte`
 
 **Step 1: Create components directory**
 
 Run:
+
 ```bash
 mkdir -p src/lib/components
 ```
@@ -1564,9 +1617,11 @@ Replace entire contents:
 **Step 4: Verify compiles**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 5: Commit**
@@ -1583,6 +1638,7 @@ git commit -m "feat: add offline banner component"
 **Step 1: Start dev server**
 
 Run:
+
 ```bash
 bun run dev
 ```
@@ -1626,22 +1682,27 @@ bun run dev
 **Step 1: Run type check**
 
 Run:
+
 ```bash
 bun run check
 ```
+
 Expected: No errors
 
 **Step 2: Run linter**
 
 Run:
+
 ```bash
 bun run lint
 ```
+
 Expected: No errors (or fix any that appear)
 
 **Step 3: Format code**
 
 Run:
+
 ```bash
 bun run format
 ```

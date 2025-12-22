@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 
 	let { form } = $props();
 </script>
@@ -53,7 +54,7 @@
 
 		<p class="mt-4 text-center text-gray-400">
 			Already have an account?
-			<a href="/login" class="text-accent-400 hover:underline">Log in</a>
+			<a href={resolve('/login')} class="text-accent-400 hover:underline">Log in</a>
 		</p>
 	</div>
 </div>

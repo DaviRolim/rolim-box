@@ -4,22 +4,22 @@
 
 @theme {
 	/* Primary - Dark Purple */
-	--color-primary-900: #2D1B4E;
-	--color-primary-800: #3D2663;
-	--color-primary-700: #4A2C6F;
-	--color-primary-600: #5C3A87;
-	--color-primary-500: #6E489F;
+	--color-primary-900: #2d1b4e;
+	--color-primary-800: #3d2663;
+	--color-primary-700: #4a2c6f;
+	--color-primary-600: #5c3a87;
+	--color-primary-500: #6e489f;
 
 	/* Secondary - Black */
-	--color-secondary-900: #0A0A0A;
-	--color-secondary-800: #1A1A1A;
-	--color-secondary-700: #2A2A2A;
+	--color-secondary-900: #0a0a0a;
+	--color-secondary-800: #1a1a1a;
+	--color-secondary-700: #2a2a2a;
 
 	/* Accent - Pink */
-	--color-accent-500: #E91E8C;
-	--color-accent-400: #FF6B9D;
-	--color-accent-300: #FF8FB3;
+	--color-accent-500: #e91e8c;
+	--color-accent-400: #ff6b9d;
+	--color-accent-300: #ff8fb3;
 
 	/* Muted - Light Purple */
-	--color-muted: #8B7AB8;
+	--color-muted: #8b7ab8;
 }

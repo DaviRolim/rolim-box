@@ -12,13 +12,13 @@ Phase 1 establishes the foundational architecture for RolimBox: PWA setup, authe
 
 ### Key Decisions Made
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Cloud backend | Turso (SQLite) | Already configured, avoids adding services |
-| Offline mode | Read-only | Simplifies sync, avoids conflicts between shared account users |
-| User auth | Email + password | Simple, enables future password reset |
-| UI approach | Minimal + brand colors | Focus on functionality, polish in Phase 5 |
-| Multi-user prep | Workspace model | Schema supports future team features |
+| Decision        | Choice                 | Rationale                                                      |
+| --------------- | ---------------------- | -------------------------------------------------------------- |
+| Cloud backend   | Turso (SQLite)         | Already configured, avoids adding services                     |
+| Offline mode    | Read-only              | Simplifies sync, avoids conflicts between shared account users |
+| User auth       | Email + password       | Simple, enables future password reset                          |
+| UI approach     | Minimal + brand colors | Focus on functionality, polish in Phase 5                      |
+| Multi-user prep | Workspace model        | Schema supports future team features                           |
 
 ---
 
@@ -71,55 +71,69 @@ static/
 
 // User account
 export const user = sqliteTable('user', {
-  id: text('id').primaryKey(),                    // UUID
-  email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+	id: text('id').primaryKey(), // UUID
+	email: text('email').notNull().unique(),
+	passwordHash: text('password_hash').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
 
 // Session (existing, no changes)
 export const session = sqliteTable('session', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => user.id),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull()
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull()
 });
 
 // Workspace (for future multi-user support)
 export const workspace = sqliteTable('workspace', {
-  id: text('id').primaryKey(),                    // UUID
-  name: text('name').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+	id: text('id').primaryKey(), // UUID
+	name: text('name').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
 });
 
 // User-Workspace membership
-export const workspaceMember = sqliteTable('workspace_member', {
-  userId: text('user_id').notNull().references(() => user.id),
-  workspaceId: text('workspace_id').notNull().references(() => workspace.id),
-  role: text('role').notNull(),                   // 'owner' | 'coach'
-  joinedAt: integer('joined_at', { mode: 'timestamp' }).notNull()
-}, (table) => ({
-  pk: primaryKey({ columns: [table.userId, table.workspaceId] })
-}));
+export const workspaceMember = sqliteTable(
+	'workspace_member',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id),
+		workspaceId: text('workspace_id')
+			.notNull()
+			.references(() => workspace.id),
+		role: text('role').notNull(), // 'owner' | 'coach'
+		joinedAt: integer('joined_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.userId, table.workspaceId] })
+	})
+);
 
 // Workout of the Day
 export const wod = sqliteTable('wod', {
-  id: text('id').primaryKey(),                    // UUID
-  workspaceId: text('workspace_id').notNull().references(() => workspace.id),
-  date: text('date').notNull(),                   // ISO date: "2025-12-22"
-  description: text('description'),               // nullable
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+	id: text('id').primaryKey(), // UUID
+	workspaceId: text('workspace_id')
+		.notNull()
+		.references(() => workspace.id),
+	date: text('date').notNull(), // ISO date: "2025-12-22"
+	description: text('description'), // nullable
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
 });
 
 // WoD Sections
 export const section = sqliteTable('section', {
-  id: text('id').primaryKey(),                    // UUID
-  wodId: text('wod_id').notNull().references(() => wod.id, { onDelete: 'cascade' }),
-  type: text('type').notNull(),                   // 'warmup'|'skill'|'wod'|'cooldown'|'stretches'|'custom'
-  name: text('name').notNull(),                   // Display name
-  content: text('content').notNull().default(''),
-  order: integer('order').notNull(),              // Position in WoD (0-indexed)
-  timerConfig: text('timer_config')               // nullable, JSON string
+	id: text('id').primaryKey(), // UUID
+	wodId: text('wod_id')
+		.notNull()
+		.references(() => wod.id, { onDelete: 'cascade' }),
+	type: text('type').notNull(), // 'warmup'|'skill'|'wod'|'cooldown'|'stretches'|'custom'
+	name: text('name').notNull(), // Display name
+	content: text('content').notNull().default(''),
+	order: integer('order').notNull(), // Position in WoD (0-indexed)
+	timerConfig: text('timer_config') // nullable, JSON string
 });
 ```
 
@@ -129,43 +143,43 @@ export const section = sqliteTable('section', {
 // src/lib/db/indexeddb.ts
 
 interface IDBSchema {
-  wods: {
-    key: string;           // wod.id
-    value: {
-      id: string;
-      workspaceId: string;
-      date: string;
-      description: string | null;
-      createdAt: number;
-      updatedAt: number;
-    };
-    indexes: {
-      'by-workspace': string;
-      'by-date': string;
-    };
-  };
-  sections: {
-    key: string;           // section.id
-    value: {
-      id: string;
-      wodId: string;
-      type: string;
-      name: string;
-      content: string;
-      order: number;
-      timerConfig: string | null;
-    };
-    indexes: {
-      'by-wod': string;
-    };
-  };
-  syncMeta: {
-    key: string;           // 'lastSync'
-    value: {
-      key: string;
-      timestamp: number;
-    };
-  };
+	wods: {
+		key: string; // wod.id
+		value: {
+			id: string;
+			workspaceId: string;
+			date: string;
+			description: string | null;
+			createdAt: number;
+			updatedAt: number;
+		};
+		indexes: {
+			'by-workspace': string;
+			'by-date': string;
+		};
+	};
+	sections: {
+		key: string; // section.id
+		value: {
+			id: string;
+			wodId: string;
+			type: string;
+			name: string;
+			content: string;
+			order: number;
+			timerConfig: string | null;
+		};
+		indexes: {
+			'by-wod': string;
+		};
+	};
+	syncMeta: {
+		key: string; // 'lastSync'
+		value: {
+			key: string;
+			timestamp: number;
+		};
+	};
 }
 ```
 
@@ -217,33 +231,33 @@ POST /logout
 ```typescript
 // src/hooks.server.ts
 export const handle: Handle = async ({ event, resolve }) => {
-  const sessionToken = event.cookies.get('auth-session');
+	const sessionToken = event.cookies.get('auth-session');
 
-  if (sessionToken) {
-    const { session, user } = await validateSessionToken(sessionToken);
-    event.locals.session = session;
-    event.locals.user = user;
-  }
+	if (sessionToken) {
+		const { session, user } = await validateSessionToken(sessionToken);
+		event.locals.session = session;
+		event.locals.user = user;
+	}
 
-  return resolve(event);
+	return resolve(event);
 };
 
 // src/routes/(app)/+layout.server.ts
 export const load: LayoutServerLoad = async ({ locals, redirect }) => {
-  if (!locals.user) {
-    throw redirect(302, '/login');
-  }
+	if (!locals.user) {
+		throw redirect(302, '/login');
+	}
 
-  // Load user's workspace
-  const membership = await db.query.workspaceMember.findFirst({
-    where: eq(workspaceMember.userId, locals.user.id),
-    with: { workspace: true }
-  });
+	// Load user's workspace
+	const membership = await db.query.workspaceMember.findFirst({
+		where: eq(workspaceMember.userId, locals.user.id),
+		with: { workspace: true }
+	});
 
-  return {
-    user: locals.user,
-    workspace: membership?.workspace
-  };
+	return {
+		user: locals.user,
+		workspace: membership?.workspace
+	};
 };
 ```
 
@@ -289,17 +303,17 @@ App Load
 ```typescript
 // Online only - show error if offline
 async function createWod(data: WodInput) {
-  if (!navigator.onLine) {
-    throw new Error('You are offline. Cannot create WoD.');
-  }
+	if (!navigator.onLine) {
+		throw new Error('You are offline. Cannot create WoD.');
+	}
 
-  // 1. Save to Turso via API
-  const wod = await api.post('/api/wods', data);
+	// 1. Save to Turso via API
+	const wod = await api.post('/api/wods', data);
 
-  // 2. Update local IndexedDB cache
-  await idb.put('wods', wod);
+	// 2. Update local IndexedDB cache
+	await idb.put('wods', wod);
 
-  return wod;
+	return wod;
 }
 ```
 
@@ -310,17 +324,21 @@ async function createWod(data: WodInput) {
 import { browser } from '$app/environment';
 
 function createSyncStore() {
-  let isOnline = $state(browser ? navigator.onLine : true);
+	let isOnline = $state(browser ? navigator.onLine : true);
 
-  if (browser) {
-    window.addEventListener('online', () => isOnline = true);
-    window.addEventListener('offline', () => isOnline = false);
-  }
+	if (browser) {
+		window.addEventListener('online', () => (isOnline = true));
+		window.addEventListener('offline', () => (isOnline = false));
+	}
 
-  return {
-    get isOnline() { return isOnline; },
-    get isOffline() { return !isOnline; }
-  };
+	return {
+		get isOnline() {
+			return isOnline;
+		},
+		get isOffline() {
+			return !isOnline;
+		}
+	};
 }
 
 export const syncStore = createSyncStore();
@@ -335,25 +353,25 @@ export const syncStore = createSyncStore();
 ```json
 // static/manifest.json
 {
-  "name": "RolimBox",
-  "short_name": "RolimBox",
-  "description": "CrossFit Workout Management & Timer System",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0A0A0A",
-  "theme_color": "#2D1B4E",
-  "icons": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+	"name": "RolimBox",
+	"short_name": "RolimBox",
+	"description": "CrossFit Workout Management & Timer System",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#0A0A0A",
+	"theme_color": "#2D1B4E",
+	"icons": [
+		{
+			"src": "/icons/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png"
+		}
+	]
 }
 ```
 
@@ -362,30 +380,19 @@ export const syncStore = createSyncStore();
 ```javascript
 // static/sw.js
 const CACHE_NAME = 'rolimbox-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
-];
+const STATIC_ASSETS = ['/', '/manifest.json', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+	event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
 });
 
 self.addEventListener('fetch', (event) => {
-  // Cache-first for static assets, network-first for API
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    );
-  }
+	// Cache-first for static assets, network-first for API
+	if (event.request.url.includes('/api/')) {
+		event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+	} else {
+		event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
+	}
 });
 ```
 
@@ -394,11 +401,11 @@ self.addEventListener('fetch', (event) => {
 ```svelte
 <!-- src/routes/+layout.svelte -->
 <svelte:head>
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#2D1B4E" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+	<link rel="manifest" href="/manifest.json" />
+	<meta name="theme-color" content="#2D1B4E" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	<link rel="apple-touch-icon" href="/icons/icon-192.png" />
 </svelte:head>
 ```
 
@@ -411,25 +418,25 @@ self.addEventListener('fetch', (event) => {
 @import 'tailwindcss';
 
 @theme {
-  /* Primary - Dark Purple */
-  --color-primary-900: #2D1B4E;
-  --color-primary-800: #3D2663;
-  --color-primary-700: #4A2C6F;
-  --color-primary-600: #5C3A87;
-  --color-primary-500: #6E489F;
+	/* Primary - Dark Purple */
+	--color-primary-900: #2d1b4e;
+	--color-primary-800: #3d2663;
+	--color-primary-700: #4a2c6f;
+	--color-primary-600: #5c3a87;
+	--color-primary-500: #6e489f;
 
-  /* Secondary - Black */
-  --color-secondary-900: #0A0A0A;
-  --color-secondary-800: #1A1A1A;
-  --color-secondary-700: #2A2A2A;
+	/* Secondary - Black */
+	--color-secondary-900: #0a0a0a;
+	--color-secondary-800: #1a1a1a;
+	--color-secondary-700: #2a2a2a;
 
-  /* Accent - Pink */
-  --color-accent-500: #E91E8C;
-  --color-accent-400: #FF6B9D;
-  --color-accent-300: #FF8FB3;
+	/* Accent - Pink */
+	--color-accent-500: #e91e8c;
+	--color-accent-400: #ff6b9d;
+	--color-accent-300: #ff8fb3;
 
-  /* Muted - Light Purple */
-  --color-muted: #8B7AB8;
+	/* Muted - Light Purple */
+	--color-muted: #8b7ab8;
 }
 ```
 
@@ -438,6 +445,7 @@ self.addEventListener('fetch', (event) => {
 ## 7. Phase 1 Deliverables Checklist
 
 ### PWA Foundation
+
 - [ ] PWA manifest with RolimBox branding
 - [ ] Service worker for static asset caching
 - [ ] App icons (192px, 512px)
@@ -445,6 +453,7 @@ self.addEventListener('fetch', (event) => {
 - [ ] Responsive layout shell (mobile-first)
 
 ### Authentication System
+
 - [ ] Update user schema (email, password_hash)
 - [ ] Password hashing with Argon2
 - [ ] Registration flow with workspace creation
@@ -455,6 +464,7 @@ self.addEventListener('fetch', (event) => {
 - [ ] Register page UI
 
 ### Database Schema
+
 - [ ] User table updates
 - [ ] Workspace table
 - [ ] WorkspaceMember table
@@ -463,12 +473,14 @@ self.addEventListener('fetch', (event) => {
 - [ ] Run migrations
 
 ### Local Cache Layer
+
 - [ ] IndexedDB setup (idb library)
 - [ ] WoD and Section object stores
 - [ ] Sync metadata store
 - [ ] Cache read/write utilities
 
 ### Data Sync
+
 - [ ] Online/offline detection store
 - [ ] Fetch WoDs from Turso on load
 - [ ] Update IndexedDB after fetch
@@ -476,6 +488,7 @@ self.addEventListener('fetch', (event) => {
 - [ ] Offline indicator UI component
 
 ### Basic UI
+
 - [ ] Tailwind brand color tokens
 - [ ] Empty dashboard page
 - [ ] Offline banner component
