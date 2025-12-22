@@ -39,10 +39,27 @@ interface RolimBoxDB extends DBSchema {
 			timestamp: number;
 		};
 	};
+	syncQueue: {
+		key: string;
+		value: {
+			id: string;
+			type: 'create' | 'update' | 'delete';
+			entity: 'wod';
+			entityId: string;
+			payload: unknown;
+			createdAt: number;
+			retries: number;
+			status: 'pending' | 'failed';
+			failedAt?: number;
+		};
+		indexes: {
+			'by-entity': string;
+		};
+	};
 }
 
 const DB_NAME = 'rolimbox';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<RolimBoxDB>> | null = null;
 
@@ -70,6 +87,12 @@ function getDB(): Promise<IDBPDatabase<RolimBoxDB>> {
 				// Sync metadata store
 				if (!db.objectStoreNames.contains('syncMeta')) {
 					db.createObjectStore('syncMeta', { keyPath: 'key' });
+				}
+
+				// Sync queue store
+				if (!db.objectStoreNames.contains('syncQueue')) {
+					const queueStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
+					queueStore.createIndex('by-entity', 'entityId');
 				}
 			}
 		});
@@ -158,5 +181,60 @@ export async function getLastSync(): Promise<number | null> {
 // Clear all data (for logout)
 export async function clearAllCachedData(): Promise<void> {
 	const db = await getDB();
-	await Promise.all([db.clear('wods'), db.clear('sections'), db.clear('syncMeta')]);
+	await Promise.all([db.clear('wods'), db.clear('sections'), db.clear('syncMeta'), db.clear('syncQueue')]);
+}
+
+// Sync queue operations
+export async function addToSyncQueue(operation: RolimBoxDB['syncQueue']['value']): Promise<void> {
+	try {
+		const db = await getDB();
+		await db.put('syncQueue', operation);
+	} catch (error) {
+		console.error('Failed to add to sync queue:', error);
+		throw error;
+	}
+}
+
+export async function getAllSyncQueueOperations(): Promise<RolimBoxDB['syncQueue']['value'][]> {
+	try {
+		const db = await getDB();
+		return db.getAll('syncQueue');
+	} catch (error) {
+		console.error('Failed to get sync queue operations:', error);
+		throw error;
+	}
+}
+
+export async function deleteSyncQueueOperation(id: string): Promise<void> {
+	try {
+		const db = await getDB();
+		await db.delete('syncQueue', id);
+	} catch (error) {
+		console.error('Failed to delete sync queue operation:', error);
+		throw error;
+	}
+}
+
+export async function updateSyncQueueOperation(
+	operation: RolimBoxDB['syncQueue']['value']
+): Promise<void> {
+	try {
+		const db = await getDB();
+		await db.put('syncQueue', operation);
+	} catch (error) {
+		console.error('Failed to update sync queue operation:', error);
+		throw error;
+	}
+}
+
+export async function clearSyncQueueForEntity(entityId: string): Promise<void> {
+	try {
+		const db = await getDB();
+		const operations = await db.getAllFromIndex('syncQueue', 'by-entity', entityId);
+		const tx = db.transaction('syncQueue', 'readwrite');
+		await Promise.all([...operations.map((op) => tx.store.delete(op.id)), tx.done]);
+	} catch (error) {
+		console.error('Failed to clear sync queue for entity:', error);
+		throw error;
+	}
 }
