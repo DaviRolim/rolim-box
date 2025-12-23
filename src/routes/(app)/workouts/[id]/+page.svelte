@@ -744,10 +744,6 @@
 			display: none;
 		}
 
-		.btn-timer {
-			padding: 10px 16px;
-		}
-
 		.not-found-title {
 			font-size: 24px;
 		}
