@@ -8,6 +8,7 @@ import {
 } from '$lib/types/timer';
 import { createTimerEngine, type TimerEngine } from '$lib/services/timer-engine';
 import { audioService } from '$lib/services/audio.svelte';
+import { audioEventManager } from '$lib/services/audio-events.svelte';
 
 class TimerStore {
 	// Core state
@@ -23,7 +24,6 @@ class TimerStore {
 	// Internal
 	private engine: TimerEngine | null = null;
 	private totalDurationMs = 0;
-	private playedEvents = new Set<string>(); // Track played audio events
 
 	// Derived values
 	get remainingMs(): number {
@@ -83,13 +83,11 @@ class TimerStore {
 		this.context = context || null;
 		this.totalDurationMs = getTotalDuration(config) * 1000;
 		this.reset();
+		audioEventManager.initialize(config.type);
 	}
 
 	async start() {
 		if (this.state !== 'idle' || !this.config) return;
-
-		// Reset played events for fresh start
-		this.playedEvents.clear();
 
 		// Run countdown sequence with audio
 		this.state = 'countdown';
@@ -143,7 +141,7 @@ class TimerStore {
 		this.isWorkPhase = true;
 		this.completedRounds = 0;
 		this.countdownValue = null;
-		this.playedEvents.clear();
+		audioEventManager.reset();
 	}
 
 	incrementRounds() {
@@ -151,10 +149,47 @@ class TimerStore {
 	}
 
 	// Private methods
+	private getRoundElapsedMs(): number {
+		if (!this.config) return 0;
+
+		switch (this.config.type) {
+			case 'emom': {
+				const intervalMs = this.config.intervalWork! * 1000;
+				return this.elapsedMs % intervalMs;
+			}
+			case 'tabata': {
+				const workMs = this.config.intervalWork! * 1000;
+				const restMs = this.config.intervalRest! * 1000;
+				const cycleMs = workMs + restMs;
+				return this.elapsedMs % cycleMs;
+			}
+			default:
+				return this.elapsedMs;
+		}
+	}
+
+	private getRoundDurationMs(): number {
+		if (!this.config) return 0;
+
+		switch (this.config.type) {
+			case 'emom':
+				return this.config.intervalWork! * 1000;
+			case 'tabata':
+				return this.isWorkPhase
+					? this.config.intervalWork! * 1000
+					: this.config.intervalRest! * 1000;
+			default:
+				return this.totalDurationMs;
+		}
+	}
+
 	private handleTick(deltaMs: number) {
 		if (!this.config) return;
 
 		const prevElapsedMs = this.elapsedMs;
+		const prevRound = this.currentRound;
+		const prevPhase = this.isWorkPhase;
+
 		this.elapsedMs += deltaMs;
 
 		// Check for completion
@@ -163,9 +198,6 @@ class TimerStore {
 			this.stop();
 			return;
 		}
-
-		// Check audio events BEFORE updating rounds (to detect transitions)
-		this.checkAudioEvents(prevElapsedMs, this.elapsedMs);
 
 		// Handle round/phase transitions
 		switch (this.config.type) {
@@ -191,176 +223,20 @@ class TimerStore {
 				break;
 			}
 		}
-	}
 
-	// Event-based audio checking
-	private checkAudioEvents(prevMs: number, currentMs: number) {
-		if (!this.config) return;
-
-		switch (this.config.type) {
-			case 'emom':
-				this.checkEmomAudio(prevMs, currentMs);
-				break;
-			case 'amrap':
-			case 'fortime':
-				this.checkAmrapForTimeAudio(prevMs, currentMs);
-				break;
-			case 'tabata':
-				this.checkTabataAudio(prevMs, currentMs);
-				break;
-		}
-	}
-
-	private checkEmomAudio(prevMs: number, currentMs: number) {
-		if (!this.config || this.config.type !== 'emom') return;
-
-		const intervalMs = this.config.intervalWork! * 1000;
-		const totalRounds = this.config.rounds!;
-		const totalMs = this.totalDurationMs;
-
-		// Calculate halfway round (used to skip "next round" at halfway point)
-		const halfwayRound = Math.ceil(totalRounds / 2);
-		const hasHalfway = halfwayRound >= 1 && halfwayRound < totalRounds;
-
-		// Check each round transition (except first)
-		for (let round = 2; round <= totalRounds; round++) {
-			const transitionMs = (round - 1) * intervalMs;
-
-			// 10-second warning beep before transition
-			const warningMs = transitionMs - 10000;
-			if (warningMs > 0 && this.crossedThreshold(prevMs, currentMs, warningMs)) {
-				this.playOnce(`emom-warning-${round}`, () => {
-					audioService.playBeep(880, 100);
-				});
-			}
-
-			// 3, 2, 1 countdown beeps before transition
-			for (const sec of [3, 2, 1] as const) {
-				const countdownMs = transitionMs - sec * 1000;
-				if (countdownMs > 0 && this.crossedThreshold(prevMs, currentMs, countdownMs)) {
-					this.playOnce(`emom-countdown-${round}-${sec}`, () => {
-						audioService.playCountdownBeep(sec);
-					});
-				}
-			}
-
-			// Round transition voice cue (skip if this is the halfway point)
-			const isHalfwayTransition = hasHalfway && round - 1 === halfwayRound;
-			if (!isHalfwayTransition && this.crossedThreshold(prevMs, currentMs, transitionMs)) {
-				this.playOnce(`emom-transition-${round}`, () => {
-					audioService.playVoiceCue('next-round');
-				});
-			}
-		}
-
-		// Final countdown before timer ends (last round completion)
-		// 10-second warning beep before end
-		const finalWarningMs = totalMs - 10000;
-		if (finalWarningMs > 0 && this.crossedThreshold(prevMs, currentMs, finalWarningMs)) {
-			this.playOnce('emom-warning-final', () => {
-				audioService.playBeep(880, 100);
-			});
-		}
-
-		// 3, 2, 1 countdown before timer ends
-		for (const sec of [3, 2, 1] as const) {
-			const countdownMs = totalMs - sec * 1000;
-			if (countdownMs > 0 && this.crossedThreshold(prevMs, currentMs, countdownMs)) {
-				this.playOnce(`emom-countdown-final-${sec}`, () => {
-					audioService.playCountdownBeep(sec);
-				});
-			}
-		}
-
-		// Halfway through all rounds (plays after the middle round)
-		if (hasHalfway) {
-			const halfwayMs = halfwayRound * intervalMs;
-			if (this.crossedThreshold(prevMs, currentMs, halfwayMs)) {
-				this.playOnce('emom-halfway-rounds', () => {
-					audioService.playVoiceCue('half-emom');
-				});
-			}
-		}
-	}
-
-	private checkAmrapForTimeAudio(prevMs: number, currentMs: number) {
-		if (!this.config) return;
-
-		const totalMs = this.totalDurationMs;
-
-		// Halfway through time
-		const halfwayMs = totalMs / 2;
-		if (this.crossedThreshold(prevMs, currentMs, halfwayMs)) {
-			this.playOnce('halfway', () => {
-				audioService.playVoiceCue('halfway');
-			});
-		}
-
-		// One minute remaining
-		const oneMinuteMs = totalMs - 60000;
-		if (oneMinuteMs > 0 && this.crossedThreshold(prevMs, currentMs, oneMinuteMs)) {
-			this.playOnce('one-minute', () => {
-				audioService.playVoiceCue('one-minute');
-			});
-		}
-
-		// 10 seconds remaining
-		const tenSecondsMs = totalMs - 10000;
-		if (tenSecondsMs > 0 && this.crossedThreshold(prevMs, currentMs, tenSecondsMs)) {
-			this.playOnce('ten-seconds', () => {
-				audioService.playVoiceCue('ten-seconds');
-			});
-		}
-
-		// 3, 2, 1 countdown
-		for (const sec of [3, 2, 1] as const) {
-			const countdownMs = totalMs - sec * 1000;
-			if (countdownMs > 0 && this.crossedThreshold(prevMs, currentMs, countdownMs)) {
-				this.playOnce(`countdown-${sec}`, () => {
-					audioService.playCountdownBeep(sec);
-				});
-			}
-		}
-	}
-
-	private checkTabataAudio(prevMs: number, currentMs: number) {
-		if (!this.config || this.config.type !== 'tabata') return;
-
-		const workMs = this.config.intervalWork! * 1000;
-		const restMs = this.config.intervalRest! * 1000;
-		const cycleMs = workMs + restMs;
-		const totalRounds = this.config.rounds!;
-
-		for (let round = 1; round <= totalRounds; round++) {
-			const cycleStart = (round - 1) * cycleMs;
-
-			// Work phase at cycle start (skip first - that's the GO)
-			if (round > 1 && this.crossedThreshold(prevMs, currentMs, cycleStart)) {
-				this.playOnce(`tabata-work-${round}`, () => {
-					audioService.playVoiceCue('work');
-				});
-			}
-
-			// Rest phase after work
-			const restStart = cycleStart + workMs;
-			if (this.crossedThreshold(prevMs, currentMs, restStart)) {
-				this.playOnce(`tabata-rest-${round}`, () => {
-					audioService.playVoiceCue('rest');
-				});
-			}
-		}
-	}
-
-	// Helper: Check if we crossed a threshold between prev and current
-	private crossedThreshold(prevMs: number, currentMs: number, thresholdMs: number): boolean {
-		return prevMs < thresholdMs && currentMs >= thresholdMs;
-	}
-
-	// Helper: Play audio only once per event ID
-	private playOnce(eventId: string, playFn: () => void) {
-		if (this.playedEvents.has(eventId)) return;
-		this.playedEvents.add(eventId);
-		playFn();
+		// Check audio events via event manager
+		audioEventManager.check({
+			prevMs: prevElapsedMs,
+			currentMs: this.elapsedMs,
+			totalMs: this.totalDurationMs,
+			currentRound: this.currentRound,
+			totalRounds: this.totalRounds,
+			roundChanged: this.currentRound !== prevRound,
+			isWorkPhase: this.isWorkPhase,
+			phaseChanged: this.isWorkPhase !== prevPhase,
+			roundElapsedMs: this.getRoundElapsedMs(),
+			roundDurationMs: this.getRoundDurationMs()
+		});
 	}
 
 	private sleep(ms: number): Promise<void> {
