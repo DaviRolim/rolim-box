@@ -1,10 +1,13 @@
-const CACHE_NAME = 'rolimbox-v3';
+const CACHE_NAME = 'rolimbox-v4';
 const STATIC_ASSETS = [
 	'/',
 	'/manifest.json',
 	'/icons/icon-192.png',
-	'/icons/icon-512.png',
-	// Audio files
+	'/icons/icon-512.png'
+];
+
+// Audio files cached separately (non-critical)
+const AUDIO_ASSETS = [
 	'/audio/voice/go.mp3',
 	'/audio/voice/halfway.mp3',
 	'/audio/voice/half-emom.mp3',
@@ -19,7 +22,18 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
-		caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+		caches.open(CACHE_NAME).then(async (cache) => {
+			// Cache critical assets first (must succeed)
+			await cache.addAll(STATIC_ASSETS);
+			// Cache audio assets individually (non-blocking, failures are ok)
+			for (const asset of AUDIO_ASSETS) {
+				try {
+					await cache.add(asset);
+				} catch (e) {
+					console.warn('Failed to cache audio asset:', asset, e);
+				}
+			}
+		})
 	);
 	self.skipWaiting();
 });
@@ -40,15 +54,26 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
 	// Skip non-GET requests
 	if (event.request.method !== 'GET') return;
-	// Skip non-HTTP(S) schemes (e.g. chrome-extension://), which Cache API can't store
+
+	// Skip non-HTTP(S) schemes
 	const url = new URL(event.request.url);
 	if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
-	// Network-first for API and dynamic routes
-	if (event.request.url.includes('/api/') ||
-	    event.request.url.includes('/login') ||
-	    event.request.url.includes('/register') ||
-	    event.request.url.includes('/logout')) {
+	// Handle navigation requests (opening the app)
+	if (event.request.mode === 'navigate') {
+		event.respondWith(
+			fetch(event.request)
+				.catch(() => caches.match('/'))
+				.then((response) => response || caches.match('/'))
+		);
+		return;
+	}
+
+	// Network-first for API and auth routes
+	if (url.pathname.startsWith('/api/') ||
+	    url.pathname === '/login' ||
+	    url.pathname === '/register' ||
+	    url.pathname === '/logout') {
 		event.respondWith(
 			fetch(event.request).catch(() => caches.match(event.request))
 		);
@@ -58,7 +83,9 @@ self.addEventListener('fetch', (event) => {
 	// Cache-first for static assets
 	event.respondWith(
 		caches.match(event.request).then((cached) => {
-			return cached || fetch(event.request).then((response) => {
+			if (cached) return cached;
+
+			return fetch(event.request).then((response) => {
 				// Cache successful responses
 				if (response.status === 200) {
 					const responseClone = response.clone();
@@ -67,6 +94,12 @@ self.addEventListener('fetch', (event) => {
 					});
 				}
 				return response;
+			}).catch(() => {
+				// Return cached root for HTML requests as fallback
+				if (event.request.headers.get('accept')?.includes('text/html')) {
+					return caches.match('/');
+				}
+				return new Response('Offline', { status: 503 });
 			});
 		})
 	);
