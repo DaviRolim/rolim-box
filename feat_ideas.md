@@ -1,0 +1,1 @@
+- Add the 'AI Magic Wand button' to automatically suggest full sections based on a WoD Description, the suggestions can be dismissed or updated manually or just accepted and saved.
