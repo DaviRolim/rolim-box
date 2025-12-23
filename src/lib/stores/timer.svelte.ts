@@ -117,17 +117,20 @@ class TimerStore {
 		if (this.state !== 'running') return;
 		this.state = 'paused';
 		this.engine?.pause();
+		audioService.cancelAll();
 	}
 
 	resume() {
-		if (this.state !== 'paused') return;
+		if (this.state !== 'paused' || !this.config) return;
 		this.state = 'running';
 		this.engine?.resume();
+		audioService.reschedule(this.config, this.remainingMs);
 	}
 
 	stop() {
 		this.engine?.stop();
 		this.state = 'completed';
+		audioService.cancelAll();
 	}
 
 	reset() {
@@ -139,6 +142,7 @@ class TimerStore {
 		this.isWorkPhase = true;
 		this.completedRounds = 0;
 		this.countdownValue = null;
+		audioService.cancelAll();
 	}
 
 	incrementRounds() {
