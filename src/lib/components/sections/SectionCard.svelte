@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { sectionTypes } from '$lib/config/section-types';
 	import type { Section } from '$lib/types/wod';
+	import { parseTimerConfig, TIMER_LABELS, formatTime } from '$lib/types/timer';
 
 	interface Props {
 		section: Section;
@@ -32,6 +33,7 @@
 			? section.content.slice(0, 100) + '...'
 			: section.content
 	);
+	const timerConfig = $derived(parseTimerConfig(section.timerConfig));
 </script>
 
 <div class="section-card" data-color={sectionConfig.color}>
@@ -114,13 +116,33 @@
 	</div>
 
 	<div class="section-footer">
-		<button type="button" class="btn-timer" disabled title="Coming in Phase 3">
-			<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-				<circle cx="8" cy="8" r="6" stroke-width="1.5" />
-				<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
-			</svg>
-			Timer (Coming Soon)
-		</button>
+		{#if timerConfig}
+			<a
+				href="/timer/{section.id}?wod={section.wodId}"
+				class="btn-timer-active"
+			>
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+					<circle cx="8" cy="8" r="6" stroke-width="1.5" />
+					<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
+				</svg>
+				{TIMER_LABELS[timerConfig.type]}
+				{#if timerConfig.type === 'amrap' || timerConfig.type === 'fortime'}
+					- {formatTime(timerConfig.duration!)}
+				{:else if timerConfig.type === 'emom'}
+					- {timerConfig.rounds}x{timerConfig.intervalWork}s
+				{:else if timerConfig.type === 'tabata'}
+					- {timerConfig.rounds}x {timerConfig.intervalWork}s/{timerConfig.intervalRest}s
+				{/if}
+			</a>
+		{:else}
+			<button type="button" class="btn-timer" disabled title="No timer configured">
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+					<circle cx="8" cy="8" r="6" stroke-width="1.5" />
+					<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
+				</svg>
+				No Timer
+			</button>
+		{/if}
 	</div>
 </div>
 
@@ -389,6 +411,30 @@
 		color: #525252;
 		cursor: not-allowed;
 		opacity: 0.5;
+	}
+
+	.btn-timer-active {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px 20px;
+		background: linear-gradient(135deg, #e91e8c 0%, #be185d 100%);
+		border: 2px solid #e91e8c;
+		color: #ffffff;
+		font-family: 'Inter', system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		text-decoration: none;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		min-height: 48px;
+	}
+
+	.btn-timer-active:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(233, 30, 140, 0.4);
 	}
 
 	/* Mobile optimization */
