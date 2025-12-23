@@ -152,7 +152,7 @@
 	}
 
 	// Handle section save
-	function handleSaveSection(updates: { type: SectionType; name: string; content: string }) {
+	function handleSaveSection(updates: { type: SectionType; name: string; content: string; timerConfig: string | null }) {
 		if (!editingSection) return;
 
 		const editingSectionId = editingSection.id;
@@ -162,7 +162,8 @@
 						...section,
 						type: updates.type,
 						name: updates.name,
-						content: updates.content
+						content: updates.content,
+						timerConfig: updates.timerConfig
 					}
 				: section
 		);
@@ -208,7 +209,8 @@
 				type: section.type,
 				name: section.name,
 				content: section.content,
-				order: index
+				order: index,
+				timerConfig: section.timerConfig
 			}));
 
 			// Create WoD

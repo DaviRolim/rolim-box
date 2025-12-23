@@ -52,7 +52,8 @@ export const sectionSchema = z.object({
 	type: z.enum(['warmup', 'skill', 'wod', 'cooldown', 'stretches', 'custom']),
 	name: z.string().min(1, 'Section name is required').max(100, 'Section name too long'),
 	content: z.string().max(2000, 'Section content too long'),
-	order: z.number().int().min(0, 'Order must be a non-negative integer')
+	order: z.number().int().min(0, 'Order must be a non-negative integer'),
+	timerConfig: z.string().nullable().optional()
 });
 
 /**

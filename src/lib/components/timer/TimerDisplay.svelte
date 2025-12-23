@@ -2,7 +2,7 @@
 <script lang="ts">
 	import { timerStore } from '$lib/stores/timer.svelte';
 	import { TIMER_LABELS, formatTime } from '$lib/types/timer';
-	import { audioService } from '$lib/services/audio';
+	import { audioService } from '$lib/services/audio.svelte';
 	import CountdownOverlay from './CountdownOverlay.svelte';
 	import TimerProgress from './TimerProgress.svelte';
 	import RoundIndicator from './RoundIndicator.svelte';

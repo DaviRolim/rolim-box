@@ -137,6 +137,8 @@ async function fetchAndUpdateCache(workspaceId: string): Promise<void> {
 
 			// Update cache with fresh data
 			for (const wod of wods.map(mapApiWoDToWoD)) {
+				// Delete old sections first to prevent duplication
+				await deleteCachedSectionsByWod(wod.id);
 				await cacheWodWithSections(wod);
 			}
 		}
@@ -154,6 +156,8 @@ async function fetchSingleWoDAndUpdateCache(id: string): Promise<void> {
 		if (response.ok) {
 			const wod = await response.json();
 
+			// Delete old sections first to prevent duplication
+			await deleteCachedSectionsByWod(id);
 			// Update cache with fresh data
 			await cacheWodWithSections(mapApiWoDToWoD(wod));
 		}
@@ -185,7 +189,7 @@ export async function createWoD(data: CreateWoDInput): Promise<WoD> {
 		name: section.name,
 		content: section.content,
 		order: section.order ?? index,
-		timerConfig: null
+		timerConfig: section.timerConfig ?? null
 	}));
 
 	// 3. Create WoD object

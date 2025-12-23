@@ -7,7 +7,7 @@ import {
 	getTotalDuration
 } from '$lib/types/timer';
 import { createTimerEngine, type TimerEngine } from '$lib/services/timer-engine';
-import { audioService } from '$lib/services/audio';
+import { audioService } from '$lib/services/audio.svelte';
 
 class TimerStore {
 	// Core state

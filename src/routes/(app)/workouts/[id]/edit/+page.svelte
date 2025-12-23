@@ -205,7 +205,7 @@
 	}
 
 	// Handle section save
-	function handleSaveSection(updates: { type: SectionType; name: string; content: string }) {
+	function handleSaveSection(updates: { type: SectionType; name: string; content: string; timerConfig: string | null }) {
 		if (!editingSection) return;
 
 		const editingSectionId = editingSection.id;
@@ -215,8 +215,8 @@
 						...section,
 						type: updates.type,
 						name: updates.name,
-						content: updates.content
-						// timerConfig is preserved via spread operator
+						content: updates.content,
+						timerConfig: updates.timerConfig
 					}
 				: section
 		);
