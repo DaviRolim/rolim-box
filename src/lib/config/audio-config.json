@@ -1,0 +1,25 @@
+{
+	"universal": {
+		"countdown": {
+			"3": { "type": "beep", "frequency": 440, "duration": 150 },
+			"2": { "type": "beep", "frequency": 550, "duration": 150 },
+			"1": { "type": "beep", "frequency": 660, "duration": 150 },
+			"go": { "type": "voice", "file": "go.mp3" }
+		},
+		"checkpoints": [
+			{ "id": "halfway", "type": "voice", "file": "halfway.mp3" },
+			{ "id": "one-minute", "remainingMs": 60000, "type": "voice", "file": "one-minute.mp3" },
+			{ "id": "thirty-seconds", "remainingMs": 30000, "type": "voice", "file": "thirty-seconds.mp3" },
+			{ "id": "ten-seconds", "remainingMs": 10000, "type": "voice", "file": "ten-seconds.mp3" }
+		],
+		"completion": { "type": "voice", "file": "time.mp3" }
+	},
+	"emom": {
+		"roundTransition": { "type": "voice", "file": "next-round.mp3" },
+		"roundWarning": { "remainingMs": 5000, "type": "beep", "frequency": 880, "duration": 100 }
+	},
+	"tabata": {
+		"workPhase": { "type": "voice", "file": "work.mp3" },
+		"restPhase": { "type": "voice", "file": "rest.mp3" }
+	}
+}
