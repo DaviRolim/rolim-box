@@ -13,6 +13,15 @@
 
 	const config = audioConfigJson as AudioConfig;
 
+	// Extract beep configs from the new event-driven structure
+	const emomEvents = config.timerEvents.emom;
+	const emomBeepEvent = Array.isArray(emomEvents)
+		? emomEvents.find(e => e.action.type === 'beep')
+		: null;
+	const emomBeepConfig: BeepConfig = emomBeepEvent?.action.type === 'beep'
+		? { type: 'beep', frequency: emomBeepEvent.action.frequency, duration: emomBeepEvent.action.duration }
+		: { type: 'beep', frequency: 880, duration: 100 };
+
 	const beepEntries: BeepEntry[] = [
 		{
 			id: 'universal.countdown.3',
@@ -32,22 +41,7 @@
 		{
 			id: 'emom.roundWarning',
 			label: 'EMOM: round warning (10s remaining)',
-			config: config.emom.roundWarning
-		},
-		{
-			id: 'emom.roundCountdown.3',
-			label: 'EMOM: round countdown (3)',
-			config: config.emom.roundCountdown['3']
-		},
-		{
-			id: 'emom.roundCountdown.2',
-			label: 'EMOM: round countdown (2)',
-			config: config.emom.roundCountdown['2']
-		},
-		{
-			id: 'emom.roundCountdown.1',
-			label: 'EMOM: round countdown (1)',
-			config: config.emom.roundCountdown['1']
+			config: emomBeepConfig
 		}
 	];
 
