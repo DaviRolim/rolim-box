@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { sectionTypes } from '$lib/config/section-types';
 	import type { Section, SectionType } from '$lib/types/wod';
+	import { TimerConfig } from '$lib/components/timer';
+	import { parseTimerConfig, serializeTimerConfig, type TimerConfig as TConfig } from '$lib/types/timer';
 
 	interface Props {
 		section: Section;
-		onSave: (updates: { type: SectionType; name: string; content: string }) => void;
+		onSave: (updates: { type: SectionType; name: string; content: string; timerConfig: string | null }) => void;
 		onCancel: () => void;
 	}
 
@@ -15,6 +17,9 @@
 	let content = $state(section.content);
 	let nameError = $state('');
 	let contentError = $state('');
+	let showTimerConfig = $state(!!section.timerConfig);
+	let timerConfigComponent: TimerConfig;
+	let initialTimerConfig = $state(parseTimerConfig(section.timerConfig));
 
 	// Reset when section.id changes
 	$effect(() => {
@@ -58,11 +63,26 @@
 	function handleSubmit() {
 		if (!validateForm()) return;
 
+		let timerConfig: string | null = null;
+		if (showTimerConfig && timerConfigComponent) {
+			timerConfig = serializeTimerConfig(timerConfigComponent.getConfig());
+		}
+
 		onSave({
 			type: selectedType,
 			name: name.trim(),
-			content: content.trim()
+			content: content.trim(),
+			timerConfig
 		});
+	}
+
+	function toggleTimerConfig() {
+		showTimerConfig = !showTimerConfig;
+	}
+
+	function removeTimerConfig() {
+		showTimerConfig = false;
+		initialTimerConfig = null;
 	}
 
 	function handleCancel() {
@@ -140,6 +160,39 @@
 			></textarea>
 			{#if contentError}
 				<p id="content-error" class="form-error" role="alert">{contentError}</p>
+			{/if}
+		</div>
+
+		<!-- Timer Configuration -->
+		<div class="form-group">
+			{#if !showTimerConfig}
+				<button type="button" class="btn-add-timer" onclick={toggleTimerConfig}>
+					<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+						<circle cx="8" cy="8" r="6" stroke-width="1.5" />
+						<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
+					</svg>
+					Add Timer
+				</button>
+			{:else}
+				<div class="timer-config-container">
+					<div class="timer-config-header">
+						<span class="timer-config-label">
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+								<circle cx="8" cy="8" r="6" stroke-width="1.5" />
+								<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
+							</svg>
+							Timer
+						</span>
+						<button type="button" class="btn-remove-timer" onclick={removeTimerConfig}>
+							Remove
+						</button>
+					</div>
+					<TimerConfig
+						bind:this={timerConfigComponent}
+						initialConfig={initialTimerConfig}
+						compact={true}
+					/>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -453,6 +506,74 @@
 		.btn-save {
 			width: 100%;
 		}
+	}
+
+	/* Timer Configuration */
+	.btn-add-timer {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		padding: 14px 16px;
+		background: transparent;
+		border: 2px dashed #2a2a2a;
+		color: #525252;
+		font-family: 'Inter', system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.btn-add-timer:hover {
+		border-color: #e91e8c;
+		color: #e91e8c;
+		background: rgba(233, 30, 140, 0.05);
+	}
+
+	.timer-config-container {
+		background: #0a0a0a;
+		border: 2px solid #2a2a2a;
+		padding: 16px;
+	}
+
+	.timer-config-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 16px;
+		padding-bottom: 12px;
+		border-bottom: 1px solid #2a2a2a;
+	}
+
+	.timer-config-label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		font-family: 'Inter', system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #e91e8c;
+	}
+
+	.btn-remove-timer {
+		padding: 6px 12px;
+		background: transparent;
+		border: 1px solid #ef4444;
+		color: #ef4444;
+		font-family: 'Inter', system-ui, sans-serif;
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.btn-remove-timer:hover {
+		background: #ef4444;
+		color: #ffffff;
 	}
 
 	/* Reduced motion */
