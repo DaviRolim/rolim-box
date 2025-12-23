@@ -8,6 +8,7 @@
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import type { PageData } from './$types';
 	import type { WoD } from '$lib/types/wod';
+	import { parseTimerConfig, TIMER_LABELS, formatTime } from '$lib/types/timer';
 
 	let { data }: { data: PageData } = $props();
 
@@ -177,21 +178,32 @@
 							<pre class="section-text">{section.content}</pre>
 						</div>
 
-						<!-- Timer button (disabled for Phase 3) -->
+						<!-- Timer button -->
 						<div class="section-footer">
-							<button
-								class="btn-timer"
-								disabled
-								aria-label="Timer coming in Phase 3"
-								title="Timer functionality coming in Phase 3"
-							>
-								<svg class="timer-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
-									<circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" />
-									<path d="M10 6v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="square" />
-								</svg>
-								<span class="timer-text">Timer</span>
-								<span class="timer-badge">Phase 3</span>
-							</button>
+							{@const timerConfig = parseTimerConfig(section.timerConfig)}
+							{#if timerConfig}
+								<a
+									href="/timer/{section.id}?wod={wod.id}"
+									class="btn-timer-active"
+								>
+									<svg class="timer-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+										<circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" />
+										<path d="M10 6v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="square" />
+									</svg>
+									<span class="timer-text">{TIMER_LABELS[timerConfig.type]}</span>
+									<span class="timer-config-text">
+										{#if timerConfig.type === 'amrap' || timerConfig.type === 'fortime'}
+											{formatTime(timerConfig.duration!)}
+										{:else if timerConfig.type === 'emom'}
+											{timerConfig.rounds}x{timerConfig.intervalWork}s
+										{:else if timerConfig.type === 'tabata'}
+											{timerConfig.rounds}x {timerConfig.intervalWork}s/{timerConfig.intervalRest}s
+										{/if}
+									</span>
+								</a>
+							{:else}
+								<span class="no-timer-text">No timer configured</span>
+							{/if}
 						</div>
 					</article>
 				{/each}
@@ -502,35 +514,44 @@
 		justify-content: flex-end;
 	}
 
-	.btn-timer {
+	.btn-timer-active {
 		display: flex;
 		align-items: center;
 		gap: 10px;
 		padding: 12px 20px;
-		background: transparent;
-		border: 2px solid #2a2a2a;
-		color: #525252;
+		background: linear-gradient(135deg, #e91e8c 0%, #be185d 100%);
+		border: 2px solid #e91e8c;
+		color: #ffffff;
 		font-family: 'Inter', system-ui, -apple-system, sans-serif;
 		font-size: 12px;
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		cursor: not-allowed;
-		opacity: 0.5;
+		text-decoration: none;
+		cursor: pointer;
+		transition: all 0.2s ease;
 		min-height: 44px;
+	}
+
+	.btn-timer-active:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(233, 30, 140, 0.4);
 	}
 
 	.timer-icon {
 		flex-shrink: 0;
 	}
 
-	.timer-badge {
+	.timer-config-text {
 		padding: 4px 8px;
-		background: #2a2a2a;
-		border: 1px solid #3a3a3a;
-		font-size: 10px;
-		font-weight: 800;
-		color: #737373;
+		background: rgba(0, 0, 0, 0.3);
+		font-size: 11px;
+	}
+
+	.no-timer-text {
+		font-family: 'Inter', system-ui, sans-serif;
+		font-size: 12px;
+		color: #525252;
 	}
 
 	/* ===== EMPTY SECTIONS STATE ===== */
