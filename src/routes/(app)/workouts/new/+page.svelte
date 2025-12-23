@@ -25,6 +25,8 @@
 	let showAddForm = $state(false);
 	let editingSection = $state<Section | null>(null);
 	let isSaving = $state(false);
+	let isGenerating = $state(false);
+	let showReplaceConfirm = $state(false);
 
 	// Form validation errors
 	let dateError = $state('');
@@ -243,6 +245,64 @@
 		}
 		goto('/workouts');
 	}
+
+	// Handle AI section generation
+	async function generateSections() {
+		if (description.length < 5) return;
+
+		// If sections exist, show confirmation dialog
+		if (sections.length > 0) {
+			showReplaceConfirm = true;
+			return;
+		}
+
+		await doGenerateSections();
+	}
+
+	async function doGenerateSections() {
+		showReplaceConfirm = false;
+		isGenerating = true;
+
+		try {
+			const response = await fetch('/api/wods/generate-sections', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ description })
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(data.error || 'Failed to generate sections');
+			}
+
+			// Replace sections with generated ones
+			sections = data.sections.map((section: { type: SectionType; name: string; content: string; order: number; timerConfig: string | null }, index: number) => ({
+				id: `temp-${Date.now()}-${index}`,
+				wodId: '',
+				type: section.type,
+				name: section.name,
+				content: section.content,
+				order: index,
+				timerConfig: section.timerConfig
+			}));
+
+			toastStore.success('Sections generated successfully');
+		} catch (error) {
+			console.error('Failed to generate sections:', error);
+			toastStore.error(error instanceof Error ? error.message : 'Failed to generate sections. Please try again.');
+		} finally {
+			isGenerating = false;
+		}
+	}
+
+	function cancelReplaceConfirm() {
+		showReplaceConfirm = false;
+	}
+
+	function confirmReplace() {
+		doGenerateSections();
+	}
 </script>
 
 <div class="create-page">
@@ -294,17 +354,44 @@
 					Description (optional)
 					<span class="form-hint">{description.length}/500</span>
 				</label>
-				<textarea
-					id="workout-description"
-					class="form-textarea"
-					class:error={descriptionError}
-					bind:value={description}
-					placeholder="Add a brief description of the workout..."
-					maxlength="500"
-					rows="3"
-					aria-invalid={!!descriptionError}
-					aria-describedby={descriptionError ? 'description-error' : undefined}
-				></textarea>
+				<div class="textarea-wrapper">
+					<textarea
+						id="workout-description"
+						class="form-textarea"
+						class:error={descriptionError}
+						bind:value={description}
+						placeholder="Add a brief description of the workout..."
+						maxlength="500"
+						rows="3"
+						aria-invalid={!!descriptionError}
+						aria-describedby={descriptionError ? 'description-error' : undefined}
+					></textarea>
+					{#if description.length >= 5}
+						<button
+							type="button"
+							class="btn-generate"
+							onclick={generateSections}
+							disabled={isGenerating || isSaving}
+							aria-label="Generate sections with AI"
+							title="Generate sections with AI"
+						>
+							{#if isGenerating}
+								<svg
+									class="spinner"
+									width="20"
+									height="20"
+									viewBox="0 0 20 20"
+									fill="none"
+									stroke="currentColor"
+								>
+									<circle cx="10" cy="10" r="8" stroke-width="3" stroke-dasharray="50" />
+								</svg>
+							{:else}
+								<img src="/icons/sparkles.png" alt="" width="20" height="20" class="sparkles-icon" />
+							{/if}
+						</button>
+					{/if}
+				</div>
 				{#if descriptionError}
 					<p id="description-error" class="form-error" role="alert">{descriptionError}</p>
 				{/if}
@@ -343,6 +430,25 @@
 					{/if}
 				{/if}
 			</div>
+
+			<!-- Replace sections confirmation dialog -->
+			{#if showReplaceConfirm}
+				<div class="confirm-dialog-backdrop" onclick={cancelReplaceConfirm}>
+					<div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
+						<p class="confirm-message">
+							This will replace your existing {sections.length} section{sections.length === 1 ? '' : 's'}. Continue?
+						</p>
+						<div class="confirm-actions">
+							<button type="button" class="btn-cancel" onclick={cancelReplaceConfirm}>
+								Cancel
+							</button>
+							<button type="button" class="btn-confirm" onclick={confirmReplace}>
+								Generate
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Save button -->
 			<div class="form-actions">
@@ -530,6 +636,113 @@
 		line-height: 1.6;
 	}
 
+	/* Textarea wrapper for sparkles button positioning */
+	.textarea-wrapper {
+		position: relative;
+	}
+
+	.btn-generate {
+		position: absolute;
+		bottom: 12px;
+		right: 12px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 36px;
+		height: 36px;
+		background: rgba(110, 72, 159, 0.2);
+		border: 2px solid #6e489f;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.btn-generate:hover:not(:disabled) {
+		background: rgba(110, 72, 159, 0.4);
+		transform: scale(1.05);
+	}
+
+	.btn-generate:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.btn-generate:focus-visible {
+		outline: 2px solid #6e489f;
+		outline-offset: 2px;
+	}
+
+	.sparkles-icon {
+		filter: invert(1);
+	}
+
+	/* Confirmation dialog */
+	.confirm-dialog-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.7);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 200;
+	}
+
+	.confirm-dialog {
+		background: #1a1a1a;
+		border: 2px solid #2a2a2a;
+		padding: 24px;
+		max-width: 400px;
+		width: 90%;
+	}
+
+	.confirm-message {
+		font-family: 'Inter', system-ui, -apple-system, sans-serif;
+		font-size: 16px;
+		color: #ffffff;
+		margin: 0 0 24px 0;
+		line-height: 1.5;
+	}
+
+	.confirm-actions {
+		display: flex;
+		gap: 12px;
+		justify-content: flex-end;
+	}
+
+	.btn-cancel,
+	.btn-confirm {
+		font-family: 'Inter', system-ui, -apple-system, sans-serif;
+		font-size: 14px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		padding: 12px 20px;
+		cursor: pointer;
+		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.btn-cancel {
+		background: transparent;
+		border: 2px solid #2a2a2a;
+		color: #a3a3a3;
+	}
+
+	.btn-cancel:hover {
+		background: #2a2a2a;
+		color: #ffffff;
+	}
+
+	.btn-confirm {
+		background: linear-gradient(135deg, #6e489f 0%, #5c3a87 100%);
+		border: 2px solid #6e489f;
+		color: #ffffff;
+	}
+
+	.btn-confirm:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(110, 72, 159, 0.3);
+	}
+
 	.form-error {
 		font-family: 'Inter', system-ui, -apple-system, sans-serif;
 		font-size: 12px;
@@ -629,10 +842,11 @@
 		animation: spin 1s linear infinite;
 	}
 
+	.btn-generate .spinner {
+		color: #6e489f;
+	}
+
 	@keyframes spin {
-		from {
-			transform: rotate(0deg);
-		}
 		to {
 			transform: rotate(360deg);
 		}
