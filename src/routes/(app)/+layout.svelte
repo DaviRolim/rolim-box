@@ -1,5 +1,6 @@
 <script lang="ts">
 	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
+	import BottomNav from '$lib/components/BottomNav.svelte';
 
 	let { data, children } = $props();
 </script>
@@ -21,7 +22,9 @@
 		</div>
 	</header>
 
-	<main class="mx-auto max-w-4xl p-4">
+	<main class="mx-auto max-w-4xl p-4 pb-24">
 		{@render children()}
 	</main>
+
+	<BottomNav />
 </div>
