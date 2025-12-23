@@ -20,7 +20,7 @@
 		onIncrement
 	}: Props = $props();
 
-	const showManualCounter = $derived(timerType === 'amrap' || timerType === 'fortime');
+	const showManualCounter = $derived(timerType === 'amrap');
 	const showAutoRounds = $derived(timerType === 'emom' || timerType === 'tabata');
 	const showIncrementButton = $derived(timerType === 'amrap');
 </script>
