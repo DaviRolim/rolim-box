@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rolimbox-v2';
+const CACHE_NAME = 'rolimbox-v3';
 const STATIC_ASSETS = [
 	'/',
 	'/manifest.json',
@@ -7,6 +7,7 @@ const STATIC_ASSETS = [
 	// Audio files
 	'/audio/voice/go.mp3',
 	'/audio/voice/halfway.mp3',
+	'/audio/voice/half-emom.mp3',
 	'/audio/voice/one-minute.mp3',
 	'/audio/voice/thirty-seconds.mp3',
 	'/audio/voice/ten-seconds.mp3',
