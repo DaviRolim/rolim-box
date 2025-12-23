@@ -7,6 +7,7 @@
 export type VoiceCueType =
 	| 'go'
 	| 'halfway'
+	| 'half-emom'
 	| 'one-minute'
 	| 'thirty-seconds'
 	| 'ten-seconds'
@@ -51,17 +52,9 @@ export interface AudioConfig {
 			'1': BeepConfig;
 			go: VoiceConfig;
 		};
-		checkpoints: CheckpointConfig[];
 		completion: VoiceConfig;
 	};
-	emom: {
-		roundTransition: VoiceConfig;
-		roundWarning: BeepConfig & { remainingMs: number };
-	};
-	tabata: {
-		workPhase: VoiceConfig;
-		restPhase: VoiceConfig;
-	};
+	timerEvents: Record<string, TimerEventsConfig>;
 }
 
 // ============================================================================
@@ -75,3 +68,40 @@ export interface ScheduledCheckpoint {
 	frequency?: number;
 	duration?: number;
 }
+
+// ============================================================================
+// Event System Types
+// ============================================================================
+
+export type EventTrigger =
+	| { type: 'percentage'; value: number }
+	| { type: 'remainingMs'; value: number }
+	| { type: 'roundStart'; skipFirst?: boolean }
+	| { type: 'beforeRoundEnd'; seconds: number }
+	| { type: 'phaseChange'; phase: 'work' | 'rest'; skipFirst?: boolean }
+	| { type: 'halfwayRounds' };
+
+export type EventAction =
+	| { type: 'voice'; cue: VoiceCueType }
+	| { type: 'beep'; frequency: number; duration: number }
+	| { type: 'countdown' };
+
+export interface AudioEvent {
+	trigger: EventTrigger;
+	action: EventAction;
+}
+
+export interface AudioCheckContext {
+	prevMs: number;
+	currentMs: number;
+	totalMs: number;
+	currentRound: number;
+	totalRounds: number;
+	roundChanged: boolean;
+	isWorkPhase: boolean;
+	phaseChanged: boolean;
+	roundElapsedMs: number;
+	roundDurationMs: number;
+}
+
+export type TimerEventsConfig = AudioEvent[] | string;
