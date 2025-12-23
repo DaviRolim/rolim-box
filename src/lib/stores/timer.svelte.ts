@@ -7,6 +7,7 @@ import {
 	getTotalDuration
 } from '$lib/types/timer';
 import { createTimerEngine, type TimerEngine } from '$lib/services/timer-engine';
+import { audioService } from '$lib/services/audio';
 
 class TimerStore {
 	// Core state
@@ -86,20 +87,30 @@ class TimerStore {
 	async start() {
 		if (this.state !== 'idle' || !this.config) return;
 
-		// Run countdown sequence
+		// Run countdown sequence with audio
 		this.state = 'countdown';
 		for (const val of [3, 2, 1, 'GO'] as const) {
 			this.countdownValue = val;
-			await this.sleep(val === 'GO' ? 500 : 1000);
+			if (val === 'GO') {
+				audioService.playVoiceCue('go');
+				await this.sleep(500);
+			} else {
+				audioService.playCountdownBeep(val);
+				await this.sleep(1000);
+			}
 		}
 		this.countdownValue = null;
 
-		// Start timer
+		// Start timer and schedule audio checkpoints
 		this.state = 'running';
 		this.engine = createTimerEngine({
 			onTick: (deltaMs) => this.handleTick(deltaMs)
 		});
 		this.engine.start();
+
+		// Schedule all audio checkpoints
+		const ctx = new AudioContext();
+		audioService.scheduleForTimer(this.config, ctx.currentTime);
 	}
 
 	pause() {
