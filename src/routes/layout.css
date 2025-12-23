@@ -19,7 +19,30 @@
 	--color-accent-500: #e91e8c;
 	--color-accent-400: #ff6b9d;
 	--color-accent-300: #ff8fb3;
+	--color-accent-600: #be185d;
 
 	/* Muted - Light Purple */
 	--color-muted: #8b7ab8;
+
+	/* Section Colors */
+	--color-section-warmup: #f97316;
+	--color-section-skill: #3b82f6;
+	--color-section-wod: #e91e8c;
+	--color-section-cooldown: #06b6d4;
+	--color-section-stretches: #a855f7;
+	--color-section-custom: #6b7280;
+
+	/* Text Colors */
+	--color-text-primary: #ffffff;
+	--color-text-secondary: #a3a3a3;
+	--color-text-muted: #737373;
+	--color-text-disabled: #525252;
+
+	/* Semantic Colors */
+	--color-error: #ef4444;
+	--color-success: #22c55e;
+
+	/* Border Colors */
+	--color-border-default: #2a2a2a;
+	--color-border-hover: #3a3a3a;
 }
