@@ -148,8 +148,8 @@
 
 <style>
 	.section-card {
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
+		background: var(--color-secondary-800);
+		border: 2px solid var(--color-secondary-700);
 		position: relative;
 		overflow: hidden;
 		transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -170,19 +170,19 @@
 	}
 
 	.section-accent[data-color='orange'] {
-		background: linear-gradient(90deg, #f97316 0%, #ea580c 100%);
+		background: linear-gradient(90deg, var(--color-section-warmup) 0%, #ea580c 100%);
 	}
 
 	.section-accent[data-color='blue'] {
-		background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+		background: linear-gradient(90deg, var(--color-section-skill) 0%, #2563eb 100%);
 	}
 
 	.section-accent[data-color='pink'] {
-		background: linear-gradient(90deg, #e91e8c 0%, #be185d 100%);
+		background: linear-gradient(90deg, var(--color-section-wod) 0%, #be185d 100%);
 	}
 
 	.section-accent[data-color='cyan'] {
-		background: linear-gradient(90deg, #06b6d4 0%, #0891b2 100%);
+		background: linear-gradient(90deg, var(--color-section-cooldown) 0%, #0891b2 100%);
 	}
 
 	.section-accent[data-color='purple'] {
@@ -222,23 +222,23 @@
 	}
 
 	.section-badge[data-color='orange'] {
-		border-color: #f97316;
-		color: #f97316;
+		border-color: var(--color-section-warmup);
+		color: var(--color-section-warmup);
 	}
 
 	.section-badge[data-color='blue'] {
-		border-color: #3b82f6;
-		color: #3b82f6;
+		border-color: var(--color-section-skill);
+		color: var(--color-section-skill);
 	}
 
 	.section-badge[data-color='pink'] {
-		border-color: #e91e8c;
-		color: #e91e8c;
+		border-color: var(--color-section-wod);
+		color: var(--color-section-wod);
 	}
 
 	.section-badge[data-color='cyan'] {
-		border-color: #06b6d4;
-		color: #06b6d4;
+		border-color: var(--color-section-cooldown);
+		color: var(--color-section-cooldown);
 	}
 
 	.section-badge[data-color='purple'] {
@@ -283,7 +283,7 @@
 		align-items: center;
 		justify-content: center;
 		background: transparent;
-		border: 1px solid #2a2a2a;
+		border: 1px solid var(--color-secondary-700);
 		color: #737373;
 		cursor: pointer;
 		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -291,7 +291,7 @@
 	}
 
 	.btn-reorder:not(:disabled):hover {
-		background: #2a2a2a;
+		background: var(--color-secondary-700);
 		border-color: #3a3a3a;
 		color: #ffffff;
 		transform: translateY(-1px);
@@ -342,8 +342,8 @@
 	}
 
 	.btn-delete {
-		border-color: #ef4444;
-		color: #ef4444;
+		border-color: var(--color-error);
+		color: var(--color-error);
 		padding: 0 12px;
 	}
 
@@ -389,8 +389,8 @@
 
 	.section-footer {
 		padding: 16px 20px;
-		background: #0a0a0a;
-		border-top: 1px solid #2a2a2a;
+		background: var(--color-secondary-900);
+		border-top: 1px solid var(--color-secondary-700);
 	}
 
 	.btn-timer {
@@ -406,7 +406,7 @@
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 		padding: 0 20px;
-		border: 2px solid #2a2a2a;
+		border: 2px solid var(--color-secondary-700);
 		background: transparent;
 		color: #525252;
 		cursor: not-allowed;
@@ -418,8 +418,8 @@
 		align-items: center;
 		gap: 10px;
 		padding: 12px 20px;
-		background: linear-gradient(135deg, #e91e8c 0%, #be185d 100%);
-		border: 2px solid #e91e8c;
+		background: linear-gradient(135deg, var(--color-section-wod) 0%, #be185d 100%);
+		border: 2px solid var(--color-section-wod);
 		color: #ffffff;
 		font-family: 'Inter', system-ui, sans-serif;
 		font-size: 13px;
