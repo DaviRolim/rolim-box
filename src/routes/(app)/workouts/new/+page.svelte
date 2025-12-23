@@ -117,7 +117,7 @@
 	}
 
 	// Handle section add
-	function handleAddSection(sectionData: { type: SectionType; name: string; content: string }) {
+	function handleAddSection(sectionData: { type: SectionType; name: string; content: string; timerConfig: string | null }) {
 		const newSection: Section = {
 			id: `temp-${Date.now()}-${Math.random()}`,
 			wodId: '', // Will be set when WoD is created
@@ -125,7 +125,7 @@
 			name: sectionData.name,
 			content: sectionData.content,
 			order: sections.length,
-			timerConfig: null
+			timerConfig: sectionData.timerConfig
 		};
 
 		sections = [...sections, newSection];

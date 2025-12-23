@@ -66,7 +66,8 @@
 					type: s.type,
 					name: s.name,
 					content: s.content,
-					order: s.order
+					order: s.order,
+					timerConfig: s.timerConfig
 				}))
 			});
 
@@ -94,7 +95,8 @@
 					type: s.type,
 					name: s.name,
 					content: s.content,
-					order: s.order
+					order: s.order,
+					timerConfig: s.timerConfig
 				}))
 			});
 			hasUnsavedChanges = currentState !== initialFormState;
@@ -170,7 +172,7 @@
 	}
 
 	// Handle section add
-	function handleAddSection(sectionData: { type: SectionType; name: string; content: string }) {
+	function handleAddSection(sectionData: { type: SectionType; name: string; content: string; timerConfig: string | null }) {
 		const newSection: Section = {
 			id: `temp-${Date.now()}-${Math.random()}`,
 			wodId: data.wodId,
@@ -178,7 +180,7 @@
 			name: sectionData.name,
 			content: sectionData.content,
 			order: sections.length,
-			timerConfig: null
+			timerConfig: sectionData.timerConfig
 		};
 
 		sections = [...sections, newSection];

@@ -36,3 +36,38 @@ npm run build
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+## Database
+
+This project uses [Turso](https://turso.tech) (libSQL) with Drizzle ORM.
+
+### Environment Variables
+
+Create a `.env` file with:
+
+```sh
+DATABASE_URL=libsql://your-db-name.turso.io
+DATABASE_AUTH_TOKEN=your-auth-token
+```
+
+For local development, you can use a local SQLite file:
+
+```sh
+DATABASE_URL=file:local.db
+```
+
+### Database Commands
+
+```sh
+# Push schema changes directly (development)
+bun run db:push
+
+# Generate migrations
+bun run db:generate
+
+# Run migrations (production)
+bun run db:migrate
+
+# Open Drizzle Studio
+bun run db:studio
+```

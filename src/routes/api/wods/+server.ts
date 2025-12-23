@@ -154,7 +154,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 					name: sectionData.name,
 					content: sectionData.content,
 					order: sectionData.order,
-					timerConfig: null
+					timerConfig: sectionData.timerConfig ?? null
 				})
 				.returning();
 			createdSections.push(newSection);

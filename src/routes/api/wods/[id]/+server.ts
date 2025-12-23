@@ -153,7 +153,7 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 						name: sectionData.name,
 						content: sectionData.content,
 						order: sectionData.order,
-						timerConfig: null
+						timerConfig: sectionData.timerConfig ?? null
 					})
 					.returning();
 				updatedSections.push(newSection);

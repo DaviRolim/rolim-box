@@ -9,8 +9,9 @@ const audioConfig = audioConfigJson as AudioConfig;
 // ============================================================================
 
 let audioContext: AudioContext | null = null;
-const buffers = new Map<string, AudioBuffer>();
-let preloaded = false;
+const decodedBuffers = new Map<string, AudioBuffer>();
+const rawBuffers = new Map<string, ArrayBuffer>();
+let prefetched = false;
 
 function getAudioContext(): AudioContext {
 	if (!audioContext) {
@@ -43,40 +44,63 @@ const VOICE_FILES: VoiceCueType[] = [
 	'rest'
 ];
 
-async function loadAudioBuffer(filename: string): Promise<AudioBuffer | null> {
+async function fetchAudioFile(filename: string): Promise<ArrayBuffer | null> {
 	try {
-		const ctx = getAudioContext();
 		const response = await fetch(`/audio/voice/${filename}`);
 		if (!response.ok) {
 			console.warn(`Audio file not found: ${filename}`);
 			return null;
 		}
-		const arrayBuffer = await response.arrayBuffer();
-		return await ctx.decodeAudioData(arrayBuffer);
+		return await response.arrayBuffer();
 	} catch (e) {
-		console.warn(`Failed to load audio: ${filename}`, e);
+		console.warn(`Failed to fetch audio: ${filename}`, e);
 		return null;
 	}
 }
 
 async function preload(): Promise<void> {
-	if (preloaded) return;
+	if (prefetched) return;
 
-	// Initialize AudioContext (may be suspended until user interaction)
-	getAudioContext();
-
-	// Load all voice cue files
-	const loadPromises = VOICE_FILES.map(async (cue) => {
+	// Only fetch raw audio data - don't create AudioContext yet
+	// AudioContext must be created on user interaction to comply with browser autoplay policies
+	const fetchPromises = VOICE_FILES.map(async (cue) => {
 		const filename = `${cue}.mp3`;
-		const buffer = await loadAudioBuffer(filename);
-		if (buffer) {
-			buffers.set(cue, buffer);
+		const arrayBuffer = await fetchAudioFile(filename);
+		if (arrayBuffer) {
+			rawBuffers.set(cue, arrayBuffer);
 		}
 	});
 
-	await Promise.all(loadPromises);
-	preloaded = true;
-	console.log(`Audio preloaded: ${buffers.size}/${VOICE_FILES.length} files`);
+	await Promise.all(fetchPromises);
+	prefetched = true;
+	console.log(`Audio prefetched: ${rawBuffers.size}/${VOICE_FILES.length} files`);
+}
+
+async function getDecodedBuffer(cue: VoiceCueType): Promise<AudioBuffer | null> {
+	// Return cached decoded buffer if available
+	if (decodedBuffers.has(cue)) {
+		return decodedBuffers.get(cue)!;
+	}
+
+	// Get raw buffer
+	const rawBuffer = rawBuffers.get(cue);
+	if (!rawBuffer) {
+		console.warn(`Raw audio buffer not found: ${cue}`);
+		return null;
+	}
+
+	// Decode on demand (AudioContext exists at this point due to user interaction)
+	try {
+		const ctx = getAudioContext();
+		// Need to clone ArrayBuffer since decodeAudioData detaches it
+		const clonedBuffer = rawBuffer.slice(0);
+		const decoded = await ctx.decodeAudioData(clonedBuffer);
+		decodedBuffers.set(cue, decoded);
+		return decoded;
+	} catch (e) {
+		console.warn(`Failed to decode audio: ${cue}`, e);
+		return null;
+	}
 }
 
 // ============================================================================
@@ -104,8 +128,8 @@ function playBeepNow(frequency: number, duration: number): void {
 	oscillator.stop(endTime);
 }
 
-function playVoiceBufferNow(cue: VoiceCueType): void {
-	const buffer = buffers.get(cue);
+async function playVoiceBufferNow(cue: VoiceCueType): Promise<void> {
+	const buffer = await getDecodedBuffer(cue);
 	if (!buffer) {
 		console.warn(`Audio buffer not found: ${cue}`);
 		return;
@@ -158,7 +182,7 @@ class AudioService {
 	async playVoiceCue(cue: VoiceCueType): Promise<void> {
 		if (this.isMuted) return;
 		await ensureContextResumed();
-		playVoiceBufferNow(cue);
+		await playVoiceBufferNow(cue);
 	}
 }
 
