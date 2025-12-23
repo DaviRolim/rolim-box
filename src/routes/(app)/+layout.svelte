@@ -1,8 +1,20 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { audioService } from '$lib/services/audio';
 	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 
 	let { data, children } = $props();
+
+	onMount(() => {
+		// Defer audio preloading to avoid blocking initial render
+		if ('requestIdleCallback' in window) {
+			requestIdleCallback(() => audioService.preload());
+		} else {
+			// Fallback for Safari
+			setTimeout(() => audioService.preload(), 1000);
+		}
+	});
 </script>
 
 <div class="min-h-screen bg-secondary-900">
