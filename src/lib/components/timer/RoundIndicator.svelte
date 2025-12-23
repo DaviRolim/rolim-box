@@ -22,6 +22,7 @@
 
 	const showManualCounter = $derived(timerType === 'amrap' || timerType === 'fortime');
 	const showAutoRounds = $derived(timerType === 'emom' || timerType === 'tabata');
+	const showIncrementButton = $derived(timerType === 'amrap');
 </script>
 
 <div class="round-indicator">
@@ -30,11 +31,13 @@
 			<span class="counter-label">ROUNDS</span>
 			<div class="counter-row">
 				<span class="counter-value">{completedRounds}</span>
-				<button type="button" class="increment-btn" onclick={onIncrement} aria-label="Add round">
-					<svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-						<path d="M16 8v16M8 16h16" stroke="currentColor" stroke-width="3" stroke-linecap="square" />
-					</svg>
-				</button>
+				{#if showIncrementButton}
+					<button type="button" class="increment-btn" onclick={onIncrement} aria-label="Add round">
+						<svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+							<path d="M16 8v16M8 16h16" stroke="currentColor" stroke-width="3" stroke-linecap="square" />
+						</svg>
+					</button>
+				{/if}
 			</div>
 		</div>
 	{/if}
