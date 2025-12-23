@@ -160,6 +160,7 @@
 			<!-- Sections -->
 			<div class="sections-container">
 				{#each wod.sections as section (section.id)}
+					{@const timerConfig = parseTimerConfig(section.timerConfig)}
 					<article class="section-card" style="--section-color: {getSectionTypeColor(section.type)}">
 						<!-- Section header with type badge -->
 						<div class="section-header">
@@ -180,7 +181,6 @@
 
 						<!-- Timer button -->
 						<div class="section-footer">
-							{@const timerConfig = parseTimerConfig(section.timerConfig)}
 							{#if timerConfig}
 								<a
 									href="/timer/{section.id}?wod={wod.id}"
