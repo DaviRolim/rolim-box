@@ -2,6 +2,7 @@
 <script lang="ts">
 	import { timerStore } from '$lib/stores/timer.svelte';
 	import { TIMER_LABELS, formatTime } from '$lib/types/timer';
+	import { audioService } from '$lib/services/audio';
 	import CountdownOverlay from './CountdownOverlay.svelte';
 	import TimerProgress from './TimerProgress.svelte';
 	import RoundIndicator from './RoundIndicator.svelte';
@@ -66,11 +67,32 @@
 				<span class="timer-cap">(cap: {formatTime(timerStore.config.duration!)})</span>
 			{/if}
 		</span>
-		<button type="button" class="exit-btn" onclick={handleExit} aria-label="Exit timer">
-			<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M18 6L6 18M6 6l12 12" stroke-linecap="square" />
-			</svg>
-		</button>
+		<div class="header-actions">
+			<button
+				type="button"
+				class="mute-btn"
+				onclick={() => audioService.toggleMute()}
+				aria-label={audioService.isMuted ? 'Unmute' : 'Mute'}
+			>
+				{#if audioService.isMuted}
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M11 5L6 9H2v6h4l5 4V5z" />
+						<line x1="23" y1="9" x2="17" y2="15" />
+						<line x1="17" y1="9" x2="23" y2="15" />
+					</svg>
+				{:else}
+					<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M11 5L6 9H2v6h4l5 4V5z" />
+						<path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+					</svg>
+				{/if}
+			</button>
+			<button type="button" class="exit-btn" onclick={handleExit} aria-label="Exit timer">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M18 6L6 18M6 6l12 12" stroke-linecap="square" />
+				</svg>
+			</button>
+		</div>
 	</header>
 
 	<!-- Main display -->
@@ -145,6 +167,29 @@
 	.timer-cap {
 		color: #525252;
 		font-weight: 600;
+	}
+
+	.header-actions {
+		display: flex;
+		gap: 8px;
+	}
+
+	.mute-btn {
+		width: 48px;
+		height: 48px;
+		background: transparent;
+		border: 2px solid #2a2a2a;
+		color: #737373;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.15s ease;
+	}
+
+	.mute-btn:hover {
+		border-color: #e91e8c;
+		color: #e91e8c;
 	}
 
 	.exit-btn {
