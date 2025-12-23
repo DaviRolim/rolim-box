@@ -155,6 +155,33 @@
 		</div>
 	</section>
 
+	<!-- Timer Quick Actions -->
+	<section class="section timer-section">
+		<div class="section-header">
+			<h2 class="section-title">QUICK TIMERS</h2>
+			<div class="section-accent"></div>
+		</div>
+
+		<div class="timer-actions-grid">
+			<a href="/timer?type=amrap" class="timer-card">
+				<span class="timer-name">AMRAP</span>
+				<span class="timer-desc">As Many Rounds As Possible</span>
+			</a>
+			<a href="/timer?type=emom" class="timer-card">
+				<span class="timer-name">EMOM</span>
+				<span class="timer-desc">Every Minute On the Minute</span>
+			</a>
+			<a href="/timer?type=fortime" class="timer-card">
+				<span class="timer-name">FOR TIME</span>
+				<span class="timer-desc">Complete for time</span>
+			</a>
+			<a href="/timer?type=tabata" class="timer-card">
+				<span class="timer-name">TABATA</span>
+				<span class="timer-desc">Work/Rest intervals</span>
+			</a>
+		</div>
+	</section>
+
 	<!-- Recent Workouts Section -->
 	<section class="section recent-section">
 		<div class="section-header">
@@ -752,6 +779,60 @@
 		.action-card,
 		.recent-item {
 			border-width: 3px;
+		}
+	}
+
+	/* ============================================================================
+	   TIMER QUICK ACTIONS
+	   ============================================================================ */
+
+	/* Timer Quick Actions */
+	.timer-section {
+		margin-top: 0.5rem;
+	}
+
+	.timer-actions-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 12px;
+	}
+
+	.timer-card {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 16px;
+		background: #1a1a1a;
+		border: 2px solid #2a2a2a;
+		border-left: 4px solid #e91e8c;
+		text-decoration: none;
+		transition: all 0.2s ease;
+	}
+
+	.timer-card:hover {
+		border-color: #e91e8c;
+		transform: translateX(4px);
+		background: rgba(233, 30, 140, 0.05);
+	}
+
+	.timer-name {
+		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
+		font-size: 16px;
+		font-weight: 900;
+		letter-spacing: 0.05em;
+		color: #ffffff;
+	}
+
+	.timer-desc {
+		font-family: 'Inter', system-ui, sans-serif;
+		font-size: 11px;
+		font-weight: 500;
+		color: #737373;
+	}
+
+	@media (max-width: 400px) {
+		.timer-actions-grid {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>
