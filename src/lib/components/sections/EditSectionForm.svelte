@@ -27,6 +27,8 @@
 		selectedType = section.type;
 		name = section.name;
 		content = section.content;
+		showTimerConfig = !!section.timerConfig;
+		initialTimerConfig = parseTimerConfig(section.timerConfig);
 	});
 
 	function handleTypeSelect(type: SectionType) {
