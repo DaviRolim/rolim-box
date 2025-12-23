@@ -61,6 +61,49 @@ async function loadAudioBuffer(filename: string): Promise<AudioBuffer | null> {
 	}
 }
 
+// ============================================================================
+// Playback Functions
+// ============================================================================
+
+function playBeep(frequency: number, duration: number, atTime?: number): OscillatorNode {
+	const ctx = getAudioContext();
+	const oscillator = ctx.createOscillator();
+	const gainNode = ctx.createGain();
+
+	oscillator.type = 'sine';
+	oscillator.frequency.value = frequency;
+	oscillator.connect(gainNode);
+	gainNode.connect(ctx.destination);
+
+	const startTime = atTime ?? ctx.currentTime;
+	const endTime = startTime + duration / 1000;
+
+	// Fade out to avoid click
+	gainNode.gain.setValueAtTime(0.5, startTime);
+	gainNode.gain.exponentialRampToValueAtTime(0.01, endTime);
+
+	oscillator.start(startTime);
+	oscillator.stop(endTime);
+
+	return oscillator;
+}
+
+function playVoiceBuffer(cue: string, atTime?: number): AudioBufferSourceNode | null {
+	const buffer = buffers.get(cue);
+	if (!buffer) {
+		console.warn(`Audio buffer not found: ${cue}`);
+		return null;
+	}
+
+	const ctx = getAudioContext();
+	const source = ctx.createBufferSource();
+	source.buffer = buffer;
+	source.connect(ctx.destination);
+	source.start(atTime ?? ctx.currentTime);
+
+	return source;
+}
+
 async function preload(): Promise<void> {
 	if (preloaded) return;
 
@@ -100,24 +143,38 @@ class AudioService {
 		this.isMuted = !this.isMuted;
 	}
 
-	// Expose preload
 	preload = preload;
 
-	// Placeholder methods - implemented in Part 2
 	async playCountdownBeep(value: CountdownValue): Promise<void> {
-		// Implemented in Task 5
+		if (this.isMuted) return;
+		await ensureContextResumed();
+
+		const config = audioConfig.universal.countdown[String(value) as '3' | '2' | '1'];
+		if (config.type === 'beep') {
+			playBeep(config.frequency, config.duration);
+		}
 	}
 
 	async playVoiceCue(cue: VoiceCueType): Promise<void> {
-		// Implemented in Task 5
+		if (this.isMuted) return;
+		await ensureContextResumed();
+
+		playVoiceBuffer(cue);
+	}
+
+	cancelAll(): void {
+		scheduledNodes.forEach((node) => {
+			try {
+				node.stop();
+			} catch {
+				// Node may already be stopped
+			}
+		});
+		scheduledNodes = [];
 	}
 
 	scheduleForTimer(config: TimerConfig, startTime: number): void {
 		// Implemented in Task 6
-	}
-
-	cancelAll(): void {
-		// Implemented in Task 5
 	}
 
 	reschedule(config: TimerConfig, remainingMs: number): void {
