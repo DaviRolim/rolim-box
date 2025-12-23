@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { sectionTypes } from '$lib/config/section-types';
 	import type { Section, SectionType } from '$lib/types/wod';
-	import { TimerConfig } from '$lib/components/timer';
-	import { parseTimerConfig, serializeTimerConfig, type TimerConfig as TConfig } from '$lib/types/timer';
+	import TimerConfigComponent from '$lib/components/timer/TimerConfig.svelte';
+	import { parseTimerConfig, serializeTimerConfig, type TimerConfig } from '$lib/types/timer';
 
 	interface Props {
 		section: Section;
@@ -18,7 +18,7 @@
 	let nameError = $state('');
 	let contentError = $state('');
 	let showTimerConfig = $state(!!section.timerConfig);
-	let timerConfigComponent: TimerConfig;
+	let timerConfigComponent: { getConfig: () => TimerConfig } | undefined = $state();
 	let initialTimerConfig = $state(parseTimerConfig(section.timerConfig));
 
 	// Reset when section.id changes
@@ -187,7 +187,7 @@
 							Remove
 						</button>
 					</div>
-					<TimerConfig
+					<TimerConfigComponent
 						bind:this={timerConfigComponent}
 						initialConfig={initialTimerConfig}
 						compact={true}

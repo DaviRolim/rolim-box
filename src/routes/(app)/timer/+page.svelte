@@ -1,20 +1,17 @@
 <!-- src/routes/(app)/timer/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { timerStore } from '$lib/stores/timer.svelte';
-	import { TimerConfig } from '$lib/components/timer';
-	import { type TimerType, type TimerConfig as TConfig, TIMER_DEFAULTS } from '$lib/types/timer';
+	import TimerConfigComponent from '$lib/components/timer/TimerConfig.svelte';
+	import type { TimerConfig } from '$lib/types/timer';
+	import type { PageData } from './$types';
 
-	// Get initial type from URL params
-	const urlType = $page.url.searchParams.get('type') as TimerType | null;
-	const initialType: TimerType = urlType && ['amrap', 'emom', 'fortime', 'tabata'].includes(urlType)
-		? urlType
-		: 'amrap';
+	let { data }: { data: PageData } = $props();
 
-	let configComponent: TimerConfig;
+	let configComponent: { getConfig: () => TimerConfig } | undefined = $state();
 
 	function handleStart() {
+		if (!configComponent) return;
 		const config = configComponent.getConfig();
 		timerStore.initialize(config);
 		goto('/timer/standalone');
@@ -42,7 +39,7 @@
 	</header>
 
 	<main class="page-content">
-		<TimerConfig bind:this={configComponent} initialType={initialType} />
+		<TimerConfigComponent bind:this={configComponent} initialType={data.timerType} />
 
 		<button type="button" class="btn-start" onclick={handleStart}>
 			<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">

@@ -29,6 +29,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
 	// Skip non-GET requests
 	if (event.request.method !== 'GET') return;
+	// Skip non-HTTP(S) schemes (e.g. chrome-extension://), which Cache API can't store
+	const url = new URL(event.request.url);
+	if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
 	// Network-first for API and dynamic routes
 	if (event.request.url.includes('/api/') ||

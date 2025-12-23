@@ -1,7 +1,7 @@
 <!-- src/routes/(app)/timer/[id]/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { timerStore } from '$lib/stores/timer.svelte';
 	import { TimerDisplay } from '$lib/components/timer';
 	import { getWoD } from '$lib/services/wod';
@@ -20,6 +20,12 @@
 				error = 'No timer configuration. Please configure a timer first.';
 			}
 			loading = false;
+			// Wait for DOM to update before starting timer
+			await tick();
+			// Auto-start the timer for standalone mode
+			if (timerStore.config && timerStore.state === 'idle') {
+				timerStore.start();
+			}
 			return;
 		}
 

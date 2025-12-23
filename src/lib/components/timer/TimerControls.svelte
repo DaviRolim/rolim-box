@@ -14,7 +14,7 @@
 
 	let { state, timerType, onStart, onPause, onResume, onReset, onStop }: Props = $props();
 
-	const stopLabel = timerType === 'fortime' ? 'FINISH' : 'STOP';
+	const stopLabel = $derived(timerType === 'fortime' ? 'FINISH' : 'STOP');
 </script>
 
 <div class="timer-controls">

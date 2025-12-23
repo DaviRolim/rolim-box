@@ -17,11 +17,18 @@
 
 	let { initialConfig = null, initialType = 'amrap', compact = false, onConfigChange }: Props = $props();
 
-	let selectedType = $state<TimerType>(initialConfig?.type || initialType);
-	let duration = $state(initialConfig?.duration ? initialConfig.duration / 60 : 20);
-	let rounds = $state(initialConfig?.rounds || 10);
-	let intervalWork = $state(initialConfig?.intervalWork || 60);
-	let intervalRest = $state(initialConfig?.intervalRest || 10);
+	// Extract initial values once to avoid Svelte warnings about capturing prop values
+	const initType = initialConfig?.type || initialType;
+	const initDuration = initialConfig?.duration ? initialConfig.duration / 60 : 20;
+	const initRounds = initialConfig?.rounds || 10;
+	const initIntervalWork = initialConfig?.intervalWork || 60;
+	const initIntervalRest = initialConfig?.intervalRest || 10;
+
+	let selectedType = $state<TimerType>(initType);
+	let duration = $state(initDuration);
+	let rounds = $state(initRounds);
+	let intervalWork = $state(initIntervalWork);
+	let intervalRest = $state(initIntervalRest);
 
 	// Reset to defaults when type changes
 	function handleTypeChange(type: TimerType) {

@@ -20,8 +20,8 @@
 		onIncrement
 	}: Props = $props();
 
-	const showManualCounter = timerType === 'amrap' || timerType === 'fortime';
-	const showAutoRounds = timerType === 'emom' || timerType === 'tabata';
+	const showManualCounter = $derived(timerType === 'amrap' || timerType === 'fortime');
+	const showAutoRounds = $derived(timerType === 'emom' || timerType === 'tabata');
 </script>
 
 <div class="round-indicator">
