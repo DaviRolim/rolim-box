@@ -216,6 +216,7 @@
 						type: updates.type,
 						name: updates.name,
 						content: updates.content
+						// timerConfig is preserved via spread operator
 					}
 				: section
 		);
@@ -261,7 +262,8 @@
 				type: section.type,
 				name: section.name,
 				content: section.content,
-				order: index
+				order: index,
+				timerConfig: section.timerConfig
 			}));
 
 			// Update WoD

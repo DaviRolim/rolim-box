@@ -217,7 +217,8 @@ export async function createWoD(data: CreateWoDInput): Promise<WoD> {
 				type: s.type,
 				name: s.name,
 				content: s.content,
-				order: s.order
+				order: s.order,
+				timerConfig: s.timerConfig
 			}))
 		},
 		status: 'pending'
@@ -254,7 +255,7 @@ export async function updateWoD(id: string, data: UpdateWoDInput): Promise<WoD> 
 			name: section.name,
 			content: section.content,
 			order: section.order ?? index,
-			timerConfig: null
+			timerConfig: (section as any).timerConfig ?? null
 		}));
 	}
 
@@ -288,7 +289,8 @@ export async function updateWoD(id: string, data: UpdateWoDInput): Promise<WoD> 
 				type: s.type,
 				name: s.name,
 				content: s.content,
-				order: s.order
+				order: s.order,
+				timerConfig: s.timerConfig
 			}))
 		},
 		status: 'pending'
@@ -383,7 +385,8 @@ export async function duplicateWoD(id: string, newDate?: string): Promise<WoD> {
 				type: s.type,
 				name: s.name,
 				content: s.content,
-				order: s.order
+				order: s.order,
+				timerConfig: s.timerConfig
 			}))
 		},
 		status: 'pending'
