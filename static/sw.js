@@ -1,9 +1,19 @@
-const CACHE_NAME = 'rolimbox-v1';
+const CACHE_NAME = 'rolimbox-v2';
 const STATIC_ASSETS = [
 	'/',
 	'/manifest.json',
 	'/icons/icon-192.png',
-	'/icons/icon-512.png'
+	'/icons/icon-512.png',
+	// Audio files
+	'/audio/voice/go.mp3',
+	'/audio/voice/halfway.mp3',
+	'/audio/voice/one-minute.mp3',
+	'/audio/voice/thirty-seconds.mp3',
+	'/audio/voice/ten-seconds.mp3',
+	'/audio/voice/time.mp3',
+	'/audio/voice/next-round.mp3',
+	'/audio/voice/work.mp3',
+	'/audio/voice/rest.mp3'
 ];
 
 self.addEventListener('install', (event) => {
