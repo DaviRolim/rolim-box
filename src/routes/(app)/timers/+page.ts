@@ -1,4 +1,4 @@
-// src/routes/(app)/timer/+page.ts
+// src/routes/(app)/timers/+page.ts
 import type { PageLoad } from './$types';
 import type { TimerType } from '$lib/types/timer';
 

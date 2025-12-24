@@ -36,454 +36,181 @@
 	const timerConfig = $derived(parseTimerConfig(section.timerConfig));
 </script>
 
-<div class="section-card" data-color={sectionConfig.color}>
+<div
+	class="glass group relative overflow-hidden rounded-2xl border border-white/5 transition-all duration-300 hover:border-white/10 hover:shadow-2xl hover:shadow-black"
+>
 	<!-- Kinetic accent line -->
-	<div class="section-accent" data-color={sectionConfig.color}></div>
+	<div
+		class="absolute inset-x-0 top-0 h-1 opacity-80 transition-opacity group-hover:opacity-100"
+		style="background: {sectionConfig.color === 'orange'
+			? 'var(--color-accent-500)'
+			: sectionConfig.color === 'blue'
+				? 'var(--color-secondary-accent)'
+				: sectionConfig.color === 'pink'
+					? 'var(--color-accent-600)'
+					: sectionConfig.color === 'cyan'
+						? '#06b6d4'
+						: sectionConfig.color === 'purple'
+							? '#a855f7'
+							: '#64748b'}"
+	></div>
 
-	<div class="section-header">
-		<div class="section-badge" data-color={sectionConfig.color}>
-			<span class="section-icon" role="img" aria-label={sectionConfig.label}>
-				{sectionConfig.icon}
-			</span>
-			<span class="section-type">{sectionConfig.label}</span>
-		</div>
+	<div class="flex flex-col gap-4 p-5">
+		<div class="flex items-center justify-between gap-4">
+			<div class="flex items-center gap-3">
+				<div
+					class="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xl"
+				>
+					{sectionConfig.icon}
+				</div>
+				<div>
+					<span class="text-[10px] font-bold tracking-widest text-text-muted uppercase"
+						>{sectionConfig.label}</span
+					>
+					<h3 class="text-lg leading-none font-black tracking-tight text-white uppercase">
+						{section.name}
+					</h3>
+				</div>
+			</div>
 
-		{#if editable}
-			<div class="section-controls">
-				<div class="reorder-buttons">
+			{#if editable}
+				<div class="flex items-center gap-1">
+					<div class="mr-2 flex flex-col gap-0.5">
+						<button
+							type="button"
+							class="p-1 text-text-muted transition-colors hover:text-white disabled:opacity-20"
+							onclick={onMoveUp}
+							disabled={!canMoveUp}
+							title="Move up"
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="3"
+							>
+								<path d="M18 15l-6-6-6 6" stroke-linecap="round" stroke-linejoin="round" />
+							</svg>
+						</button>
+						<button
+							type="button"
+							class="p-1 text-text-muted transition-colors hover:text-white disabled:opacity-20"
+							onclick={onMoveDown}
+							disabled={!canMoveDown}
+							title="Move down"
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="3"
+							>
+								<path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+							</svg>
+						</button>
+					</div>
+
 					<button
 						type="button"
-						class="btn-reorder"
-						onclick={onMoveUp}
-						disabled={!canMoveUp}
-						aria-label="Move section up"
-						title="Move up"
+						class="flex items-center gap-1.5 rounded-lg border border-white/5 bg-primary-800/50 px-3 py-1.5 text-[10px] font-bold tracking-wider text-white uppercase transition-colors hover:bg-primary-700"
+						onclick={onEdit}
 					>
-						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-							<path d="M8 12V4M8 4L4 8M8 4L12 8" stroke-width="2" stroke-linecap="square" />
+						<svg
+							width="12"
+							height="12"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+						>
+							<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+							<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
 						</svg>
+						EDIT
 					</button>
+
 					<button
 						type="button"
-						class="btn-reorder"
-						onclick={onMoveDown}
-						disabled={!canMoveDown}
-						aria-label="Move section down"
-						title="Move down"
+						class="rounded-lg p-2 text-text-muted transition-colors hover:bg-error/5 hover:text-error"
+						onclick={onDelete}
+						title="Delete"
 					>
-						<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-							<path d="M8 4V12M8 12L4 8M8 12L12 8" stroke-width="2" stroke-linecap="square" />
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2.5"
+						>
+							<path
+								d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+							/>
 						</svg>
 					</button>
 				</div>
+			{/if}
+		</div>
 
-				<button
-					type="button"
-					class="btn-edit"
-					onclick={onEdit}
-					aria-label="Edit section"
-					title="Edit"
+		<div class="relative">
+			<pre
+				class="rounded-xl border border-white/5 bg-black/20 p-4 font-sans text-sm leading-relaxed whitespace-pre-wrap text-text-secondary">{truncatedContent}</pre>
+			{#if section.content.length > 100 && !expanded}
+				<div
+					class="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg-card/50 to-transparent"
+				></div>
+			{/if}
+		</div>
+
+		<div class="flex items-center justify-between pt-2">
+			{#if timerConfig}
+				<a
+					href="/timers/{section.id}?wod={section.wodId}"
+					class="flex items-center gap-2 rounded-full border border-accent-500/20 bg-accent-500/10 px-4 py-2 text-xs font-bold text-accent-400 shadow-lg shadow-accent-500/10 transition-all hover:bg-accent-500/20 active:scale-95"
 				>
-					<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-						<path
-							d="M11.5 2L14 4.5L5 13.5H2.5V11L11.5 2Z"
-							stroke-width="1.5"
-							stroke-linecap="square"
-						/>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="3"
+					>
+						<circle cx="12" cy="12" r="10" />
+						<polyline points="12 6 12 12 16 14" />
 					</svg>
-					Edit
-				</button>
-
-				<button
-					type="button"
-					class="btn-delete"
-					onclick={onDelete}
-					aria-label="Delete section"
-					title="Delete"
+					<span class="tracking-wider uppercase">
+						{TIMER_LABELS[timerConfig.type]}
+						{#if timerConfig.type === 'amrap' || timerConfig.type === 'fortime'}
+							• {formatTime(timerConfig.duration!)}
+						{:else if timerConfig.type === 'emom'}
+							• {timerConfig.rounds}x{timerConfig.intervalWork}s
+						{:else if timerConfig.type === 'tabata'}
+							• {timerConfig.rounds}x {timerConfig.intervalWork}s/{timerConfig.intervalRest}s
+						{/if}
+					</span>
+				</a>
+			{:else}
+				<div
+					class="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold tracking-wider text-text-muted uppercase"
 				>
-					<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-						<path d="M3 4H13M5 4V3H11V4M6 7V11M10 7V11" stroke-width="1.5" stroke-linecap="square" />
-						<path d="M4 4H12V13H4V4Z" stroke-width="1.5" stroke-linecap="square" />
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"
+					>
+						<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
 					</svg>
-				</button>
-			</div>
-		{/if}
-	</div>
-
-	<div class="section-body">
-		<h3 class="section-name">{section.name}</h3>
-		<pre class="section-content">{truncatedContent}</pre>
-	</div>
-
-	<div class="section-footer">
-		{#if timerConfig}
-			<a
-				href="/timer/{section.id}?wod={section.wodId}"
-				class="btn-timer-active"
-			>
-				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-					<circle cx="8" cy="8" r="6" stroke-width="1.5" />
-					<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
-				</svg>
-				{TIMER_LABELS[timerConfig.type]}
-				{#if timerConfig.type === 'amrap' || timerConfig.type === 'fortime'}
-					- {formatTime(timerConfig.duration!)}
-				{:else if timerConfig.type === 'emom'}
-					- {timerConfig.rounds}x{timerConfig.intervalWork}s
-				{:else if timerConfig.type === 'tabata'}
-					- {timerConfig.rounds}x {timerConfig.intervalWork}s/{timerConfig.intervalRest}s
-				{/if}
-			</a>
-		{:else}
-			<button type="button" class="btn-timer" disabled title="No timer configured">
-				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-					<circle cx="8" cy="8" r="6" stroke-width="1.5" />
-					<path d="M8 5V8L10.5 10.5" stroke-width="1.5" stroke-linecap="square" />
-				</svg>
-				No Timer
-			</button>
-		{/if}
+					NO TIMER
+				</div>
+			{/if}
+		</div>
 	</div>
 </div>
-
-<style>
-	.section-card {
-		background: var(--color-secondary-800);
-		border: 2px solid var(--color-secondary-700);
-		position: relative;
-		overflow: hidden;
-		transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.section-card:hover {
-		border-color: #3a3a3a;
-	}
-
-	/* Kinetic accent - bold geometric bar */
-	.section-accent {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 4px;
-		animation: accentPulse 2s ease-in-out infinite;
-	}
-
-	.section-accent[data-color='orange'] {
-		background: linear-gradient(90deg, var(--color-section-warmup) 0%, #ea580c 100%);
-	}
-
-	.section-accent[data-color='blue'] {
-		background: linear-gradient(90deg, var(--color-section-skill) 0%, #2563eb 100%);
-	}
-
-	.section-accent[data-color='pink'] {
-		background: linear-gradient(90deg, var(--color-section-wod) 0%, #be185d 100%);
-	}
-
-	.section-accent[data-color='cyan'] {
-		background: linear-gradient(90deg, var(--color-section-cooldown) 0%, #0891b2 100%);
-	}
-
-	.section-accent[data-color='purple'] {
-		background: linear-gradient(90deg, #6e489f 0%, #5c3a87 100%);
-	}
-
-	.section-accent[data-color='gray'] {
-		background: linear-gradient(90deg, #737373 0%, #525252 100%);
-	}
-
-	@keyframes accentPulse {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.7;
-		}
-	}
-
-	.section-header {
-		padding: 20px 20px 16px 20px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 16px;
-		flex-wrap: wrap;
-	}
-
-	.section-badge {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 8px 16px;
-		border: 2px solid;
-		background: rgba(0, 0, 0, 0.3);
-	}
-
-	.section-badge[data-color='orange'] {
-		border-color: var(--color-section-warmup);
-		color: var(--color-section-warmup);
-	}
-
-	.section-badge[data-color='blue'] {
-		border-color: var(--color-section-skill);
-		color: var(--color-section-skill);
-	}
-
-	.section-badge[data-color='pink'] {
-		border-color: var(--color-section-wod);
-		color: var(--color-section-wod);
-	}
-
-	.section-badge[data-color='cyan'] {
-		border-color: var(--color-section-cooldown);
-		color: var(--color-section-cooldown);
-	}
-
-	.section-badge[data-color='purple'] {
-		border-color: #6e489f;
-		color: #6e489f;
-	}
-
-	.section-badge[data-color='gray'] {
-		border-color: #737373;
-		color: #737373;
-	}
-
-	.section-icon {
-		font-size: 18px;
-		line-height: 1;
-	}
-
-	.section-type {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 12px;
-		font-weight: 800;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.section-controls {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.reorder-buttons {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.btn-reorder {
-		width: 44px;
-		height: 22px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: transparent;
-		border: 1px solid var(--color-secondary-700);
-		color: #737373;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		padding: 0;
-	}
-
-	.btn-reorder:not(:disabled):hover {
-		background: var(--color-secondary-700);
-		border-color: #3a3a3a;
-		color: #ffffff;
-		transform: translateY(-1px);
-	}
-
-	.btn-reorder:not(:disabled):active {
-		transform: translateY(0);
-	}
-
-	.btn-reorder:disabled {
-		opacity: 0.3;
-		cursor: not-allowed;
-	}
-
-	.btn-reorder:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.btn-edit,
-	.btn-delete {
-		height: 44px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 12px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 0 16px;
-		border: 2px solid;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		background: transparent;
-	}
-
-	.btn-edit {
-		border-color: #6e489f;
-		color: #6e489f;
-	}
-
-	.btn-edit:hover {
-		background: rgba(110, 72, 159, 0.15);
-		border-color: #8b5fc9;
-		transform: translateY(-1px);
-	}
-
-	.btn-delete {
-		border-color: var(--color-error);
-		color: var(--color-error);
-		padding: 0 12px;
-	}
-
-	.btn-delete:hover {
-		background: rgba(239, 68, 68, 0.15);
-		border-color: #f87171;
-		transform: translateY(-1px);
-	}
-
-	.btn-edit:active,
-	.btn-delete:active {
-		transform: translateY(0);
-	}
-
-	.btn-edit:focus-visible,
-	.btn-delete:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.section-body {
-		padding: 0 20px 20px 20px;
-	}
-
-	.section-name {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 18px;
-		font-weight: 700;
-		color: #ffffff;
-		margin: 0 0 12px 0;
-	}
-
-	.section-content {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 400;
-		line-height: 1.7;
-		color: #a3a3a3;
-		margin: 0;
-		white-space: pre-wrap;
-		word-wrap: break-word;
-	}
-
-	.section-footer {
-		padding: 16px 20px;
-		background: var(--color-secondary-900);
-		border-top: 1px solid var(--color-secondary-700);
-	}
-
-	.btn-timer {
-		width: 100%;
-		height: 48px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 13px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 0 20px;
-		border: 2px solid var(--color-secondary-700);
-		background: transparent;
-		color: #525252;
-		cursor: not-allowed;
-		opacity: 0.5;
-	}
-
-	.btn-timer-active {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 12px 20px;
-		background: linear-gradient(135deg, var(--color-section-wod) 0%, #be185d 100%);
-		border: 2px solid var(--color-section-wod);
-		color: #ffffff;
-		font-family: 'Inter', system-ui, sans-serif;
-		font-size: 13px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		text-decoration: none;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		min-height: 48px;
-	}
-
-	.btn-timer-active:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(233, 30, 140, 0.4);
-	}
-
-	/* Mobile optimization */
-	@media (max-width: 640px) {
-		.section-header {
-			padding: 16px 16px 12px 16px;
-		}
-
-		.section-controls {
-			width: 100%;
-			justify-content: flex-end;
-		}
-
-		.btn-edit {
-			flex: 1;
-		}
-
-		.section-body {
-			padding: 0 16px 16px 16px;
-		}
-
-		.section-name {
-			font-size: 16px;
-		}
-
-		.section-content {
-			font-size: 13px;
-		}
-
-		.section-footer {
-			padding: 12px 16px;
-		}
-	}
-
-	/* Reduced motion */
-	@media (prefers-reduced-motion: reduce) {
-		.section-card,
-		.section-accent,
-		.btn-reorder,
-		.btn-edit,
-		.btn-delete {
-			animation: none;
-			transition: none;
-		}
-
-		.btn-reorder:not(:disabled):hover,
-		.btn-edit:hover,
-		.btn-delete:hover {
-			transform: none;
-		}
-	}
-</style>

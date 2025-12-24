@@ -29,4 +29,22 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
-{@render children()}
+<div
+	class="min-h-screen bg-bg-base font-sans text-text-primary antialiased selection:bg-accent-500 selection:text-white"
+>
+	<div
+		class="relative z-10 mx-auto min-h-screen w-full max-w-md border-x border-white/5 bg-bg-surface shadow-2xl shadow-black md:max-w-7xl"
+	>
+		{@render children()}
+	</div>
+
+	<!-- Background Ambient Glow -->
+	<div class="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+		<div
+			class="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-primary-900/40 mix-blend-screen blur-[128px]"
+		></div>
+		<div
+			class="bg-accent-900/20 absolute right-[-10%] bottom-[-10%] h-[500px] w-[500px] rounded-full mix-blend-screen blur-[128px]"
+		></div>
+	</div>
+</div>

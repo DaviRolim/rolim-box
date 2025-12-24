@@ -1,48 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
 @theme {
-	/* Primary - Dark Purple */
-	--color-primary-900: #2d1b4e;
-	--color-primary-800: #3d2663;
-	--color-primary-700: #4a2c6f;
-	--color-primary-600: #5c3a87;
-	--color-primary-500: #6e489f;
+	/* Font - Outfit */
+	--font-family-sans: 'Outfit', sans-serif;
 
-	/* Secondary - Black */
-	--color-secondary-900: #0a0a0a;
-	--color-secondary-800: #1a1a1a;
-	--color-secondary-700: #2a2a2a;
+	/* Primary - Deep Zinc/Slate */
+	--color-primary-900: #0f172a;
+	--color-primary-800: #1e293b;
+	--color-primary-700: #334155;
+	--color-primary-600: #475569;
+	--color-primary-500: #64748b;
 
-	/* Accent - Pink */
-	--color-accent-500: #e91e8c;
-	--color-accent-400: #ff6b9d;
-	--color-accent-300: #ff8fb3;
-	--color-accent-600: #be185d;
+	/* Backgrounds */
+	--color-bg-base: #030712; /* Very dark blue/black */
+	--color-bg-surface: #111827; /* Dark gray/blue */
+	--color-bg-card: #1f2937; /* Slightly lighter */
 
-	/* Muted - Light Purple */
-	--color-muted: #8b7ab8;
+	/* Accent - Vibrant Pink/Purple Gradient base */
+	--color-accent-500: #ec4899; /* Pink-500 */
+	--color-accent-400: #f472b6; /* Pink-400 */
+	--color-accent-600: #db2777; /* Pink-600 */
+	--color-accent-glow: rgba(236, 72, 153, 0.5);
 
-	/* Section Colors */
-	--color-section-warmup: #f97316;
-	--color-section-skill: #3b82f6;
-	--color-section-wod: #e91e8c;
-	--color-section-cooldown: #06b6d4;
-	--color-section-stretches: #a855f7;
-	--color-section-custom: #6b7280;
+	/* Secondary Accent - Cyan */
+	--color-secondary-accent: #06b6d4;
 
 	/* Text Colors */
-	--color-text-primary: #ffffff;
-	--color-text-secondary: #a3a3a3;
-	--color-text-muted: #737373;
-	--color-text-disabled: #525252;
+	--color-text-primary: #f8fafc;
+	--color-text-secondary: #94a3b8;
+	--color-text-muted: #64748b;
 
 	/* Semantic Colors */
 	--color-error: #ef4444;
-	--color-success: #22c55e;
+	--color-success: #10b981;
 
-	/* Border Colors */
-	--color-border-default: #2a2a2a;
-	--color-border-hover: #3a3a3a;
+	/* Glassmorphism */
+	--glass-bg: rgba(30, 41, 59, 0.7);
+	--glass-border: rgba(255, 255, 255, 0.1);
+	--glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+@layer utilities {
+	.glass {
+		background: var(--glass-bg);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border: 1px solid var(--glass-border);
+		box-shadow: var(--glass-shadow);
+	}
+	
+	.glass-hover {
+		transition: all 0.3s ease;
+	}
+	
+	.glass-hover:hover {
+		background: rgba(51, 65, 85, 0.8);
+		border-color: rgba(255, 255, 255, 0.2);
+		transform: translateY(-2px);
+		box-shadow: 0 10px 40px -10px rgba(236, 72, 153, 0.3);
+	}
+
+	.text-gradient {
+		background: linear-gradient(135deg, #f472b6 0%, #a855f7 100%);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
 }

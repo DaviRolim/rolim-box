@@ -17,16 +17,35 @@
 	});
 </script>
 
-<div class="min-h-screen bg-secondary-900">
+<div class="min-h-screen bg-bg-base text-text-primary">
 	<OfflineBanner />
 
-	<header class="border-b border-gray-800 bg-secondary-800 px-4 py-3">
-		<div class="mx-auto flex max-w-4xl items-center justify-between">
-			<h1 class="text-xl font-bold text-white">RolimBox</h1>
+	<header
+		class="sticky top-0 z-50 border-b border-white/5 bg-bg-surface/50 px-4 py-4 backdrop-blur-md"
+	>
+		<div class="mx-auto flex max-w-6xl items-center justify-between">
+			<a href="/dashboard" class="flex items-center gap-2">
+				<div
+					class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-600 font-black text-white shadow-lg shadow-accent-500/20"
+				>
+					R
+				</div>
+				<h1 class="text-xl font-black tracking-tighter text-white uppercase italic">RolimBox</h1>
+			</a>
 			<div class="flex items-center gap-4">
-				<span class="text-sm text-gray-400">{data.user?.email}</span>
+				<div class="hidden flex-col items-end sm:flex">
+					<span class="text-[10px] font-bold tracking-widest text-accent-400 uppercase"
+						>Workspace</span
+					>
+					<span class="text-xs font-medium text-text-secondary"
+						>{data.user?.email?.split('@')[0]}</span
+					>
+				</div>
 				<form action="/logout" method="POST">
-					<button type="submit" class="text-sm text-gray-400 transition hover:text-white">
+					<button
+						type="submit"
+						class="glass-hover rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-xs font-bold tracking-wider text-text-muted uppercase transition-all hover:border-error/30 hover:bg-error/5 hover:text-error"
+					>
 						Logout
 					</button>
 				</form>
@@ -34,7 +53,7 @@
 		</div>
 	</header>
 
-	<main class="mx-auto max-w-4xl p-4 pb-24">
+	<main class="mx-auto min-h-[calc(100vh-140px)] max-w-6xl">
 		{@render children()}
 	</main>
 

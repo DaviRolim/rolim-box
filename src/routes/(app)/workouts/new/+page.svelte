@@ -1,15 +1,19 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, beforeNavigate } from '$app/navigation';
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
-	import { beforeNavigate } from '$app/navigation';
 	import SectionList from '$lib/components/sections/SectionList.svelte';
 	import AddSectionForm from '$lib/components/sections/AddSectionForm.svelte';
 	import EditSectionForm from '$lib/components/sections/EditSectionForm.svelte';
+	import Button from '$lib/components/Button.svelte';
+	import Card from '$lib/components/Card.svelte';
+	import Toast from '$lib/components/Toast.svelte';
+	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import { createWoD } from '$lib/services/wod';
 	import type { Section, SectionType } from '$lib/types/wod';
-
+	import type { TimerConfig } from '$lib/types/timer';
+	import type { PageData } from './$types';
 	interface Props {
 		data: {
 			workspaceId: string;
@@ -119,7 +123,12 @@
 	}
 
 	// Handle section add
-	function handleAddSection(sectionData: { type: SectionType; name: string; content: string; timerConfig: string | null }) {
+	function handleAddSection(sectionData: {
+		type: SectionType;
+		name: string;
+		content: string;
+		timerConfig: string | null;
+	}) {
 		const newSection: Section = {
 			id: `temp-${Date.now()}-${Math.random()}`,
 			wodId: '', // Will be set when WoD is created
@@ -154,7 +163,12 @@
 	}
 
 	// Handle section save
-	function handleSaveSection(updates: { type: SectionType; name: string; content: string; timerConfig: string | null }) {
+	function handleSaveSection(updates: {
+		type: SectionType;
+		name: string;
+		content: string;
+		timerConfig: string | null;
+	}) {
 		if (!editingSection) return;
 
 		const editingSectionId = editingSection.id;
@@ -238,9 +252,7 @@
 	// Handle cancel
 	function handleCancel() {
 		if (hasUnsavedChanges) {
-			const confirmed = confirm(
-				'You have unsaved changes. Are you sure you want to cancel?'
-			);
+			const confirmed = confirm('You have unsaved changes. Are you sure you want to cancel?');
 			if (!confirmed) return;
 		}
 		goto('/workouts');
@@ -277,20 +289,33 @@
 			}
 
 			// Replace sections with generated ones
-			sections = data.sections.map((section: { type: SectionType; name: string; content: string; order: number; timerConfig: string | null }, index: number) => ({
-				id: `temp-${Date.now()}-${index}`,
-				wodId: '',
-				type: section.type,
-				name: section.name,
-				content: section.content,
-				order: index,
-				timerConfig: section.timerConfig
-			}));
+			sections = data.sections.map(
+				(
+					section: {
+						type: SectionType;
+						name: string;
+						content: string;
+						order: number;
+						timerConfig: string | null;
+					},
+					index: number
+				) => ({
+					id: `temp-${Date.now()}-${index}`,
+					wodId: '',
+					type: section.type,
+					name: section.name,
+					content: section.content,
+					order: index,
+					timerConfig: section.timerConfig
+				})
+			);
 
 			toastStore.success('Sections generated successfully');
 		} catch (error) {
 			console.error('Failed to generate sections:', error);
-			toastStore.error(error instanceof Error ? error.message : 'Failed to generate sections. Please try again.');
+			toastStore.error(
+				error instanceof Error ? error.message : 'Failed to generate sections. Please try again.'
+			);
 		} finally {
 			isGenerating = false;
 		}
@@ -305,108 +330,209 @@
 	}
 </script>
 
-<div class="create-page">
-	<!-- Header -->
-	<header class="page-header">
-		<button type="button" class="btn-back" onclick={handleCancel} aria-label="Cancel">
-			<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-				<path d="M12 4L6 10L12 16" stroke-width="2" stroke-linecap="square" />
-			</svg>
-			Cancel
-		</button>
+``````
+<Toast />
 
-		<h1 class="page-title">New Workout</h1>
+<ConfirmModal
+	bind:open={showReplaceConfirm}
+	title="Replace Sections?"
+	message="This will replace your existing {sections.length} section{sections.length === 1
+		? ''
+		: 's'}. Are you sure you want to continue?"
+	confirmText="Replace"
+	cancelText="Cancel"
+	variant="default"
+	onConfirm={confirmReplace}
+	onCancel={cancelReplaceConfirm}
+/>
+
+<div class="flex flex-col gap-8 p-4 pb-24 md:p-6 lg:mx-auto lg:max-w-5xl">
+	<!-- Header Section -->
+	<header class="flex items-center justify-between border-b border-white/10 pb-4">
+		<div class="flex items-center gap-4">
+			<Button variant="ghost" size="sm" onclick={handleCancel} class="p-2">
+				<svg
+					class="h-5 w-5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+				>
+					<path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+				</svg>
+			</Button>
+			<div>
+				<h1
+					class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
+				>
+					New WOD
+				</h1>
+				<div class="h-1 w-12 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+			</div>
+		</div>
+		<Button
+			variant="primary"
+			size="sm"
+			onclick={handleSave}
+			disabled={isSaving}
+			class="px-6 shadow-lg shadow-accent-500/20"
+		>
+			{#if isSaving}
+				<div
+					class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white"
+				></div>
+				SAVING...
+			{:else}
+				<svg
+					class="mr-2 h-4 w-4"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="3"
+				>
+					<path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" />
+				</svg>
+				SAVE WOD
+			{/if}
+		</Button>
 	</header>
 
-	<!-- Form -->
-	<div class="page-content">
-		<form class="workout-form" onsubmit={(e) => e.preventDefault()}>
-			<!-- Date input -->
-			<div class="form-group">
-				<label class="form-label" for="workout-date">Date</label>
-				<div class="date-input-wrapper">
-					<input
-						id="workout-date"
-						type="date"
-						class="form-input date-input"
-						class:error={dateError}
-						bind:value={date}
-						aria-invalid={!!dateError}
-						aria-describedby={dateError ? 'date-error' : undefined}
-					/>
-					<div class="date-icon" aria-hidden="true">
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-							<rect x="3" y="4" width="14" height="14" stroke-width="2" stroke-linecap="square" />
-							<line x1="3" y1="8" x2="17" y2="8" stroke-width="2" stroke-linecap="square" />
-							<line x1="7" y1="2" x2="7" y2="6" stroke-width="2" stroke-linecap="square" />
-							<line x1="13" y1="2" x2="13" y2="6" stroke-width="2" stroke-linecap="square" />
-						</svg>
+	<!-- Main Form -->
+	<div class="grid grid-cols-1 gap-8">
+		<!-- Configuration Card -->
+		<Card class="space-y-6">
+			<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+				<!-- Date input -->
+				<div class="space-y-2">
+					<label
+						class="text-[10px] font-bold tracking-widest text-accent-400 uppercase"
+						for="workout-date">Workout Date</label
+					>
+					<div class="group relative">
+						<input
+							id="workout-date"
+							type="date"
+							class="w-full rounded-xl border bg-white/5 p-4 text-white transition-all outline-none group-hover:bg-white/10 focus:border-accent-500/50 focus:bg-white/10 {dateError
+								? 'border-error/50'
+								: 'border-white/5'}"
+							bind:value={date}
+						/>
+						{#if dateError}
+							<p class="mt-1 text-[10px] font-bold tracking-wider text-error uppercase">
+								{dateError}
+							</p>
+						{/if}
 					</div>
 				</div>
-				{#if dateError}
-					<p id="date-error" class="form-error" role="alert">{dateError}</p>
-				{/if}
+
+				<!-- Workspace Info (Read-only aesthetic) -->
+				<div class="space-y-2 opacity-60">
+					<span class="text-[10px] font-bold tracking-widest text-text-muted uppercase"
+						>Target Workspace</span
+					>
+					<div class="flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 p-4">
+						<div
+							class="flex h-6 w-6 items-center justify-center rounded-full bg-accent-500/20 text-accent-400"
+						>
+							<svg
+								class="h-3 w-3"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="3"
+							>
+								<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+							</svg>
+						</div>
+						<span class="text-xs font-bold tracking-tight text-white uppercase"
+							>{data.workspaceId.slice(0, 8)}...</span
+						>
+					</div>
+				</div>
 			</div>
 
 			<!-- Description textarea -->
-			<div class="form-group">
-				<label class="form-label" for="workout-description">
-					Description (optional)
-					<span class="form-hint">{description.length}/500</span>
-				</label>
-				<div class="textarea-wrapper">
+			<div class="space-y-2">
+				<div class="flex items-center justify-between">
+					<label
+						class="text-[10px] font-bold tracking-widest text-accent-400 uppercase"
+						for="workout-description">Quick Description</label
+					>
+					<span class="text-[10px] font-medium text-text-muted">{description.length}/500</span>
+				</div>
+				<div class="group relative">
 					<textarea
 						id="workout-description"
-						class="form-textarea"
-						class:error={descriptionError}
+						class="min-h-[100px] w-full rounded-xl border bg-white/5 p-4 text-white transition-all outline-none group-hover:bg-white/10 focus:border-accent-500/50 focus:bg-white/10 {descriptionError
+							? 'border-error/50'
+							: 'border-white/5'}"
 						bind:value={description}
-						placeholder="Add a brief description of the workout..."
+						placeholder="E.g. Full body metabolic conditioning focus..."
 						maxlength="500"
 						rows="3"
-						aria-invalid={!!descriptionError}
-						aria-describedby={descriptionError ? 'description-error' : undefined}
 					></textarea>
+
 					{#if description.length >= 5}
 						<button
 							type="button"
-							class="btn-generate"
+							class="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-xl bg-accent-600 text-white shadow-lg transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
 							onclick={generateSections}
 							disabled={isGenerating || isSaving}
-							aria-label="Generate sections with AI"
-							title="Generate sections with AI"
+							title="AI Intelligence"
 						>
 							{#if isGenerating}
+								<div
+									class="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white"
+								></div>
+							{:else}
 								<svg
-									class="spinner"
-									width="20"
-									height="20"
-									viewBox="0 0 20 20"
+									class="h-5 w-5"
+									viewBox="0 0 24 24"
 									fill="none"
 									stroke="currentColor"
+									stroke-width="2.5"
 								>
-									<circle cx="10" cy="10" r="8" stroke-width="3" stroke-dasharray="50" />
+									<path
+										d="M12 2v4m0 14v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m14 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"
+										stroke-linecap="round"
+									/>
 								</svg>
-							{:else}
-								<img src="/icons/sparkles.png" alt="" width="20" height="20" class="sparkles-icon" />
 							{/if}
 						</button>
 					{/if}
 				</div>
 				{#if descriptionError}
-					<p id="description-error" class="form-error" role="alert">{descriptionError}</p>
+					<p class="mt-1 text-[10px] font-bold tracking-wider text-error uppercase">
+						{descriptionError}
+					</p>
 				{/if}
+				<p class="text-[10px] text-text-muted italic">
+					Type a description and use the sparkles to generate a full workout structure using AI.
+				</p>
+			</div>
+		</Card>
+
+		<!-- Sections List -->
+		<div class="space-y-6">
+			<div class="flex items-center justify-between gap-4">
+				<div>
+					<h2 class="text-xl font-black tracking-tight text-white uppercase">Workout Structure</h2>
+					<p class="text-[10px] font-bold tracking-widest text-accent-400 uppercase">
+						{sections.length}
+						{sections.length === 1 ? 'Section' : 'Sections'} planned
+					</p>
+				</div>
 			</div>
 
-			<!-- Sections -->
-			<div class="form-group">
-				<label class="form-label">Sections</label>
-
+			<div class="space-y-4">
 				{#if editingSection}
-					<EditSectionForm
-						section={editingSection}
-						onSave={handleSaveSection}
-						onCancel={handleCancelEdit}
-					/>
+					<div class="animate-in fade-in slide-in-from-top-4 duration-300">
+						<EditSectionForm
+							section={editingSection}
+							onSave={handleSaveSection}
+							onCancel={handleCancelEdit}
+						/>
+					</div>
 				{:else}
 					<SectionList
 						{sections}
@@ -417,486 +543,57 @@
 					/>
 
 					{#if showAddForm}
-						<div class="add-section-wrapper">
+						<div class="animate-in fade-in slide-in-from-top-4 duration-300">
 							<AddSectionForm onAdd={handleAddSection} onCancel={handleCancelAdd} />
 						</div>
 					{:else}
-						<button type="button" class="btn-add-section" onclick={() => (showAddForm = true)}>
-							<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-								<path d="M10 4V16M4 10H16" stroke-width="2" stroke-linecap="square" />
-							</svg>
-							Add Section
+						<button
+							type="button"
+							class="group relative w-full overflow-hidden rounded-2xl border border-dashed border-white/10 bg-white/5 p-8 transition-all hover:border-accent-500/50 hover:bg-white/10"
+							onclick={() => (showAddForm = true)}
+						>
+							<div class="flex flex-col items-center justify-center gap-3">
+								<div
+									class="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-text-muted transition-all group-hover:bg-accent-500/20 group-hover:text-accent-400"
+								>
+									<svg
+										class="h-6 w-6"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="3"
+									>
+										<path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
+									</svg>
+								</div>
+								<span
+									class="text-xs font-black tracking-widest text-text-muted uppercase transition-colors group-hover:text-white"
+									>Add Section</span
+								>
+							</div>
 						</button>
 					{/if}
 				{/if}
 			</div>
+		</div>
 
-			<!-- Replace sections confirmation dialog -->
-			{#if showReplaceConfirm}
-				<div class="confirm-dialog-backdrop" onclick={cancelReplaceConfirm}>
-					<div class="confirm-dialog" onclick={(e) => e.stopPropagation()}>
-						<p class="confirm-message">
-							This will replace your existing {sections.length} section{sections.length === 1 ? '' : 's'}. Continue?
-						</p>
-						<div class="confirm-actions">
-							<button type="button" class="btn-cancel" onclick={cancelReplaceConfirm}>
-								Cancel
-							</button>
-							<button type="button" class="btn-confirm" onclick={confirmReplace}>
-								Generate
-							</button>
-						</div>
-					</div>
-				</div>
-			{/if}
-
-			<!-- Save button -->
-			<div class="form-actions">
-				<button
-					type="button"
-					class="btn-save"
-					onclick={handleSave}
-					disabled={isSaving}
-					aria-busy={isSaving}
-				>
-					{#if isSaving}
-						<svg
-							class="spinner"
-							width="20"
-							height="20"
-							viewBox="0 0 20 20"
-							fill="none"
-							stroke="currentColor"
-						>
-							<circle cx="10" cy="10" r="8" stroke-width="3" stroke-dasharray="50" />
-						</svg>
-						Saving...
-					{:else}
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-							<path d="M4 10L8 14L16 6" stroke-width="2" stroke-linecap="square" />
-						</svg>
-						Save Workout
-					{/if}
-				</button>
-			</div>
-		</form>
+		<!-- Bottom Actions -->
+		<div class="mt-8 flex flex-col gap-4 md:flex-row md:justify-center">
+			<Button
+				variant="primary"
+				class="w-full py-4 shadow-xl shadow-accent-500/20 md:w-auto md:px-12"
+				onclick={handleSave}
+				disabled={isSaving}
+			>
+				{#if isSaving}
+					<div
+						class="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white"
+					></div>
+					SAVING WORKOUT...
+				{:else}
+					COMPLETE & SAVE WOD
+				{/if}
+			</Button>
+		</div>
 	</div>
 </div>
-
-<style>
-	.create-page {
-		min-height: 100vh;
-		background: #0a0a0a;
-		padding-bottom: 40px;
-	}
-
-	/* Header */
-	.page-header {
-		position: sticky;
-		top: 0;
-		z-index: 100;
-		display: flex;
-		align-items: center;
-		gap: 16px;
-		padding: 20px 24px;
-		background: #0a0a0a;
-		border-bottom: 2px solid #2a2a2a;
-	}
-
-	.btn-back {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 12px 16px;
-		background: transparent;
-		border: 2px solid #2a2a2a;
-		color: #a3a3a3;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.btn-back:hover {
-		background: #2a2a2a;
-		border-color: #3a3a3a;
-		color: #ffffff;
-		transform: translateY(-1px);
-	}
-
-	.btn-back:active {
-		transform: translateY(0);
-	}
-
-	.btn-back:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.page-title {
-		flex: 1;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 24px;
-		font-weight: 800;
-		text-transform: uppercase;
-		letter-spacing: -0.01em;
-		color: #ffffff;
-		margin: 0;
-	}
-
-	/* Content */
-	.page-content {
-		max-width: 800px;
-		margin: 0 auto;
-		padding: 32px 24px;
-	}
-
-	.workout-form {
-		display: flex;
-		flex-direction: column;
-		gap: 32px;
-	}
-
-	.form-group {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-	}
-
-	.form-label {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 13px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #ffffff;
-	}
-
-	.form-hint {
-		font-size: 11px;
-		font-weight: 600;
-		color: #525252;
-	}
-
-	.date-input-wrapper {
-		position: relative;
-	}
-
-	.form-input,
-	.form-textarea {
-		width: 100%;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 16px;
-		font-weight: 400;
-		padding: 16px 18px;
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		color: #ffffff;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.date-input {
-		padding-right: 50px;
-	}
-
-	.date-icon {
-		position: absolute;
-		right: 16px;
-		top: 50%;
-		transform: translateY(-50%);
-		color: #525252;
-		pointer-events: none;
-	}
-
-	.form-input:focus,
-	.form-textarea:focus {
-		outline: none;
-		border-color: #6e489f;
-		box-shadow: 0 0 0 3px rgba(110, 72, 159, 0.15);
-	}
-
-	.form-input.error,
-	.form-textarea.error {
-		border-color: #ef4444;
-	}
-
-	.form-input::placeholder,
-	.form-textarea::placeholder {
-		color: #525252;
-	}
-
-	.form-textarea {
-		resize: vertical;
-		line-height: 1.6;
-	}
-
-	/* Textarea wrapper for sparkles button positioning */
-	.textarea-wrapper {
-		position: relative;
-	}
-
-	.btn-generate {
-		position: absolute;
-		bottom: 12px;
-		right: 12px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 36px;
-		height: 36px;
-		background: rgba(110, 72, 159, 0.2);
-		border: 2px solid #6e489f;
-		border-radius: 8px;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.btn-generate:hover:not(:disabled) {
-		background: rgba(110, 72, 159, 0.4);
-		transform: scale(1.05);
-	}
-
-	.btn-generate:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.btn-generate:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.sparkles-icon {
-		filter: invert(1);
-	}
-
-	/* Confirmation dialog */
-	.confirm-dialog-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.7);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 200;
-	}
-
-	.confirm-dialog {
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		padding: 24px;
-		max-width: 400px;
-		width: 90%;
-	}
-
-	.confirm-message {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 16px;
-		color: #ffffff;
-		margin: 0 0 24px 0;
-		line-height: 1.5;
-	}
-
-	.confirm-actions {
-		display: flex;
-		gap: 12px;
-		justify-content: flex-end;
-	}
-
-	.btn-cancel,
-	.btn-confirm {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 12px 20px;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.btn-cancel {
-		background: transparent;
-		border: 2px solid #2a2a2a;
-		color: #a3a3a3;
-	}
-
-	.btn-cancel:hover {
-		background: #2a2a2a;
-		color: #ffffff;
-	}
-
-	.btn-confirm {
-		background: linear-gradient(135deg, #6e489f 0%, #5c3a87 100%);
-		border: 2px solid #6e489f;
-		color: #ffffff;
-	}
-
-	.btn-confirm:hover {
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(110, 72, 159, 0.3);
-	}
-
-	.form-error {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 12px;
-		font-weight: 600;
-		color: #ef4444;
-		margin: 0;
-	}
-
-	.add-section-wrapper {
-		margin-top: 16px;
-	}
-
-	.btn-add-section {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 18px 24px;
-		background: transparent;
-		border: 2px dashed #2a2a2a;
-		color: #a3a3a3;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		margin-top: 16px;
-	}
-
-	.btn-add-section:hover {
-		background: rgba(110, 72, 159, 0.1);
-		border-color: #6e489f;
-		border-style: solid;
-		color: #6e489f;
-		transform: translateY(-2px);
-	}
-
-	.btn-add-section:active {
-		transform: translateY(0);
-	}
-
-	.btn-add-section:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.form-actions {
-		display: flex;
-		justify-content: center;
-		margin-top: 16px;
-	}
-
-	.btn-save {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 12px;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 16px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 20px 48px;
-		background: linear-gradient(135deg, #6e489f 0%, #5c3a87 100%);
-		border: 2px solid #6e489f;
-		color: #ffffff;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		min-width: 240px;
-		box-shadow: 0 4px 16px rgba(110, 72, 159, 0.3);
-		position: relative;
-	}
-
-	.btn-save:hover:not(:disabled) {
-		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(110, 72, 159, 0.4);
-	}
-
-	.btn-save:active:not(:disabled) {
-		transform: translateY(0);
-	}
-
-	.btn-save:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.btn-save:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.spinner {
-		animation: spin 1s linear infinite;
-	}
-
-	.btn-generate .spinner {
-		color: #6e489f;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	/* Mobile optimization */
-	@media (max-width: 640px) {
-		.page-header {
-			padding: 16px 20px;
-		}
-
-		.page-title {
-			font-size: 20px;
-		}
-
-		.btn-back {
-			font-size: 13px;
-			padding: 10px 14px;
-		}
-
-		.page-content {
-			padding: 24px 20px;
-		}
-
-		.workout-form {
-			gap: 24px;
-		}
-
-		.btn-save {
-			width: 100%;
-			min-width: 0;
-			padding: 18px 32px;
-			font-size: 14px;
-		}
-	}
-
-	/* Reduced motion */
-	@media (prefers-reduced-motion: reduce) {
-		.btn-back,
-		.btn-add-section,
-		.btn-save,
-		.spinner {
-			animation: none;
-			transition: none;
-		}
-
-		.btn-back:hover,
-		.btn-add-section:hover,
-		.btn-save:hover {
-			transform: none;
-		}
-	}
-</style>

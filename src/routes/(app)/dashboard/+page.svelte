@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { listWoDs } from '$lib/services/wod';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import Card from '$lib/components/Card.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import type { WoD } from '$lib/types/wod';
 
 	let { data } = $props();
@@ -61,778 +63,255 @@
 	<title>Dashboard - RolimBox</title>
 </svelte:head>
 
-<div class="dashboard-container">
+<div class="flex flex-col gap-8 p-4 pb-24 md:p-6">
 	<!-- Dashboard Header -->
-	<div class="dashboard-header">
-		<h1 class="dashboard-title">
-			<span class="title-main">DASHBOARD</span>
-			<span class="title-accent"></span>
-		</h1>
-		<div class="header-date">
-			<span class="date-day">{formatDayOfWeek(today)}</span>
-			<span class="date-full">{formatDate(today)}</span>
+	<header class="flex items-end justify-between border-b border-white/10 pb-4">
+		<div>
+			<h1
+				class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
+			>
+				Dashboard
+			</h1>
+			<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
 		</div>
-	</div>
+		<div
+			class="glass flex flex-col items-end rounded-lg border border-white/5 bg-white/5 px-4 py-2"
+		>
+			<span class="text-xs font-bold tracking-widest text-accent-400 uppercase"
+				>{formatDayOfWeek(today)}</span
+			>
+			<span class="text-sm font-medium text-text-primary">{formatDate(today)}</span>
+		</div>
+	</header>
 
 	<!-- Today's Workout Section -->
-	<section class="section today-section">
-		<div class="section-header">
-			<h2 class="section-title">TODAY'S WORKOUT</h2>
-			<div class="section-accent"></div>
+	<section class="flex flex-col gap-4">
+		<div class="flex items-center gap-3">
+			<h2 class="text-lg font-bold tracking-wide text-text-primary uppercase">Today's Workout</h2>
+			<div class="h-[2px] flex-1 bg-white/5"></div>
 		</div>
 
 		{#if loading}
-			<div class="today-card loading-card">
+			<Card class="space-y-4">
 				<Skeleton variant="text" height="1.5rem" width="60%" />
 				<Skeleton variant="text" height="1rem" width="100%" />
 				<Skeleton variant="text" height="1rem" width="80%" />
-				<div class="card-actions">
+				<div class="flex gap-3 pt-2">
 					<Skeleton variant="button" width="100px" height="44px" />
 					<Skeleton variant="button" width="100px" height="44px" />
 				</div>
-			</div>
+			</Card>
 		{:else if todaysWoD}
-			<div class="today-card">
-				<div class="card-content">
-					<div class="card-date">{formatDate(todaysWoD.date)}</div>
-					<p class="card-description">{getPreviewText(todaysWoD)}</p>
-					{#if todaysWoD.sections.length > 0}
-						<div class="section-count">{todaysWoD.sections.length} sections</div>
-					{/if}
+			<Card class="relative overflow-hidden border-l-4 border-l-accent-500">
+				<!-- Background Glow -->
+				<div
+					class="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full bg-accent-500/10 blur-3xl"
+				></div>
+
+				<div class="relative z-10 flex flex-col gap-4">
+					<div class="flex items-center justify-between">
+						<div
+							class="rounded-md bg-accent-500/10 px-2 py-1 text-xs font-bold tracking-wider text-accent-400 uppercase"
+						>
+							{formatDate(todaysWoD.date)}
+						</div>
+						{#if todaysWoD.sections.length > 0}
+							<span class="text-xs text-text-muted">{todaysWoD.sections.length} sections</span>
+						{/if}
+					</div>
+
+					<p class="text-base leading-relaxed text-text-secondary">{getPreviewText(todaysWoD)}</p>
+
+					<div class="flex gap-3 pt-2">
+						<a href="/workouts/{todaysWoD.id}" class="w-full sm:w-auto">
+							<Button variant="primary" class="w-full sm:w-auto">VIEW WOD</Button>
+						</a>
+						<a href="/workouts/{todaysWoD.id}/edit" class="w-full sm:w-auto">
+							<Button variant="secondary" class="w-full sm:w-auto">EDIT</Button>
+						</a>
+					</div>
 				</div>
-				<div class="card-actions">
-					<a href="/workouts/{todaysWoD.id}" class="btn btn-primary">
-						<span class="btn-text">VIEW</span>
-					</a>
-					<a href="/workouts/{todaysWoD.id}/edit" class="btn btn-secondary">
-						<span class="btn-text">EDIT</span>
-					</a>
-				</div>
-			</div>
+			</Card>
 		{:else}
-			<div class="today-card empty-card">
-				<div class="empty-icon">
-					<div class="icon-bar"></div>
-					<div class="icon-bar"></div>
-					<div class="icon-bar"></div>
+			<Card
+				class="flex flex-col items-center justify-center gap-4 border-dashed border-white/10 bg-transparent py-8 text-center"
+			>
+				<div
+					class="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-text-muted"
+				>
+					<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+						<path
+							d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
 				</div>
-				<p class="empty-text">No workout scheduled for today</p>
-				<a href="/workouts/new" class="btn btn-primary">
-					<span class="btn-text">CREATE TODAY'S WoD</span>
+				<div class="space-y-1">
+					<p class="font-medium text-text-primary">No workout scheduled</p>
+					<p class="text-sm text-text-muted">Take a rest day or create a new one.</p>
+				</div>
+				<a href="/workouts/new">
+					<Button variant="outline" size="sm">Create Today's WOD</Button>
 				</a>
-			</div>
+			</Card>
 		{/if}
 	</section>
 
-	<!-- Quick Actions Section -->
-	<section class="section quick-actions-section">
-		<div class="section-header">
-			<h2 class="section-title">QUICK ACTIONS</h2>
-			<div class="section-accent"></div>
+	<!-- Quick Actions -->
+	<div class="grid grid-cols-2 gap-4">
+		<a
+			href="/workouts/new"
+			class="group to-accent-800 relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent-600 p-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-accent-600/20"
+		>
+			<div
+				class="relative flex h-full flex-col items-center justify-center gap-3 rounded-xl bg-bg-card/40 p-6 text-center backdrop-blur-sm transition-colors group-hover:bg-transparent"
+			>
+				<div
+					class="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-transform group-hover:scale-110"
+				>
+					<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+						<path
+							d="M12 5v14M5 12h14"
+							stroke-width="3"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</div>
+				<span class="font-bold tracking-wider text-white uppercase">New WOD</span>
+			</div>
+		</a>
+
+		<a
+			href="/workouts"
+			class="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-600 to-primary-800 p-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary-600/20"
+		>
+			<div
+				class="relative flex h-full flex-col items-center justify-center gap-3 rounded-xl bg-bg-card/40 p-6 text-center backdrop-blur-sm transition-colors group-hover:bg-transparent"
+			>
+				<div
+					class="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition-transform group-hover:scale-110"
+				>
+					<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+						<path
+							d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+						<path
+							d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+							stroke-width="2"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						/>
+					</svg>
+				</div>
+				<span class="font-bold tracking-wider text-white uppercase">Library</span>
+			</div>
+		</a>
+	</div>
+
+	<!-- Quick Timers -->
+	<section class="flex flex-col gap-4">
+		<div class="flex items-center gap-3">
+			<h2 class="text-lg font-bold tracking-wide text-text-primary uppercase">Quick Timers</h2>
+			<div class="h-[2px] flex-1 bg-white/5"></div>
 		</div>
 
-		<div class="quick-actions-grid">
-			<a href="/workouts/new" class="action-card action-new">
-				<div class="action-icon">
-					<div class="plus-icon">
-						<div class="plus-h"></div>
-						<div class="plus-v"></div>
-					</div>
-				</div>
-				<span class="action-label">NEW WoD</span>
+		<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+			<a href="/timers?type=amrap">
+				<Card
+					class="flex flex-col gap-1 p-4 transition-transform hover:-translate-y-1 hover:border-accent-500/50"
+				>
+					<span class="font-bold text-accent-400">AMRAP</span>
+					<span class="text-xs text-text-muted">As Many Rounds As Possible</span>
+				</Card>
 			</a>
-
-			<a href="/workouts" class="action-card action-library">
-				<div class="action-icon">
-					<div class="library-icon">
-						<div class="lib-line"></div>
-						<div class="lib-line"></div>
-						<div class="lib-line"></div>
-					</div>
-				</div>
-				<span class="action-label">ALL WORKOUTS</span>
+			<a href="/timers?type=emom">
+				<Card
+					class="flex flex-col gap-1 p-4 transition-transform hover:-translate-y-1 hover:border-accent-500/50"
+				>
+					<span class="font-bold text-accent-400">EMOM</span>
+					<span class="text-xs text-text-muted">Every Minute On Minute</span>
+				</Card>
+			</a>
+			<a href="/timers?type=fortime">
+				<Card
+					class="flex flex-col gap-1 p-4 transition-transform hover:-translate-y-1 hover:border-accent-500/50"
+				>
+					<span class="font-bold text-accent-400">FOR TIME</span>
+					<span class="text-xs text-text-muted">Complete as fast as possible</span>
+				</Card>
+			</a>
+			<a href="/timers?type=tabata">
+				<Card
+					class="flex flex-col gap-1 p-4 transition-transform hover:-translate-y-1 hover:border-accent-500/50"
+				>
+					<span class="font-bold text-accent-400">TABATA</span>
+					<span class="text-xs text-text-muted">High intensity intervals</span>
+				</Card>
 			</a>
 		</div>
 	</section>
 
-	<!-- Timer Quick Actions -->
-	<section class="section timer-section">
-		<div class="section-header">
-			<h2 class="section-title">QUICK TIMERS</h2>
-			<div class="section-accent"></div>
-		</div>
-
-		<div class="timer-actions-grid">
-			<a href="/timer?type=amrap" class="timer-card">
-				<span class="timer-name">AMRAP</span>
-				<span class="timer-desc">As Many Rounds As Possible</span>
-			</a>
-			<a href="/timer?type=emom" class="timer-card">
-				<span class="timer-name">EMOM</span>
-				<span class="timer-desc">Every Minute On the Minute</span>
-			</a>
-			<a href="/timer?type=fortime" class="timer-card">
-				<span class="timer-name">FOR TIME</span>
-				<span class="timer-desc">Complete for time</span>
-			</a>
-			<a href="/timer?type=tabata" class="timer-card">
-				<span class="timer-name">TABATA</span>
-				<span class="timer-desc">Work/Rest intervals</span>
-			</a>
-		</div>
-	</section>
-
-	<!-- Recent Workouts Section -->
-	<section class="section recent-section">
-		<div class="section-header">
-			<h2 class="section-title">RECENT WORKOUTS</h2>
-			<div class="section-accent"></div>
+	<!-- Recent Workouts -->
+	<section class="flex flex-col gap-4">
+		<div class="flex items-center gap-3">
+			<h2 class="text-lg font-bold tracking-wide text-text-primary uppercase">Recent Workouts</h2>
+			<div class="h-[2px] flex-1 bg-white/5"></div>
 		</div>
 
 		{#if loading}
-			<div class="recent-list">
+			<div class="space-y-3">
 				{#each Array(3) as _, i}
-					<div class="recent-item loading-item">
-						<Skeleton variant="text" height="1rem" width="30%" />
-						<Skeleton variant="text" height="1rem" width="100%" />
-					</div>
+					<Card class="h-20">
+						<Skeleton variant="text" height="100%" width="100%" />
+					</Card>
 				{/each}
 			</div>
 		{:else if recentWoDs.length > 0}
-			<div class="recent-list">
+			<div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
 				{#each recentWoDs as wod}
-					<a href="/workouts/{wod.id}" class="recent-item">
-						<div class="recent-date">
-							<span class="date-marker"></span>
-							<span>{formatDate(wod.date)}</span>
-						</div>
-						<div class="recent-preview">{getPreviewText(wod)}</div>
+					<a href="/workouts/{wod.id}" class="block">
+						<Card
+							class="group flex items-center gap-4 px-4 py-3 transition-all hover:border-accent-500/30 hover:bg-white/5"
+						>
+							<div
+								class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-800 text-accent-400 transition-transform group-hover:scale-110"
+							>
+								<span class="text-xs font-bold">{new Date(wod.date).getDate()}</span>
+							</div>
+							<div class="min-w-0 flex-1">
+								<div class="text-xs tracking-wider text-text-muted uppercase">
+									{new Date(wod.date).toLocaleDateString('en-US', { month: 'short' })}
+								</div>
+								<div
+									class="truncate text-sm font-medium text-text-secondary transition-colors group-hover:text-text-primary"
+								>
+									{getPreviewText(wod)}
+								</div>
+							</div>
+							<div
+								class="text-text-muted transition-all group-hover:translate-x-1 group-hover:text-accent-400"
+							>
+								<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+									<path
+										d="M9 18l6-6-6-6"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									/>
+								</svg>
+							</div>
+						</Card>
 					</a>
 				{/each}
 			</div>
 		{:else}
-			<div class="recent-empty">
-				<p>No recent workouts yet</p>
-			</div>
+			<div class="py-8 text-center text-sm text-text-muted">No recent workouts found.</div>
 		{/if}
 	</section>
 </div>
-
-<style>
-	/* ============================================================================
-	   ATHLETIC BRUTALISM DASHBOARD DESIGN
-	   Characteristics:
-	   - Bold geometric shapes and hard edges
-	   - High contrast with RolimBox brand colors (purple/pink)
-	   - Raw, industrial aesthetic with athletic energy
-	   - Prominent typography with condensed sans-serif
-	   - Angular accents and strong grid structure
-	   ============================================================================ */
-
-	.dashboard-container {
-		padding: clamp(1rem, 4vw, 2rem);
-		max-width: 1200px;
-		margin: 0 auto;
-		display: flex;
-		flex-direction: column;
-		gap: clamp(1.5rem, 4vw, 2.5rem);
-	}
-
-	/* ============================================================================
-	   DASHBOARD HEADER
-	   ============================================================================ */
-
-	.dashboard-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		gap: 1rem;
-		padding-bottom: 1rem;
-		border-bottom: 3px solid #6e489f;
-		position: relative;
-	}
-
-	.dashboard-title {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.title-main {
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: clamp(2rem, 5vw, 3rem);
-		font-weight: 900;
-		line-height: 0.9;
-		letter-spacing: 0.02em;
-		color: #ffffff;
-		text-transform: uppercase;
-		position: relative;
-	}
-
-	.title-accent {
-		width: 60px;
-		height: 4px;
-		background: linear-gradient(90deg, #e91e8c 0%, #6e489f 100%);
-		display: block;
-		transform: skewX(-10deg);
-	}
-
-	.header-date {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-end;
-		gap: 0.25rem;
-		padding: 0.5rem 0.75rem;
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		border-right: 3px solid #6e489f;
-		transform: skewX(-5deg);
-	}
-
-	.header-date > * {
-		transform: skewX(5deg);
-	}
-
-	.date-day {
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: 0.75rem;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		color: #6e489f;
-		text-transform: uppercase;
-	}
-
-	.date-full {
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: #ffffff;
-	}
-
-	/* ============================================================================
-	   SECTION STRUCTURE
-	   ============================================================================ */
-
-	.section {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.section-header {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.section-title {
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: clamp(1.25rem, 3vw, 1.5rem);
-		font-weight: 900;
-		letter-spacing: 0.05em;
-		color: #ffffff;
-		text-transform: uppercase;
-		line-height: 1;
-	}
-
-	.section-accent {
-		width: 40px;
-		height: 3px;
-		background: #e91e8c;
-		transform: skewX(-10deg);
-	}
-
-	/* ============================================================================
-	   TODAY'S WORKOUT CARD
-	   ============================================================================ */
-
-	.today-card {
-		background: #1a1a1a;
-		border: 3px solid #2a2a2a;
-		border-left: 5px solid #e91e8c;
-		padding: 1.5rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		position: relative;
-		transform: translateZ(0);
-		transition:
-			border-color 0.3s ease,
-			transform 0.3s ease;
-	}
-
-	.today-card::before {
-		content: '';
-		position: absolute;
-		top: -3px;
-		right: -3px;
-		width: 20px;
-		height: 20px;
-		background: #e91e8c;
-		clip-path: polygon(100% 0, 0 0, 100% 100%);
-	}
-
-	.today-card:hover {
-		border-color: #6e489f;
-		transform: translateX(3px);
-	}
-
-	.card-content {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.card-date {
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: 0.875rem;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		color: #e91e8c;
-		text-transform: uppercase;
-	}
-
-	.card-description {
-		font-size: 1rem;
-		line-height: 1.6;
-		color: #e0e0e0;
-	}
-
-	.section-count {
-		font-size: 0.75rem;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-		color: #6e489f;
-		text-transform: uppercase;
-		padding: 0.25rem 0.5rem;
-		background: rgba(110, 72, 159, 0.15);
-		border-left: 2px solid #6e489f;
-		width: fit-content;
-	}
-
-	.card-actions {
-		display: flex;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	/* Empty State */
-	.empty-card {
-		align-items: center;
-		text-align: center;
-		padding: 3rem 1.5rem;
-		border-style: dashed;
-	}
-
-	.empty-icon {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 1rem;
-	}
-
-	.icon-bar {
-		width: 4px;
-		height: 40px;
-		background: #2a2a2a;
-		animation: pulse 1.5s ease-in-out infinite;
-	}
-
-	.icon-bar:nth-child(1) {
-		animation-delay: 0s;
-	}
-
-	.icon-bar:nth-child(2) {
-		animation-delay: 0.2s;
-		height: 50px;
-	}
-
-	.icon-bar:nth-child(3) {
-		animation-delay: 0.4s;
-	}
-
-	@keyframes pulse {
-		0%,
-		100% {
-			opacity: 0.3;
-		}
-		50% {
-			opacity: 1;
-			background: #6e489f;
-		}
-	}
-
-	.empty-text {
-		font-size: 1rem;
-		color: #666666;
-		margin-bottom: 1.5rem;
-	}
-
-	/* ============================================================================
-	   BUTTONS
-	   ============================================================================ */
-
-	.btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0.75rem 1.5rem;
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: 0.875rem;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		text-transform: uppercase;
-		text-decoration: none;
-		border: 2px solid;
-		background: transparent;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		position: relative;
-		overflow: hidden;
-		min-height: 44px;
-		transform: skewX(-5deg);
-	}
-
-	.btn-text {
-		transform: skewX(5deg);
-	}
-
-	.btn::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: -100%;
-		width: 100%;
-		height: 100%;
-		background: currentColor;
-		transition: left 0.3s ease;
-		z-index: -1;
-	}
-
-	.btn:hover::before {
-		left: 0;
-	}
-
-	.btn-primary {
-		color: #e91e8c;
-		border-color: #e91e8c;
-	}
-
-	.btn-primary:hover {
-		color: #ffffff;
-		border-color: #e91e8c;
-		background: #e91e8c;
-	}
-
-	.btn-secondary {
-		color: #6e489f;
-		border-color: #6e489f;
-	}
-
-	.btn-secondary:hover {
-		color: #ffffff;
-		border-color: #6e489f;
-		background: #6e489f;
-	}
-
-	/* ============================================================================
-	   QUICK ACTIONS GRID
-	   ============================================================================ */
-
-	.quick-actions-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 1rem;
-	}
-
-	.action-card {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
-		padding: 2rem 1rem;
-		background: #1a1a1a;
-		border: 3px solid #2a2a2a;
-		text-decoration: none;
-		transition: all 0.3s ease;
-		position: relative;
-		min-height: 140px;
-	}
-
-	.action-card::after {
-		content: '';
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		width: 0;
-		height: 3px;
-		background: currentColor;
-		transition: width 0.3s ease;
-	}
-
-	.action-card:hover {
-		transform: translateY(-3px);
-		border-color: currentColor;
-	}
-
-	.action-card:hover::after {
-		width: 100%;
-	}
-
-	.action-new {
-		color: #e91e8c;
-	}
-
-	.action-library {
-		color: #6e489f;
-	}
-
-	.action-icon {
-		width: 48px;
-		height: 48px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border: 2px solid currentColor;
-		position: relative;
-	}
-
-	.plus-icon {
-		position: relative;
-		width: 24px;
-		height: 24px;
-	}
-
-	.plus-h,
-	.plus-v {
-		position: absolute;
-		background: currentColor;
-	}
-
-	.plus-h {
-		width: 100%;
-		height: 3px;
-		top: 50%;
-		left: 0;
-		transform: translateY(-50%);
-	}
-
-	.plus-v {
-		width: 3px;
-		height: 100%;
-		left: 50%;
-		top: 0;
-		transform: translateX(-50%);
-	}
-
-	.library-icon {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-	}
-
-	.lib-line {
-		width: 24px;
-		height: 3px;
-		background: currentColor;
-	}
-
-	.lib-line:nth-child(2) {
-		width: 20px;
-	}
-
-	.action-label {
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: 0.875rem;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		color: #ffffff;
-		text-transform: uppercase;
-		text-align: center;
-	}
-
-	/* ============================================================================
-	   RECENT WORKOUTS LIST
-	   ============================================================================ */
-
-	.recent-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.recent-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		padding: 1rem;
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		border-left: 3px solid #6e489f;
-		text-decoration: none;
-		transition: all 0.2s ease;
-		position: relative;
-	}
-
-	.recent-item::before {
-		content: '';
-		position: absolute;
-		left: 0;
-		top: 0;
-		width: 0;
-		height: 100%;
-		background: rgba(110, 72, 159, 0.1);
-		transition: width 0.3s ease;
-	}
-
-	.recent-item:hover {
-		border-left-width: 5px;
-		padding-left: calc(1rem - 2px);
-	}
-
-	.recent-item:hover::before {
-		width: 100%;
-	}
-
-	.recent-date {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
-		font-weight: 600;
-		color: #6e489f;
-	}
-
-	.date-marker {
-		width: 8px;
-		height: 8px;
-		background: #e91e8c;
-		transform: rotate(45deg);
-	}
-
-	.recent-preview {
-		font-size: 0.875rem;
-		line-height: 1.5;
-		color: #cccccc;
-	}
-
-	.recent-empty {
-		padding: 2rem;
-		text-align: center;
-		background: #1a1a1a;
-		border: 2px dashed #2a2a2a;
-		color: #666666;
-	}
-
-	/* ============================================================================
-	   LOADING STATES
-	   ============================================================================ */
-
-	.loading-card {
-		gap: 1rem;
-	}
-
-	.loading-item {
-		gap: 0.5rem;
-	}
-
-	/* ============================================================================
-	   RESPONSIVE DESIGN
-	   ============================================================================ */
-
-	@media (max-width: 640px) {
-		.dashboard-header {
-			flex-direction: column;
-			align-items: stretch;
-		}
-
-		.header-date {
-			align-items: flex-start;
-		}
-
-		.card-actions {
-			flex-direction: column;
-		}
-
-		.btn {
-			width: 100%;
-		}
-
-		.quick-actions-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-
-	/* ============================================================================
-	   ACCESSIBILITY & REDUCED MOTION
-	   ============================================================================ */
-
-	@media (prefers-reduced-motion: reduce) {
-		* {
-			animation-duration: 0.01ms !important;
-			animation-iteration-count: 1 !important;
-			transition-duration: 0.01ms !important;
-		}
-	}
-
-	@media (prefers-contrast: high) {
-		.today-card,
-		.action-card,
-		.recent-item {
-			border-width: 3px;
-		}
-	}
-
-	/* ============================================================================
-	   TIMER QUICK ACTIONS
-	   ============================================================================ */
-
-	/* Timer Quick Actions */
-	.timer-section {
-		margin-top: 0.5rem;
-	}
-
-	.timer-actions-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 12px;
-	}
-
-	.timer-card {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		padding: 16px;
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		border-left: 4px solid #e91e8c;
-		text-decoration: none;
-		transition: all 0.2s ease;
-	}
-
-	.timer-card:hover {
-		border-color: #e91e8c;
-		transform: translateX(4px);
-		background: rgba(233, 30, 140, 0.05);
-	}
-
-	.timer-name {
-		font-family: 'Impact', 'Oswald', 'Arial Narrow', sans-serif;
-		font-size: 16px;
-		font-weight: 900;
-		letter-spacing: 0.05em;
-		color: #ffffff;
-	}
-
-	.timer-desc {
-		font-family: 'Inter', system-ui, sans-serif;
-		font-size: 11px;
-		font-weight: 500;
-		color: #737373;
-	}
-
-	@media (max-width: 400px) {
-		.timer-actions-grid {
-			grid-template-columns: 1fr;
-		}
-	}
-</style>

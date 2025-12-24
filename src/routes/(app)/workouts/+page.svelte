@@ -6,6 +6,8 @@
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 	import Toast from '$lib/components/Toast.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import Card from '$lib/components/Card.svelte';
+	import Button from '$lib/components/Button.svelte';
 	import type { PageData } from './$types';
 	import type { WoD } from '$lib/types/wod';
 
@@ -142,842 +144,241 @@
 	onCancel={cancelDelete}
 />
 
-<!-- Duplicate Date Picker Modal -->
 {#if duplicateModalOpen}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal-overlay" onclick={cancelDuplicate} role="dialog" aria-modal="true">
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<div class="modal-accent"></div>
-			<div class="modal-header">
-				<h2 class="modal-title">Duplicate Workout</h2>
+	<div class="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+		<button
+			type="button"
+			class="absolute inset-0 h-full w-full cursor-default bg-bg-base/80 backdrop-blur-sm"
+			onclick={cancelDuplicate}
+			aria-label="Close modal"
+		></button>
+		<Card class="relative w-full max-w-sm border-accent-500/20 shadow-2xl shadow-black">
+			<div class="space-y-6">
+				<div class="space-y-2">
+					<h3 class="text-xl font-black tracking-tight text-white uppercase">Duplicate WOD</h3>
+					<p class="text-sm text-text-muted">Choose a new date for this workout.</p>
+				</div>
+
+				<div class="space-y-2">
+					<label
+						for="dup-date"
+						class="text-[10px] font-bold tracking-widest text-accent-400 uppercase"
+						>Target Date</label
+					>
+					<input
+						type="date"
+						id="dup-date"
+						bind:value={duplicateDate}
+						class="w-full rounded-lg border border-white/10 bg-white/5 p-3 text-white outline-none focus:border-accent-500/50"
+					/>
+				</div>
+
+				<div class="flex gap-3 pt-2">
+					<Button variant="secondary" class="flex-1" onclick={cancelDuplicate}>CANCEL</Button>
+					<Button variant="primary" class="flex-1" onclick={confirmDuplicate}>DUPLICATE</Button>
+				</div>
 			</div>
-			<div class="modal-body">
-				<label for="duplicate-date" class="date-label">Select new date for workout:</label>
-				<input
-					type="date"
-					id="duplicate-date"
-					bind:value={duplicateDate}
-					class="date-input"
-					required
-				/>
-			</div>
-			<div class="modal-actions">
-				<button type="button" class="btn-cancel" onclick={cancelDuplicate}>Cancel</button>
-				<button type="button" class="btn-confirm" onclick={confirmDuplicate}>Duplicate</button>
-			</div>
-		</div>
+		</Card>
 	</div>
 {/if}
 
-<div class="library-container">
-	<!-- Header Section with Athletic Brutalism -->
-	<header class="library-header">
-		<div class="header-content">
-			<div class="title-section">
-				<div class="title-accent"></div>
-				<h1 class="library-title">WORKOUTS</h1>
-				<div class="title-underline"></div>
-			</div>
-			<button class="btn-new-wod" onclick={handleNewWod} aria-label="Create new workout">
-				<span class="btn-icon">+</span>
-				<span class="btn-text">New WoD</span>
-			</button>
+<div class="flex flex-col gap-8 p-4 pb-24 md:p-6">
+	<!-- Header Section -->
+	<header class="flex items-end justify-between border-b border-white/10 pb-4">
+		<div>
+			<h1
+				class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
+			>
+				Workouts
+			</h1>
+			<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
 		</div>
+		<Button
+			variant="primary"
+			size="sm"
+			onclick={handleNewWod}
+			class="shadow-lg shadow-accent-500/20"
+		>
+			<svg
+				class="mr-2 h-4 w-4"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="3"
+			>
+				<path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
+			</svg>
+			NEW WOD
+		</Button>
 	</header>
 
 	<!-- Workouts List -->
-	<div class="workouts-list">
+	<div class="flex flex-col gap-4">
 		{#if !data.workspaceId}
-			<!-- No Workspace State -->
-			<div class="empty-state">
-				<div class="empty-icon">⚠️</div>
-				<h2 class="empty-title">No Workspace Found</h2>
-				<p class="empty-description">Please create or join a workspace to manage workouts.</p>
-			</div>
+			<Card
+				class="flex flex-col items-center justify-center gap-4 border-dashed border-white/10 bg-transparent py-12 text-center"
+			>
+				<div class="flex h-16 w-16 items-center justify-center rounded-full bg-error/10 text-error">
+					<svg
+						class="h-8 w-8"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<circle cx="12" cy="12" r="10" />
+						<line x1="12" y1="8" x2="12" y2="12" />
+						<line x1="12" y1="16" x2="12.01" y2="16" />
+					</svg>
+				</div>
+				<div class="space-y-1">
+					<h2 class="text-xl font-bold text-white">No Workspace Found</h2>
+					<p class="mx-auto max-w-xs text-sm text-text-muted">
+						Please create or join a workspace to manage workouts.
+					</p>
+				</div>
+			</Card>
 		{:else if isLoading}
-			<!-- Loading Skeletons -->
-			{#each Array(3) as _}
-				<div class="wod-card-skeleton">
-					<Skeleton variant="text" width="60%" height="24px" />
-					<Skeleton variant="text" width="90%" height="18px" />
-					<div class="skeleton-actions">
-						<Skeleton variant="button" width="80px" height="44px" />
-						<Skeleton variant="button" width="80px" height="44px" />
-						<Skeleton variant="button" width="100px" height="44px" />
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				{#each Array(4) as _}
+					<Card class="space-y-4">
+						<div class="flex items-start justify-between">
+							<Skeleton variant="text" height="1.5rem" width="40%" />
+							<Skeleton variant="text" height="1rem" width="20%" />
+						</div>
+						<Skeleton variant="text" height="1rem" width="100%" />
+						<div class="flex gap-2 pt-2">
+							<Skeleton variant="button" width="80px" height="36px" />
+							<Skeleton variant="button" width="80px" height="36px" />
+						</div>
+					</Card>
+				{/each}
+			</div>
+		{:else if wods.length === 0}
+			<Card
+				class="flex flex-col items-center justify-center gap-6 border-dashed border-white/10 bg-transparent py-16 text-center"
+			>
+				<div class="relative">
+					<div class="absolute inset-0 rounded-full bg-accent-500/20 blur-2xl"></div>
+					<div
+						class="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-text-muted"
+					>
+						<svg
+							class="h-10 w-10"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+							<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+						</svg>
 					</div>
 				</div>
-			{/each}
-		{:else if wods.length === 0}
-			<!-- Empty State -->
-			<div class="empty-state">
-				<div class="empty-icon">💪</div>
-				<h2 class="empty-title">No workouts yet</h2>
-				<p class="empty-description">Create your first workout to get started!</p>
-				<button class="btn-empty-create" onclick={handleNewWod}>
-					<span class="btn-icon">+</span>
-					<span class="btn-text">Create Workout</span>
-				</button>
-			</div>
+				<div class="space-y-1">
+					<h2 class="text-xl font-bold text-white">No workouts yet</h2>
+					<p class="text-sm text-text-muted">
+						Your training library is empty. Start your journey today!
+					</p>
+				</div>
+				<Button variant="outline" size="sm" onclick={handleNewWod}>CREATE FIRST WOD</Button>
+			</Card>
 		{:else}
-			<!-- Workout Cards -->
-			{#each wods as wod (wod.id)}
-				<article class="wod-card">
-					<!-- Kinetic accent bar -->
-					<div class="card-accent"></div>
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				{#each wods as wod (wod.id)}
+					<Card
+						class="group relative overflow-hidden border-l-2 border-l-transparent transition-all duration-300 hover:border-l-accent-500"
+					>
+						<div class="flex flex-col gap-4">
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-3">
+									<div
+										class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/5 bg-bg-surface font-bold text-accent-400"
+									>
+										{new Date(wod.date).getDate()}
+									</div>
+									<div>
+										<h3 class="font-bold tracking-tight text-text-primary uppercase">
+											{new Date(wod.date).toLocaleDateString('en-US', {
+												month: 'short',
+												year: 'numeric'
+											})}
+										</h3>
+										<p
+											class="text-[10px] leading-none font-bold tracking-widest text-text-muted uppercase"
+										>
+											{new Date(wod.date).toLocaleDateString('en-US', { weekday: 'long' })}
+										</p>
+									</div>
+								</div>
+								<div
+									class="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest text-text-secondary uppercase"
+								>
+									{getSectionCount(wod.sections)}
+									{getSectionCount(wod.sections) === 1 ? 'Section' : 'Sections'}
+								</div>
+							</div>
 
-					<!-- Date header -->
-					<div class="card-header">
-						<time class="card-date" datetime={wod.date}>
-							{formatDate(wod.date)}
-						</time>
-						<span class="card-badge">
-							{getSectionCount(wod.sections)} {getSectionCount(wod.sections) === 1
-								? 'section'
-								: 'sections'}
-						</span>
-					</div>
+							<p class="line-clamp-2 text-sm leading-relaxed text-text-secondary">
+								{truncateDescription(wod.description)}
+							</p>
 
-					<!-- Description -->
-					<div class="card-body">
-						<p class="card-description">
-							{truncateDescription(wod.description)}
-						</p>
-					</div>
-
-					<!-- Actions -->
-					<div class="card-actions">
-						<button
-							class="action-btn action-view"
-							onclick={() => handleView(wod.id)}
-							aria-label="View workout"
-						>
-							<svg
-								class="action-icon"
-								width="18"
-								height="18"
-								viewBox="0 0 18 18"
-								fill="none"
-								stroke="currentColor"
-							>
-								<path
-									d="M9 3C5 3 1.73 5.11 0 9c1.73 3.89 5 6 9 6s7.27-2.11 9-6c-1.73-3.89-5-6-9-6z"
-									stroke-width="1.5"
-									stroke-linecap="square"
-								/>
-								<circle cx="9" cy="9" r="2.5" stroke-width="1.5" />
-							</svg>
-							<span>View</span>
-						</button>
-
-						<button
-							class="action-btn action-edit"
-							onclick={() => handleEdit(wod.id)}
-							aria-label="Edit workout"
-						>
-							<svg
-								class="action-icon"
-								width="18"
-								height="18"
-								viewBox="0 0 18 18"
-								fill="none"
-								stroke="currentColor"
-							>
-								<path
-									d="M12.5 2.5l3 3-9 9H3.5v-3l9-9z"
-									stroke-width="1.5"
-									stroke-linecap="square"
-								/>
-							</svg>
-							<span>Edit</span>
-						</button>
-
-						<button
-							class="action-btn action-duplicate"
-							onclick={() => handleDuplicateClick(wod.id)}
-							aria-label="Duplicate workout"
-						>
-							<svg
-								class="action-icon"
-								width="18"
-								height="18"
-								viewBox="0 0 18 18"
-								fill="none"
-								stroke="currentColor"
-							>
-								<rect x="6" y="6" width="10" height="10" stroke-width="1.5" stroke-linecap="square" />
-								<path
-									d="M2 2h8v8"
-									stroke-width="1.5"
-									stroke-linecap="square"
-									stroke-linejoin="miter"
-								/>
-							</svg>
-							<span>Duplicate</span>
-						</button>
-
-						<button
-							class="action-btn action-delete"
-							onclick={() => handleDeleteClick(wod.id)}
-							aria-label="Delete workout"
-						>
-							<svg
-								class="action-icon"
-								width="18"
-								height="18"
-								viewBox="0 0 18 18"
-								fill="none"
-								stroke="currentColor"
-							>
-								<path d="M3 5h12M7 5V3h4v2" stroke-width="1.5" stroke-linecap="square" />
-								<path d="M6 5v10h6V5" stroke-width="1.5" stroke-linecap="square" />
-								<path d="M8 8v4M10 8v4" stroke-width="1.5" stroke-linecap="square" />
-							</svg>
-							<span class="sr-only">Delete</span>
-						</button>
-					</div>
-				</article>
-			{/each}
+							<div class="mt-auto flex items-center justify-between border-t border-white/5 pt-2">
+								<div class="flex gap-2">
+									<Button
+										variant="secondary"
+										size="xs"
+										onclick={() => handleView(wod.id)}
+										class="text-[10px]">VIEW</Button
+									>
+									<Button
+										variant="outline"
+										size="xs"
+										onclick={() => handleEdit(wod.id)}
+										class="text-[10px]">EDIT</Button
+									>
+								</div>
+								<div class="flex gap-1">
+									<button
+										class="rounded-lg p-2 text-text-muted transition-colors hover:bg-white/5 hover:text-accent-400"
+										onclick={() => handleDuplicateClick(wod.id)}
+										title="Duplicate"
+									>
+										<svg
+											class="h-4 w-4"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+											<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+										</svg>
+									</button>
+									<button
+										class="rounded-lg p-2 text-text-muted transition-colors hover:bg-error/5 hover:text-error"
+										onclick={() => handleDeleteClick(wod.id)}
+										title="Delete"
+									>
+										<svg
+											class="h-4 w-4"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<polyline points="3 6 5 6 21 6" />
+											<path
+												d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+											/>
+										</svg>
+									</button>
+								</div>
+							</div>
+						</div>
+					</Card>
+				{/each}
+			</div>
 		{/if}
 	</div>
 </div>
-
-<style>
-	/* ============================================================================
-	   ATHLETIC BRUTALISM DESIGN SYSTEM
-	   - Bold geometric shapes
-	   - High contrast blacks with purple/pink accents
-	   - Kinetic animated elements
-	   - Sharp, precise typography
-	   ============================================================================ */
-
-	.library-container {
-		min-height: 100vh;
-		background: #0a0a0a;
-		padding: 0 0 80px 0;
-	}
-
-	/* ===== HEADER ===== */
-	.library-header {
-		position: sticky;
-		top: 0;
-		z-index: 100;
-		background: #0a0a0a;
-		border-bottom: 3px solid #1a1a1a;
-		padding: 24px 20px;
-	}
-
-	.header-content {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		gap: 20px;
-	}
-
-	.title-section {
-		position: relative;
-		flex: 1;
-	}
-
-	.title-accent {
-		position: absolute;
-		top: -8px;
-		left: -4px;
-		width: 60px;
-		height: 4px;
-		background: linear-gradient(90deg, #6e489f 0%, #e91e8c 100%);
-		animation: accentPulse 2s ease-in-out infinite;
-	}
-
-	@keyframes accentPulse {
-		0%,
-		100% {
-			opacity: 1;
-			transform: scaleX(1);
-		}
-		50% {
-			opacity: 0.7;
-			transform: scaleX(1.2);
-		}
-	}
-
-	.library-title {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 32px;
-		font-weight: 900;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: #ffffff;
-		margin: 0;
-		line-height: 1;
-		text-shadow: 0 0 30px rgba(110, 72, 159, 0.3);
-	}
-
-	.title-underline {
-		margin-top: 8px;
-		height: 2px;
-		background: linear-gradient(90deg, #2a2a2a 0%, transparent 100%);
-		width: 100%;
-	}
-
-	.btn-new-wod {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 14px 24px;
-		background: linear-gradient(135deg, #6e489f 0%, #5c3a87 100%);
-		border: 2px solid #6e489f;
-		color: #ffffff;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		cursor: pointer;
-		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-		box-shadow: 0 4px 16px rgba(110, 72, 159, 0.4);
-		position: relative;
-		overflow: hidden;
-		min-height: 48px;
-	}
-
-	.btn-new-wod::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: -100%;
-		width: 100%;
-		height: 100%;
-		background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-		transition: left 0.5s;
-	}
-
-	.btn-new-wod:hover::before {
-		left: 100%;
-	}
-
-	.btn-new-wod:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(110, 72, 159, 0.5);
-		border-color: #e91e8c;
-	}
-
-	.btn-new-wod:active {
-		transform: translateY(0);
-	}
-
-	.btn-icon {
-		font-size: 20px;
-		font-weight: 700;
-		line-height: 1;
-	}
-
-	.btn-text {
-		line-height: 1;
-	}
-
-	/* ===== WORKOUTS LIST ===== */
-	.workouts-list {
-		padding: 24px 20px;
-		display: flex;
-		flex-direction: column;
-		gap: 20px;
-	}
-
-	/* ===== WOD CARD ===== */
-	.wod-card {
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		position: relative;
-		overflow: hidden;
-		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.wod-card:hover {
-		border-color: #3a3a3a;
-		box-shadow: 0 8px 24px rgba(110, 72, 159, 0.15);
-		transform: translateY(-2px);
-	}
-
-	/* Kinetic accent bar */
-	.card-accent {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 4px;
-		background: linear-gradient(90deg, #6e489f 0%, #e91e8c 100%);
-		animation: accentSlide 3s ease-in-out infinite;
-	}
-
-	@keyframes accentSlide {
-		0%,
-		100% {
-			transform: translateX(0%);
-			opacity: 1;
-		}
-		50% {
-			transform: translateX(10%);
-			opacity: 0.8;
-		}
-	}
-
-	.card-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 20px 20px 12px 20px;
-		gap: 12px;
-		flex-wrap: wrap;
-	}
-
-	.card-date {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 18px;
-		font-weight: 800;
-		letter-spacing: -0.01em;
-		color: #ffffff;
-		text-transform: capitalize;
-	}
-
-	.card-badge {
-		display: inline-flex;
-		align-items: center;
-		padding: 6px 12px;
-		background: rgba(110, 72, 159, 0.15);
-		border: 1px solid #6e489f;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 11px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #8b7ab8;
-	}
-
-	.card-body {
-		padding: 0 20px 16px 20px;
-	}
-
-	.card-description {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 400;
-		line-height: 1.6;
-		color: #a3a3a3;
-		margin: 0;
-	}
-
-	.card-actions {
-		display: flex;
-		gap: 8px;
-		padding: 16px 20px 20px 20px;
-		border-top: 1px solid #2a2a2a;
-		background: #0a0a0a;
-		flex-wrap: wrap;
-	}
-
-	.action-btn {
-		flex: 1;
-		min-width: 80px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		padding: 12px 16px;
-		background: transparent;
-		border: 2px solid #2a2a2a;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 12px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #737373;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		min-height: 44px;
-	}
-
-	.action-btn:hover {
-		border-color: #3a3a3a;
-		background: #2a2a2a;
-		color: #ffffff;
-		transform: translateY(-1px);
-	}
-
-	.action-btn:active {
-		transform: translateY(0);
-	}
-
-	.action-btn:focus-visible {
-		outline: 2px solid #6e489f;
-		outline-offset: 2px;
-	}
-
-	.action-icon {
-		flex-shrink: 0;
-	}
-
-	.action-view:hover {
-		border-color: #6e489f;
-		color: #6e489f;
-		background: rgba(110, 72, 159, 0.1);
-	}
-
-	.action-edit:hover {
-		border-color: #e91e8c;
-		color: #e91e8c;
-		background: rgba(233, 30, 140, 0.1);
-	}
-
-	.action-duplicate:hover {
-		border-color: #8b7ab8;
-		color: #8b7ab8;
-		background: rgba(139, 122, 184, 0.1);
-	}
-
-	.action-delete {
-		flex: 0;
-		padding: 12px;
-	}
-
-	.action-delete:hover {
-		border-color: #ef4444;
-		color: #ef4444;
-		background: rgba(239, 68, 68, 0.1);
-	}
-
-	/* ===== EMPTY STATE ===== */
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 80px 20px;
-		text-align: center;
-	}
-
-	.empty-icon {
-		font-size: 64px;
-		margin-bottom: 24px;
-		opacity: 0.3;
-		filter: grayscale(1);
-	}
-
-	.empty-title {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 24px;
-		font-weight: 800;
-		text-transform: uppercase;
-		letter-spacing: 0.02em;
-		color: #ffffff;
-		margin: 0 0 12px 0;
-	}
-
-	.empty-description {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 400;
-		color: #737373;
-		margin: 0 0 32px 0;
-	}
-
-	.btn-empty-create {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 16px 32px;
-		background: linear-gradient(135deg, #6e489f 0%, #5c3a87 100%);
-		border: 2px solid #6e489f;
-		color: #ffffff;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		cursor: pointer;
-		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-		box-shadow: 0 4px 16px rgba(110, 72, 159, 0.4);
-		min-height: 48px;
-	}
-
-	.btn-empty-create:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(110, 72, 159, 0.5);
-		border-color: #e91e8c;
-	}
-
-	.btn-empty-create:active {
-		transform: translateY(0);
-	}
-
-	/* ===== LOADING SKELETONS ===== */
-	.wod-card-skeleton {
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		padding: 20px;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-
-	.skeleton-actions {
-		display: flex;
-		gap: 8px;
-		padding-top: 16px;
-		border-top: 1px solid #2a2a2a;
-	}
-
-	/* ===== DUPLICATE MODAL ===== */
-	.modal-overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 1000;
-		background: rgba(10, 10, 10, 0.85);
-		backdrop-filter: blur(8px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 20px;
-		animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	.modal-content {
-		background: #1a1a1a;
-		border: 2px solid #2a2a2a;
-		width: 100%;
-		max-width: 440px;
-		position: relative;
-		overflow: hidden;
-		animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-	}
-
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
-	}
-
-	@keyframes slideUp {
-		from {
-			opacity: 0;
-			transform: translateY(20px) scale(0.95);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0) scale(1);
-		}
-	}
-
-	.modal-accent {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 6px;
-		background: linear-gradient(90deg, #6e489f 0%, #e91e8c 100%);
-		animation: accentPulse 2s ease-in-out infinite;
-	}
-
-	.modal-header {
-		padding: 32px 24px 16px 24px;
-	}
-
-	.modal-title {
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 24px;
-		font-weight: 800;
-		letter-spacing: -0.02em;
-		text-transform: uppercase;
-		color: #ffffff;
-		margin: 0;
-	}
-
-	.modal-body {
-		padding: 0 24px 24px 24px;
-	}
-
-	.date-label {
-		display: block;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 13px;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #a3a3a3;
-		margin-bottom: 12px;
-	}
-
-	.date-input {
-		width: 100%;
-		padding: 14px 16px;
-		background: #0a0a0a;
-		border: 2px solid #2a2a2a;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 15px;
-		font-weight: 600;
-		color: #ffffff;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		min-height: 48px;
-	}
-
-	.date-input:hover {
-		border-color: #3a3a3a;
-	}
-
-	.date-input:focus {
-		outline: none;
-		border-color: #6e489f;
-		background: #1a1a1a;
-	}
-
-	.modal-actions {
-		display: flex;
-		gap: 12px;
-		padding: 20px 24px 24px 24px;
-		background: #0a0a0a;
-		border-top: 1px solid #2a2a2a;
-	}
-
-	.btn-cancel,
-	.btn-confirm {
-		flex: 1;
-		font-family: 'Inter', system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		padding: 16px 24px;
-		border: 2px solid;
-		cursor: pointer;
-		transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-		position: relative;
-		overflow: hidden;
-		min-height: 48px;
-	}
-
-	.btn-cancel {
-		background: transparent;
-		border-color: #2a2a2a;
-		color: #a3a3a3;
-	}
-
-	.btn-cancel:hover {
-		background: #2a2a2a;
-		border-color: #3a3a3a;
-		color: #ffffff;
-		transform: translateY(-1px);
-	}
-
-	.btn-confirm {
-		background: linear-gradient(135deg, #6e489f 0%, #5c3a87 100%);
-		border-color: #6e489f;
-		color: #ffffff;
-		box-shadow: 0 4px 12px rgba(110, 72, 159, 0.3);
-	}
-
-	.btn-confirm:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 6px 16px rgba(110, 72, 159, 0.4);
-	}
-
-	/* ===== RESPONSIVE DESIGN ===== */
-	@media (max-width: 640px) {
-		.library-header {
-			padding: 20px 16px;
-		}
-
-		.library-title {
-			font-size: 24px;
-		}
-
-		.btn-new-wod {
-			padding: 12px 20px;
-		}
-
-		.btn-text {
-			display: none;
-		}
-
-		.btn-icon {
-			font-size: 24px;
-		}
-
-		.workouts-list {
-			padding: 20px 16px;
-		}
-
-		.card-actions {
-			flex-wrap: wrap;
-		}
-
-		.action-btn span:not(.sr-only) {
-			display: none;
-		}
-
-		.action-btn {
-			flex: 0;
-			padding: 12px;
-		}
-
-		.action-duplicate {
-			flex: 0;
-		}
-
-		.modal-actions {
-			flex-direction: column;
-		}
-
-		.btn-cancel,
-		.btn-confirm {
-			width: 100%;
-		}
-	}
-
-	/* ===== ACCESSIBILITY ===== */
-	.sr-only {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		padding: 0;
-		margin: -1px;
-		overflow: hidden;
-		clip: rect(0, 0, 0, 0);
-		white-space: nowrap;
-		border-width: 0;
-	}
-
-	/* ===== REDUCED MOTION ===== */
-	@media (prefers-reduced-motion: reduce) {
-		.card-accent,
-		.title-accent,
-		.modal-accent {
-			animation: none;
-		}
-
-		.btn-new-wod::before {
-			display: none;
-		}
-
-		.wod-card,
-		.action-btn,
-		.btn-new-wod,
-		.btn-empty-create,
-		.btn-cancel,
-		.btn-confirm {
-			transition: none;
-		}
-
-		.wod-card:hover,
-		.action-btn:hover,
-		.btn-new-wod:hover,
-		.btn-empty-create:hover,
-		.btn-confirm:hover {
-			transform: none;
-		}
-	}
-</style>

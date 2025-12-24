@@ -1,4 +1,4 @@
-<!-- src/routes/(app)/timer/[id]/+page.svelte -->
+<!-- src/routes/(app)/timers/[id]/+page.svelte -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
@@ -80,7 +80,7 @@
 		if (timerStore.context?.wodId) {
 			goto(`/workouts/${timerStore.context.wodId}`);
 		} else {
-			goto('/timer');
+			goto('/timers');
 		}
 	}
 </script>
