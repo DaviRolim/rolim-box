@@ -67,8 +67,10 @@ export async function listWoDs(workspaceId: string): Promise<WoD[]> {
 /**
  * Get a single WoD by ID
  * Checks cache first, then API if online
+ * @param id - The WoD ID
+ * @param skipBackgroundRefresh - If true, skip background API fetch (useful during updates to prevent race conditions)
  */
-export async function getWoD(id: string): Promise<WoD | null> {
+export async function getWoD(id: string, skipBackgroundRefresh = false): Promise<WoD | null> {
 	if (!browser) return null;
 
 	// 1. Check cache first
@@ -96,8 +98,8 @@ export async function getWoD(id: string): Promise<WoD | null> {
 			updatedAt: new Date(cachedWod.updatedAt)
 		};
 
-		// 2. If online, fetch fresh data in background
-		if (syncStore.isOnline) {
+		// 2. If online and not skipping refresh, fetch fresh data in background
+		if (syncStore.isOnline && !skipBackgroundRefresh) {
 			fetchSingleWoDAndUpdateCache(id).catch((error) => {
 				console.error('Background fetch failed:', error);
 			});
@@ -243,8 +245,8 @@ export async function createWoD(data: CreateWoDInput): Promise<WoD> {
 export async function updateWoD(id: string, data: UpdateWoDInput): Promise<WoD> {
 	if (!browser) throw new Error('updateWoD can only be called in the browser');
 
-	// 1. Get existing WoD from cache
-	const existingWod = await getWoD(id);
+	// 1. Get existing WoD from cache (skip background refresh to prevent race condition)
+	const existingWod = await getWoD(id, true);
 	if (!existingWod) {
 		throw new Error(`WoD with id ${id} not found`);
 	}
@@ -341,8 +343,8 @@ export async function deleteWoD(id: string): Promise<void> {
 export async function duplicateWoD(id: string, newDate?: string): Promise<WoD> {
 	if (!browser) throw new Error('duplicateWoD can only be called in the browser');
 
-	// 1. Get existing WoD from cache
-	const existingWod = await getWoD(id);
+	// 1. Get existing WoD from cache (skip background refresh to prevent race condition)
+	const existingWod = await getWoD(id, true);
 	if (!existingWod) {
 		throw new Error(`WoD with id ${id} not found`);
 	}
