@@ -1,73 +1,95 @@
-# sv
+# RolimBox
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+**RolimBox** is a modern, high-performance web application designed for managing fitness **Workouts of the Day (WoDs)**. Built with the latest web technologies, it offers a seamless experience for coaches and athletes to create, track, and organize workouts.
 
-## Creating a project
+## 🚀 Key Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **WoD Management**: Create, edit, duplicate, and organize daily workouts with ease.
+- **AI-Powered Assistance**: Use the "Magic Wand" to automatically generate workout sections and descriptions, streamlining the programming process.
+- **Local-First Architecture**: Built with offline support in mind. Your data is cached locally for instant access and synced when you're back online.
+- **Integrated Timer**: Built-in timers to run workouts directly within the app.
+- **Modern UI/UX**: A sleek, responsive interface designed for both desktop and mobile use.
 
-```sh
-# create a new project in the current directory
-npx sv create
+## 🛠️ Technology Stack
 
-# create a new project in my-app
-npx sv create my-app
-```
+RolimBox is built on a cutting-edge stack focused on performance and developer experience:
 
-## Developing
+- **Framework**: [Svelte 5](https://svelte.dev) & [SvelteKit](https://kit.svelte.dev)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com)
+- **Database**: [Drizzle ORM](https://orm.drizzle.team) with [Turso (libSQL)](https://turso.tech)
+- **Runtime & Package Manager**: [Bun](https://bun.sh) / Node.js
+- **Validation**: [Zod](https://zod.dev)
+- **AI Integration**: [Vercel AI SDK](https://sdk.vercel.ai)
+- **Testing**: [Playwright](https://playwright.dev)
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## 🏁 Getting Started
 
-```sh
-npm run dev
+### Prerequisites
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+- [Node.js](https://nodejs.org/) or [Bun](https://bun.sh/) installed on your machine.
+- A [Turso](https://turso.tech/) account for the database (or use a local SQLite file).
 
-## Building
+### Installation
 
-To create a production version of your app:
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/DaviRolim/rolim-box.git
+    cd rolim-box
+    ```
 
-```sh
-npm run build
-```
+2.  Install dependencies:
+    ```bash
+    npm install
+    # or
+    bun install
+    ```
 
-You can preview the production build with `npm run preview`.
+3.  Set up environment variables:
+    Create a `.env` file in the root directory (copy from `.env.example` if available).
+    ```bash
+    DATABASE_URL=libsql://your-db-name.turso.io
+    DATABASE_AUTH_TOKEN=your-auth-token
+    # For local development:
+    # DATABASE_URL=file:local.db
+    ```
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+4.  Start the development server:
+    ```bash
+    npm run dev
+    # or
+    bun dev
+    ```
 
-## Database
+## 🗄️ Database Management
 
-This project uses [Turso](https://turso.tech) (libSQL) with Drizzle ORM.
+RolimBox uses Drizzle ORM for database management.
 
-### Environment Variables
-
-Create a `.env` file with:
-
-```sh
-DATABASE_URL=libsql://your-db-name.turso.io
-DATABASE_AUTH_TOKEN=your-auth-token
-```
-
-For local development, you can use a local SQLite file:
-
-```sh
-DATABASE_URL=file:local.db
-```
-
-### Database Commands
-
-```sh
-# Push schema changes directly (development)
+```bash
+# Push schema changes (Development)
 bun run db:push
 
 # Generate migrations
 bun run db:generate
 
-# Run migrations (production)
+# Run migrations (Production)
 bun run db:migrate
 
-# Open Drizzle Studio
+# Open Drizzle Studio to view data
 bun run db:studio
 ```
+
+## 🧪 Testing
+
+We use Playwright for End-to-End (E2E) testing.
+
+```bash
+npm run test:e2e
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License.
