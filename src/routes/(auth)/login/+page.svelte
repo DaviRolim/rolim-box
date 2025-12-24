@@ -9,7 +9,7 @@
 	<title>Login - RolimBox</title>
 </svelte:head>
 
-<div class="flex min-h-screen items-center justify-center bg-secondary-900 p-4">
+<div class="flex min-h-screen items-center justify-center bg-bg-base p-4">
 	<div class="w-full max-w-md">
 		<h1 class="mb-8 text-center text-3xl font-bold text-white">Welcome Back</h1>
 
@@ -21,24 +21,24 @@
 			{/if}
 
 			<div>
-				<label for="email" class="mb-1 block text-sm text-gray-300">Email</label>
+				<label for="email" class="mb-1 block text-sm text-text-secondary">Email</label>
 				<input
 					type="email"
 					id="email"
 					name="email"
 					required
-					class="w-full rounded border border-gray-700 bg-secondary-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none"
+					class="w-full rounded border border-gray-700 bg-bg-surface px-4 py-2 text-white focus:border-accent-500 focus:outline-none"
 				/>
 			</div>
 
 			<div>
-				<label for="password" class="mb-1 block text-sm text-gray-300">Password</label>
+				<label for="password" class="mb-1 block text-sm text-text-secondary">Password</label>
 				<input
 					type="password"
 					id="password"
 					name="password"
 					required
-					class="w-full rounded border border-gray-700 bg-secondary-800 px-4 py-2 text-white focus:border-accent-500 focus:outline-none"
+					class="w-full rounded border border-gray-700 bg-bg-surface px-4 py-2 text-white focus:border-accent-500 focus:outline-none"
 				/>
 			</div>
 
