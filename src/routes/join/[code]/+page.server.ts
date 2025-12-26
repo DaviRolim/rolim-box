@@ -88,6 +88,15 @@ export const actions: Actions = {
 			path: '/'
 		});
 
+		// Set the joined workspace as active
+		cookies.set('activeWorkspaceId', invite.workspaceId, {
+			path: '/',
+			maxAge: 60 * 60 * 24 * 30,
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax'
+		});
+
 		throw redirect(302, '/workouts');
 	}
 };
