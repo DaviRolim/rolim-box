@@ -34,11 +34,26 @@ export const workspaceMember = sqliteTable(
 		workspaceId: text('workspace_id')
 			.notNull()
 			.references(() => workspace.id),
-		role: text('role').notNull(), // 'owner' | 'coach'
+		role: text('role').notNull(), // 'owner' | 'coach' | 'member'
 		joinedAt: integer('joined_at', { mode: 'timestamp' }).notNull()
 	},
 	(table) => [primaryKey({ columns: [table.userId, table.workspaceId] })]
 );
+
+// Workspace invitation codes
+export const workspaceInvite = sqliteTable('workspace_invite', {
+	id: text('id').primaryKey(),
+	code: text('code').notNull().unique(),
+	workspaceId: text('workspace_id')
+		.notNull()
+		.references(() => workspace.id, { onDelete: 'cascade' }),
+	role: text('role').notNull(), // 'coach' | 'member'
+	createdBy: text('created_by')
+		.notNull()
+		.references(() => user.id),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull()
+});
 
 // Workout of the Day
 export const wod = sqliteTable('wod', {
@@ -70,5 +85,6 @@ export type Session = typeof session.$inferSelect;
 export type User = typeof user.$inferSelect;
 export type Workspace = typeof workspace.$inferSelect;
 export type WorkspaceMember = typeof workspaceMember.$inferSelect;
+export type WorkspaceInvite = typeof workspaceInvite.$inferSelect;
 export type Wod = typeof wod.$inferSelect;
 export type Section = typeof section.$inferSelect;
