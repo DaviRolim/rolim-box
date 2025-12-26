@@ -20,6 +20,17 @@ export function generateId(): string {
 	return encodeHexLowerCase(bytes);
 }
 
+export function generateInviteCode(): string {
+	const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I, O, 0, 1 for readability
+	let code = '';
+	const bytes = crypto.getRandomValues(new Uint8Array(6));
+	for (const byte of bytes) {
+		code += chars[byte % chars.length];
+	}
+	// Format as XXX-XXX for readability
+	return `${code.slice(0, 3)}-${code.slice(3, 6)}`;
+}
+
 export async function hashPassword(password: string): Promise<string> {
 	return hash(password, {
 		memoryCost: 19456,
