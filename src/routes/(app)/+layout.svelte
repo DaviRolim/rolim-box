@@ -53,7 +53,10 @@
 		</div>
 	</header>
 
-	<main class="mx-auto min-h-[calc(100vh-140px)] max-w-6xl">
+	<main
+		class="mx-auto min-h-[calc(100vh-140px)] max-w-6xl"
+		style="padding-bottom: calc(var(--bottom-nav-min-height) + env(safe-area-inset-bottom) + 2rem)"
+	>
 		{@render children()}
 	</main>
 
