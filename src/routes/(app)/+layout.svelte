@@ -3,6 +3,7 @@
 	import { audioService } from '$lib/services/audio.svelte';
 	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import WorkspaceSwitcher from '$lib/components/WorkspaceSwitcher.svelte';
 
 	let { data, children } = $props();
 
@@ -33,13 +34,8 @@
 				<h1 class="text-xl font-black tracking-tighter text-white uppercase italic">RolimBox</h1>
 			</a>
 			<div class="flex items-center gap-4">
-				<div class="hidden flex-col items-end sm:flex">
-					<span class="text-[10px] font-bold tracking-widest text-accent-400 uppercase"
-						>Workspace</span
-					>
-					<span class="text-xs font-medium text-text-secondary"
-						>{data.user?.email?.split('@')[0]}</span
-					>
+				<div class="hidden sm:block">
+					<WorkspaceSwitcher workspaces={data.workspaces} activeWorkspaceId={data.activeWorkspaceId} />
 				</div>
 				<form action="/logout" method="POST">
 					<button
