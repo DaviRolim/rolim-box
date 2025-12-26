@@ -9,7 +9,11 @@ import { eq, and, asc } from 'drizzle-orm';
 /**
  * Helper function to validate workspace membership for a WoD
  */
-async function validateWodAccess(userId: string, wodId: string): Promise<{ error?: string; wod?: typeof wod.$inferSelect }> {
+async function validateWodAccess(userId: string, wodId: string): Promise<{
+	error?: string;
+	wod?: typeof wod.$inferSelect;
+	membership?: typeof workspaceMember.$inferSelect;
+}> {
 	// Fetch WoD
 	const [wodRecord] = await db.select().from(wod).where(eq(wod.id, wodId));
 
@@ -32,7 +36,7 @@ async function validateWodAccess(userId: string, wodId: string): Promise<{ error
 		return { error: 'Access denied: not a member of this workspace' };
 	}
 
-	return { wod: wodRecord };
+	return { wod: wodRecord, membership };
 }
 
 /**
@@ -89,10 +93,15 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
 	const wodId = params.id;
 
 	// Validate access
-	const { error, wod: wodRecord } = await validateWodAccess(locals.user.id, wodId);
+	const { error, wod: wodRecord, membership } = await validateWodAccess(locals.user.id, wodId);
 	if (error) {
 		const status = error === 'WoD not found' ? 404 : 403;
 		return json({ error }, { status });
+	}
+
+	// Check if user has edit permissions (owner or coach only)
+	if (membership?.role === 'member') {
+		return json({ error: 'Members cannot edit workouts' }, { status: 403 });
 	}
 
 	// Parse and validate request body
@@ -196,10 +205,15 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	const wodId = params.id;
 
 	// Validate access
-	const { error } = await validateWodAccess(locals.user.id, wodId);
+	const { error, membership } = await validateWodAccess(locals.user.id, wodId);
 	if (error) {
 		const status = error === 'WoD not found' ? 404 : 403;
 		return json({ error }, { status });
+	}
+
+	// Check if user has edit permissions (owner or coach only)
+	if (membership?.role === 'member') {
+		return json({ error: 'Members cannot delete workouts' }, { status: 403 });
 	}
 
 	// Delete WoD (sections are cascade deleted due to DB constraint)

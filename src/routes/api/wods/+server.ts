@@ -125,6 +125,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Access denied: not a member of this workspace' }, { status: 403 });
 	}
 
+	// Check if user has edit permissions (owner or coach only)
+	if (membership.role === 'member') {
+		return json({ error: 'Members cannot create workouts' }, { status: 403 });
+	}
+
 	// Create WoD with sections in a transaction
 	const result = await db.transaction(async (tx) => {
 		const wodId = generateId();
