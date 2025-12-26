@@ -1,5 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import { sha256 } from '@oslojs/crypto/sha2';
 import { encodeBase64url, encodeHexLowerCase } from '@oslojs/encoding';
 import { hash, verify } from '@node-rs/argon2';
@@ -147,6 +147,68 @@ export async function isWorkspaceOwner(userId: string, workspaceId: string): Pro
 			)
 		);
 	return !!membership;
+}
+
+export async function createWorkspaceInvite(
+	workspaceId: string,
+	createdBy: string,
+	role: 'coach' | 'member'
+): Promise<table.WorkspaceInvite> {
+	const id = generateId();
+	const code = generateInviteCode();
+	const now = new Date();
+	const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+	const [invite] = await db
+		.insert(table.workspaceInvite)
+		.values({
+			id,
+			code,
+			workspaceId,
+			role,
+			createdBy,
+			createdAt: now,
+			expiresAt
+		})
+		.returning();
+
+	return invite;
+}
+
+export async function getInviteByCode(code: string): Promise<(table.WorkspaceInvite & { workspaceName: string }) | undefined> {
+	const [result] = await db
+		.select({
+			id: table.workspaceInvite.id,
+			code: table.workspaceInvite.code,
+			workspaceId: table.workspaceInvite.workspaceId,
+			role: table.workspaceInvite.role,
+			createdBy: table.workspaceInvite.createdBy,
+			createdAt: table.workspaceInvite.createdAt,
+			expiresAt: table.workspaceInvite.expiresAt,
+			workspaceName: table.workspace.name
+		})
+		.from(table.workspaceInvite)
+		.innerJoin(table.workspace, eq(table.workspaceInvite.workspaceId, table.workspace.id))
+		.where(eq(table.workspaceInvite.code, code.toUpperCase()));
+
+	return result;
+}
+
+export async function getWorkspaceInvites(workspaceId: string): Promise<table.WorkspaceInvite[]> {
+	const now = new Date();
+	return db
+		.select()
+		.from(table.workspaceInvite)
+		.where(
+			and(
+				eq(table.workspaceInvite.workspaceId, workspaceId),
+				gt(table.workspaceInvite.expiresAt, now)
+			)
+		);
+}
+
+export async function deleteInvite(inviteId: string): Promise<void> {
+	await db.delete(table.workspaceInvite).where(eq(table.workspaceInvite.id, inviteId));
 }
 
 export async function createSession(token: string, userId: string): Promise<table.Session> {
