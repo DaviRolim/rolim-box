@@ -1,5 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { sha256 } from '@oslojs/crypto/sha2';
 import { encodeBase64url, encodeHexLowerCase } from '@oslojs/encoding';
 import { hash, verify } from '@node-rs/argon2';
@@ -105,6 +105,48 @@ export async function getUserWorkspace(userId: string): Promise<table.Workspace 
 		.limit(1);
 
 	return result[0]?.workspace;
+}
+
+export async function getUserWorkspaces(userId: string): Promise<(table.Workspace & { role: string })[]> {
+	const results = await db
+		.select({
+			id: table.workspace.id,
+			name: table.workspace.name,
+			createdAt: table.workspace.createdAt,
+			role: table.workspaceMember.role
+		})
+		.from(table.workspaceMember)
+		.innerJoin(table.workspace, eq(table.workspaceMember.workspaceId, table.workspace.id))
+		.where(eq(table.workspaceMember.userId, userId));
+
+	return results;
+}
+
+export async function addUserToWorkspace(
+	userId: string,
+	workspaceId: string,
+	role: 'coach' | 'member'
+): Promise<void> {
+	await db.insert(table.workspaceMember).values({
+		userId,
+		workspaceId,
+		role,
+		joinedAt: new Date()
+	});
+}
+
+export async function isWorkspaceOwner(userId: string, workspaceId: string): Promise<boolean> {
+	const [membership] = await db
+		.select()
+		.from(table.workspaceMember)
+		.where(
+			and(
+				eq(table.workspaceMember.userId, userId),
+				eq(table.workspaceMember.workspaceId, workspaceId),
+				eq(table.workspaceMember.role, 'owner')
+			)
+		);
+	return !!membership;
 }
 
 export async function createSession(token: string, userId: string): Promise<table.Session> {
