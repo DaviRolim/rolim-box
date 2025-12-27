@@ -98,7 +98,7 @@
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		if (!inputValue.trim()) return;
+		if (!String(inputValue).trim()) return;
 
 		isSaving = true;
 		try {
