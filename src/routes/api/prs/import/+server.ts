@@ -91,7 +91,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	// Convert image to base64
 	const imageBuffer = await imageFile.arrayBuffer();
 	const base64Image = Buffer.from(imageBuffer).toString('base64');
-	const mimeType = imageFile.type;
 
 	// Build prompt with exercise database
 	const exerciseList = exercises
@@ -122,17 +121,14 @@ Return JSON with this exact structure:
 			output: Output.object({
 				schema: importAnalysisResponseSchema
 			}),
+			system: SYSTEM_PROMPT,
 			messages: [
-				{
-					role: 'system',
-					content: SYSTEM_PROMPT
-				},
 				{
 					role: 'user',
 					content: [
 						{
 							type: 'image',
-							image: `data:${mimeType};base64,${base64Image}`
+							image: base64Image
 						},
 						{
 							type: 'text',
