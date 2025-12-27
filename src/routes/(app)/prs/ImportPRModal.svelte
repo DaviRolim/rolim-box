@@ -1,10 +1,12 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
-	import type { UnitPreference, ImportedPR } from '$lib/types/pr';
+	import type { UnitPreference, ImportedPR, MeasurementType } from '$lib/types/pr';
 	import {
 		formatPRValue,
-		convertWeightForDisplay,
-		convertDistanceForDisplay
+		convertValueForDisplay,
+		convertValueForStorage,
+		getWeightUnit,
+		getDistanceUnit
 	} from '$lib/types/pr';
 
 	interface EnrichedImportedPR extends ImportedPR {
@@ -145,8 +147,13 @@
 			// Select all PRs by default
 			selectedPRs = new Set(matchedPRs.map((pr) => pr.exerciseId));
 
-			// Initialize edited values
-			editedValues = new Map(matchedPRs.map((pr) => [pr.exerciseId, pr.value]));
+			// Initialize edited values with display values (converted from storage units)
+			editedValues = new Map(
+				matchedPRs.map((pr) => [
+					pr.exerciseId,
+					convertValueForDisplay(pr.value, pr.measurementType, unitPreference)
+				])
+			);
 
 			if (matchedPRs.length === 0) {
 				error = 'No personal records found in this image. Make sure the image clearly shows exercise names and values.';
@@ -180,10 +187,16 @@
 	async function importPRs() {
 		const prsToImport = matchedPRs
 			.filter((pr) => selectedPRs.has(pr.exerciseId))
-			.map((pr) => ({
-				exerciseId: pr.exerciseId,
-				value: editedValues.get(pr.exerciseId) ?? pr.value
-			}));
+			.map((pr) => {
+				// Get the display value (from edited or original converted)
+				const displayValue = editedValues.get(pr.exerciseId) ??
+					convertValueForDisplay(pr.value, pr.measurementType, unitPreference);
+				// Convert back to storage units
+				return {
+					exerciseId: pr.exerciseId,
+					value: convertValueForStorage(displayValue, pr.measurementType, unitPreference)
+				};
+			});
 
 		if (prsToImport.length === 0) return;
 
@@ -214,6 +227,22 @@
 	// Count selected PRs
 	let selectedCount = $derived(selectedPRs.size);
 	let hasConflicts = $derived(matchedPRs.some((pr) => pr.hasConflict && selectedPRs.has(pr.exerciseId)));
+
+	// Get unit label for measurement type
+	function getUnitLabel(measurementType: MeasurementType): string {
+		switch (measurementType) {
+			case 'weight':
+				return getWeightUnit(unitPreference);
+			case 'distance':
+				return getDistanceUnit(unitPreference);
+			case 'time':
+				return 's';
+			case 'reps':
+				return '';
+			default:
+				return '';
+		}
+	}
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -355,18 +384,26 @@
 										</div>
 										<p class="text-xs text-text-muted truncate">{pr.originalText}</p>
 										{#if pr.hasConflict && pr.existingValue}
+											{@const existingDisplayValue = convertValueForDisplay(pr.existingValue, pr.measurementType, unitPreference)}
+											{@const unit = getUnitLabel(pr.measurementType)}
 											<p class="mt-1 text-xs text-warning">
-												Existing PR: {pr.existingValue} → {currentValue}
+												Existing: {existingDisplayValue}{unit} → {currentValue}{unit}
 											</p>
 										{/if}
 									</div>
-									<input
-										type="number"
-										value={currentValue}
-										onchange={(e) => updateValue(pr.exerciseId, Number((e.target as HTMLInputElement).value))}
-										disabled={!isSelected}
-										class="w-24 rounded border border-white/10 bg-white/5 px-2 py-1 text-right text-white disabled:opacity-50"
-									/>
+									<div class="flex items-center gap-1">
+										<input
+											type="number"
+											step="any"
+											value={currentValue}
+											onchange={(e) => updateValue(pr.exerciseId, Number((e.target as HTMLInputElement).value))}
+											disabled={!isSelected}
+											class="w-20 rounded border border-white/10 bg-white/5 px-2 py-1 text-right text-white disabled:opacity-50"
+										/>
+										{#if getUnitLabel(pr.measurementType)}
+											<span class="text-xs text-text-muted w-6">{getUnitLabel(pr.measurementType)}</span>
+										{/if}
+									</div>
 								</div>
 							</div>
 						{/each}

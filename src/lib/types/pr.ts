@@ -73,12 +73,28 @@ export type UpdateUserSettingsInput = z.infer<typeof updateUserSettingsSchema>;
 // Import Schemas
 // ============================================================================
 
-export const importedPRSchema = z.object({
+// Raw schema from AI (without measurementType - added server-side)
+export const rawImportedPRSchema = z.object({
 	exerciseId: z.string(),
 	exerciseName: z.string(),
 	originalText: z.string(),
 	value: z.number().positive(),
 	confidence: z.enum(['high', 'medium', 'low'])
+});
+
+export const rawImportAnalysisResponseSchema = z.object({
+	matched: z.array(rawImportedPRSchema),
+	unmatched: z.array(z.string())
+});
+
+// Full schema with measurementType (used client-side after enrichment)
+export const importedPRSchema = z.object({
+	exerciseId: z.string(),
+	exerciseName: z.string(),
+	originalText: z.string(),
+	value: z.number().positive(),
+	confidence: z.enum(['high', 'medium', 'low']),
+	measurementType: z.enum(['weight', 'time', 'reps', 'distance'])
 });
 
 export const importAnalysisResponseSchema = z.object({
@@ -203,4 +219,40 @@ export function isBetterPR(
 		return newValue < oldValue; // Lower time is better
 	}
 	return newValue > oldValue; // Higher weight/reps/distance is better
+}
+
+// Convert stored value to display value based on measurement type
+export function convertValueForDisplay(
+	value: number,
+	measurementType: MeasurementType,
+	unit: UnitPreference
+): number {
+	switch (measurementType) {
+		case 'weight':
+			return convertWeightForDisplay(value, unit);
+		case 'distance':
+			return convertDistanceForDisplay(value, unit);
+		case 'time':
+		case 'reps':
+		default:
+			return value; // No conversion needed
+	}
+}
+
+// Convert display value to storage value based on measurement type
+export function convertValueForStorage(
+	value: number,
+	measurementType: MeasurementType,
+	unit: UnitPreference
+): number {
+	switch (measurementType) {
+		case 'weight':
+			return convertWeightForStorage(value, unit);
+		case 'distance':
+			return convertDistanceForStorage(value, unit);
+		case 'time':
+		case 'reps':
+		default:
+			return Math.round(value); // Ensure integer for time/reps
+	}
 }
