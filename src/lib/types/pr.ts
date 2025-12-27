@@ -48,8 +48,12 @@ export const createPRSchema = z.object({
 		.string()
 		.regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
 		.refine((date) => {
-			const parsed = new Date(date);
-			return !isNaN(parsed.getTime());
+			const [year, month, day] = date.split('-').map(Number);
+			const parsed = new Date(year, month - 1, day);
+			// Check that the date didn't roll over
+			return (
+				parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day
+			);
 		}, 'Invalid date'),
 	note: z.string().max(500, 'Note too long').nullable().optional()
 });
@@ -107,6 +111,7 @@ export function convertDistanceForStorage(value: number, unit: UnitPreference): 
 
 // Time is stored in seconds, no conversion needed
 export function formatTime(seconds: number): string {
+	if (seconds < 0) seconds = 0; // Guard against negative values
 	const hours = Math.floor(seconds / 3600);
 	const mins = Math.floor((seconds % 3600) / 60);
 	const secs = seconds % 60;
@@ -119,6 +124,9 @@ export function formatTime(seconds: number): string {
 
 export function parseTime(timeStr: string): number {
 	const parts = timeStr.split(':').map(Number);
+	if (parts.some((p) => isNaN(p) || p < 0)) {
+		return 0; // Return 0 for invalid input
+	}
 	if (parts.length === 3) {
 		return parts[0] * 3600 + parts[1] * 60 + parts[2];
 	}
@@ -142,6 +150,8 @@ export function formatPRValue(
 			return `${value} reps`;
 		case 'distance':
 			return `${convertDistanceForDisplay(value, unit)}${unit === 'metric' ? 'm' : 'mi'}`;
+		default:
+			return String(value);
 	}
 }
 
