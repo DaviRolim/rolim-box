@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rolimbox-v4';
+const CACHE_NAME = 'rolimbox-v5';
 const STATIC_ASSETS = [
 	'/',
 	'/manifest.json',
@@ -60,11 +60,26 @@ self.addEventListener('fetch', (event) => {
 	if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
 	// Handle navigation requests (opening the app)
+	// Use stale-while-revalidate for fast PWA startup
 	if (event.request.mode === 'navigate') {
 		event.respondWith(
-			fetch(event.request)
-				.catch(() => caches.match('/'))
-				.then((response) => response || caches.match('/'))
+			caches.match('/').then((cached) => {
+				// Start network fetch in background
+				const networkFetch = fetch(event.request).then((response) => {
+					// Update cache with fresh response
+					if (response.status === 200) {
+						const clone = response.clone();
+						caches.open(CACHE_NAME).then((cache) => cache.put('/', clone));
+					}
+					return response;
+				});
+
+				// Return cached immediately if available, otherwise wait for network
+				if (cached) {
+					return cached;
+				}
+				return networkFetch;
+			})
 		);
 		return;
 	}
@@ -76,6 +91,23 @@ self.addEventListener('fetch', (event) => {
 	    url.pathname === '/logout') {
 		event.respondWith(
 			fetch(event.request).catch(() => caches.match(event.request))
+		);
+		return;
+	}
+
+	// Cache-first for SvelteKit immutable assets (hashed filenames)
+	if (url.pathname.startsWith('/_app/')) {
+		event.respondWith(
+			caches.match(event.request).then((cached) => {
+				if (cached) return cached;
+				return fetch(event.request).then((response) => {
+					if (response.status === 200) {
+						const clone = response.clone();
+						caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+					}
+					return response;
+				});
+			})
 		);
 		return;
 	}
