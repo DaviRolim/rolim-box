@@ -70,6 +70,36 @@ export type CreatePRInput = z.infer<typeof createPRSchema>;
 export type UpdateUserSettingsInput = z.infer<typeof updateUserSettingsSchema>;
 
 // ============================================================================
+// Import Schemas
+// ============================================================================
+
+export const importedPRSchema = z.object({
+	exerciseId: z.string(),
+	exerciseName: z.string(),
+	originalText: z.string(),
+	value: z.number().positive(),
+	confidence: z.enum(['high', 'medium', 'low'])
+});
+
+export const importAnalysisResponseSchema = z.object({
+	matched: z.array(importedPRSchema),
+	unmatched: z.array(z.string())
+});
+
+export const bulkImportItemSchema = z.object({
+	exerciseId: z.string().min(1),
+	value: z.number().positive()
+});
+
+export const bulkImportSchema = z.object({
+	prs: z.array(bulkImportItemSchema).min(1)
+});
+
+export type ImportedPR = z.infer<typeof importedPRSchema>;
+export type ImportAnalysisResponse = z.infer<typeof importAnalysisResponseSchema>;
+export type BulkImportInput = z.infer<typeof bulkImportSchema>;
+
+// ============================================================================
 // Unit Conversion Utilities
 // ============================================================================
 
