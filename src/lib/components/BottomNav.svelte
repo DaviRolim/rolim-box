@@ -21,6 +21,11 @@
 			icon: 'workouts'
 		},
 		{
+			label: 'PRs',
+			path: '/prs',
+			icon: 'prs'
+		},
+		{
 			label: 'Timers',
 			path: '/timers',
 			icon: 'timers'
@@ -43,7 +48,7 @@
 		class="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-accent-500/50 to-transparent opacity-50"
 	></div>
 
-	<div class="mx-auto grid max-w-md grid-cols-3 md:max-w-7xl">
+	<div class="mx-auto grid max-w-md grid-cols-4 md:max-w-7xl">
 		{#each navItems as item}
 			{@const active = isActive(item.path)}
 			<a
@@ -97,6 +102,28 @@
 						>
 							<circle cx="12" cy="12" r="9" stroke-width="2" />
 							<polyline points="12 6 12 12 16 14" stroke-width="2" stroke-linecap="round" />
+						</svg>
+					{:else if item.icon === 'prs'}
+						<svg
+							class="h-6 w-6 transition-transform duration-300 {active
+								? 'scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]'
+								: ''}"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+						>
+							<path
+								d="M12 15l-2 5h4l-2-5z"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
+							<path
+								d="M8 8a4 4 0 1 1 8 0c0 2.5-2 3-2 5h-4c0-2-2-2.5-2-5z"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
 						</svg>
 					{/if}
 				</div>
