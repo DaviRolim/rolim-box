@@ -3,15 +3,8 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { exercise, personalRecord } from '$lib/server/db/schema';
 import { eq, asc } from 'drizzle-orm';
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText, Output } from 'ai';
 import { env } from '$env/dynamic/private';
 import { importAnalysisResponseSchema } from '$lib/types/pr';
-
-const openrouter = createOpenAI({
-	baseURL: 'https://openrouter.ai/api/v1',
-	apiKey: env.OPENROUTER_API_KEY
-});
 
 const SYSTEM_PROMPT = `You are a fitness data extraction assistant. Extract personal records (PRs) from the provided image and match them to the given exercise database.
 
@@ -35,7 +28,9 @@ MATCHING RULES:
 CONFIDENCE LEVELS:
 - high: exact or near-exact name match
 - medium: similar name, likely correct
-- low: fuzzy match, user should verify`;
+- low: fuzzy match, user should verify
+
+IMPORTANT: Return ONLY valid JSON, no markdown code blocks or other text.`;
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
@@ -88,9 +83,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const existingPRMap = new Map(existingPRs.map((pr) => [pr.exerciseId, pr.value]));
 
-	// Convert image to base64
+	// Convert image to base64 data URI
 	const imageBuffer = await imageFile.arrayBuffer();
 	const base64Image = Buffer.from(imageBuffer).toString('base64');
+	const imageDataUri = `data:${imageFile.type};base64,${base64Image}`;
 
 	// Build prompt with exercise database
 	const exerciseList = exercises
@@ -116,32 +112,73 @@ Return JSON with this exact structure:
 }`;
 
 	try {
-		const { output } = await generateText({
-			model: openrouter('google/gemini-2.0-flash-001'),
-			output: Output.object({
-				schema: importAnalysisResponseSchema
-			}),
-			system: SYSTEM_PROMPT,
-			messages: [
-				{
-					role: 'user',
-					content: [
-						{
-							type: 'image',
-							image: base64Image
-						},
-						{
-							type: 'text',
-							text: userPrompt
-						}
-					]
-				}
-			]
+		// Use direct fetch to OpenRouter chat/completions endpoint
+		const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${env.OPENROUTER_API_KEY}`
+			},
+			body: JSON.stringify({
+				model: 'google/gemini-2.0-flash-001',
+				messages: [
+					{
+						role: 'system',
+						content: SYSTEM_PROMPT
+					},
+					{
+						role: 'user',
+						content: [
+							{
+								type: 'text',
+								text: userPrompt
+							},
+							{
+								type: 'image_url',
+								image_url: {
+									url: imageDataUri
+								}
+							}
+						]
+					}
+				]
+			})
 		});
 
-		if (!output) {
+		if (!response.ok) {
+			const errorData = await response.json();
+			console.error('OpenRouter error:', errorData);
 			return json({ error: 'Failed to analyze image' }, { status: 500 });
 		}
+
+		const data = await response.json();
+		const content = data.choices?.[0]?.message?.content;
+
+		if (!content) {
+			return json({ error: 'Failed to analyze image' }, { status: 500 });
+		}
+
+		// Parse JSON from response (handle potential markdown code blocks)
+		let jsonContent = content.trim();
+		if (jsonContent.startsWith('```json')) {
+			jsonContent = jsonContent.slice(7);
+		} else if (jsonContent.startsWith('```')) {
+			jsonContent = jsonContent.slice(3);
+		}
+		if (jsonContent.endsWith('```')) {
+			jsonContent = jsonContent.slice(0, -3);
+		}
+		jsonContent = jsonContent.trim();
+
+		const parsed = JSON.parse(jsonContent);
+		const validation = importAnalysisResponseSchema.safeParse(parsed);
+
+		if (!validation.success) {
+			console.error('Validation error:', validation.error);
+			return json({ error: 'Invalid response from AI' }, { status: 500 });
+		}
+
+		const output = validation.data;
 
 		// Enrich with conflict information
 		const enrichedMatched = output.matched.map((pr) => ({
