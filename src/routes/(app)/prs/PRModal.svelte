@@ -15,19 +15,21 @@
 		isBetterPR,
 		type ExerciseWithBestPR,
 		type UnitPreference,
-		type PersonalRecord
+		type PersonalRecord,
+		type ExerciseRankingsResponse
 	} from '$lib/types/pr';
 
 	interface Props {
 		open: boolean;
 		exercise: ExerciseWithBestPR;
 		unitPreference: UnitPreference;
+		workspaceId?: string;
 		onClose: () => void;
 		onSaved: () => void;
 		onDeleted: () => void;
 	}
 
-	let { open = $bindable(), exercise, unitPreference, onClose, onSaved, onDeleted }: Props =
+	let { open = $bindable(), exercise, unitPreference, workspaceId, onClose, onSaved, onDeleted }: Props =
 		$props();
 
 	// State
@@ -37,6 +39,8 @@
 	let showNoteField = $state(false);
 	let deleteModalOpen = $state(false);
 	let prToDelete = $state<string | null>(null);
+	let rankings = $state<ExerciseRankingsResponse | null>(null);
+	let rankingsLoading = $state(false);
 
 	// Form state
 	let inputValue = $state('');
@@ -46,10 +50,11 @@
 	// Dialog ref
 	let dialogElement: HTMLDialogElement;
 
-	// Load history when exercise changes
+	// Load history and rankings when exercise changes
 	$effect(() => {
 		if (open && exercise) {
 			loadHistory();
+			loadRankings();
 		}
 	});
 
@@ -76,6 +81,20 @@
 			console.error('Failed to load PR history:', error);
 		}
 		isLoading = false;
+	}
+
+	async function loadRankings() {
+		if (!workspaceId) return;
+		rankingsLoading = true;
+		try {
+			const res = await fetch(`/api/workspaces/${workspaceId}/exercises/${exercise.id}/rankings`);
+			if (res.ok) {
+				rankings = await res.json();
+			}
+		} catch (error) {
+			console.error('Failed to load rankings:', error);
+		}
+		rankingsLoading = false;
 	}
 
 	function resetForm() {
@@ -210,6 +229,19 @@
 			if (!best) return pr;
 			return isBetterPR(pr.value, best.value, exercise.measurementType) ? pr : best;
 		}, null as PersonalRecord | null);
+	});
+
+	function getRankEmoji(rank: number): string {
+		if (rank === 1) return '🥇';
+		if (rank === 2) return '🥈';
+		if (rank === 3) return '🥉';
+		return `#${rank}`;
+	}
+
+	let currentUserRanking = $derived.by(() => {
+		if (!rankings) return null;
+		const currentUserId = rankings.currentUserId;
+		return rankings.rankings.find(r => r.userId === currentUserId);
 	});
 
 	const categoryLabels: Record<string, string> = {
@@ -396,6 +428,53 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- Workspace Rankings -->
+			{#if workspaceId}
+				<div class="mt-6">
+					<h3 class="mb-3 text-sm font-bold uppercase text-text-secondary">Workspace Rankings</h3>
+
+					{#if rankingsLoading}
+						<div class="h-24 animate-pulse rounded-lg bg-white/5"></div>
+					{:else if rankings && rankings.rankings.length > 0}
+						<div class="rounded-xl border border-white/10 bg-white/5 p-4">
+							{#if currentUserRanking}
+								<p class="mb-3 text-sm text-text-muted">
+									You're <span class="font-bold text-white">#{currentUserRanking.rank}</span> of {rankings.totalMembers}
+								</p>
+							{:else}
+								<p class="mb-3 text-sm text-text-muted">Log a PR to join the rankings</p>
+							{/if}
+
+							<!-- Top 3 -->
+							<div class="flex flex-wrap gap-2">
+								{#each rankings.rankings.slice(0, 3) as entry (entry.userId)}
+									{@const isCurrentUser = entry.userId === rankings.currentUserId}
+									<div class="flex items-center gap-2 rounded-lg {isCurrentUser ? 'bg-accent-500/20' : 'bg-white/5'} px-3 py-2">
+										<span class="text-sm">{getRankEmoji(entry.rank)}</span>
+										<span class="text-sm font-bold text-white">
+											{isCurrentUser ? 'You' : entry.email.split('@')[0]}
+										</span>
+										<span class="text-sm text-accent-400">
+											{formatPRValue(entry.value, exercise.measurementType, unitPreference)}
+										</span>
+									</div>
+								{/each}
+							</div>
+
+							{#if rankings.rankings.length > 3}
+								<p class="mt-2 text-xs text-text-muted">
+									+{rankings.rankings.length - 3} more
+								</p>
+							{/if}
+						</div>
+					{:else if rankings}
+						<div class="rounded-xl border border-white/10 bg-white/5 p-4">
+							<p class="text-sm text-text-muted">No one has logged this exercise yet. Be the first!</p>
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 </dialog>
