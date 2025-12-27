@@ -5,7 +5,9 @@ import { eq, and, asc, desc } from 'drizzle-orm';
 import { seedExercises } from '$lib/server/db/seed-exercises';
 import type { ExerciseWithBestPR, UnitPreference, ExerciseCategory, MeasurementType } from '$lib/types/pr';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, parent }) => {
+	// Get activeWorkspaceId from parent layout
+	const { activeWorkspaceId } = await parent();
 	// Ensure exercises are seeded
 	await seedExercises();
 
@@ -63,6 +65,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		exercises: exercisesWithPRs,
-		unitPreference
+		unitPreference,
+		activeWorkspaceId
 	};
 };
