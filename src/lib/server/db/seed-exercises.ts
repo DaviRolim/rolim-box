@@ -64,7 +64,6 @@ export async function seedExercises(): Promise<void> {
 	// Check if exercises already exist
 	const existing = await db.select().from(exercise).limit(1);
 	if (existing.length > 0) {
-		console.log('Exercises already seeded, skipping...');
 		return;
 	}
 
