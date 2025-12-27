@@ -38,6 +38,59 @@ export interface ExerciseWithBestPR extends Exercise {
 }
 
 // ============================================================================
+// Leaderboard Types
+// ============================================================================
+
+export interface LeaderboardUser {
+	userId: string;
+	email: string;
+	points: number;
+	rank: number;
+}
+
+export interface ExerciseLeader {
+	exerciseId: string;
+	exerciseName: string;
+	category: ExerciseCategory;
+	measurementType: MeasurementType;
+	leaders: Array<{
+		userId: string;
+		email: string;
+		value: number;
+		date: string;
+	}>;
+}
+
+export interface LeaderboardResponse {
+	rankings: LeaderboardUser[];
+	exerciseLeaders: ExerciseLeader[];
+	totalExercises: number;
+	activeExercises: number;
+	currentUserId: string;
+}
+
+export interface ExerciseRanking {
+	rank: number;
+	userId: string;
+	email: string;
+	value: number;
+	date: string;
+}
+
+export interface ExerciseRankingsResponse {
+	exercise: {
+		id: string;
+		name: string;
+		category: ExerciseCategory;
+		measurementType: MeasurementType;
+	};
+	rankings: ExerciseRanking[];
+	totalMembers: number;
+	membersWithPR: number;
+	currentUserId: string;
+}
+
+// ============================================================================
 // Zod Validation Schemas
 // ============================================================================
 
