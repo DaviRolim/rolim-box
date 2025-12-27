@@ -29,6 +29,14 @@ export const load: LayoutServerLoad = async ({ locals, cookies, url }) => {
 	const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
 	if (!activeWorkspace && workspaces.length > 0) {
 		activeWorkspaceId = workspaces[0].id;
+		// Set the cookie so it persists
+		cookies.set('activeWorkspaceId', activeWorkspaceId, {
+			path: '/',
+			maxAge: 60 * 60 * 24 * 30,
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax'
+		});
 	}
 
 	return {
