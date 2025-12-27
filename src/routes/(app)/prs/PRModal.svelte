@@ -102,6 +102,8 @@
 		inputDate = new Date().toISOString().split('T')[0];
 		inputNote = '';
 		showNoteField = false;
+		rankings = null;
+		rankingsLoading = false;
 	}
 
 	function handleClose() {
@@ -152,6 +154,7 @@
 			if (res.ok) {
 				resetForm();
 				await loadHistory();
+				await loadRankings();
 				onSaved();
 			}
 		} catch (error) {
