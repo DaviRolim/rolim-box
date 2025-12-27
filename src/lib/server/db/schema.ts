@@ -5,7 +5,8 @@ export const user = sqliteTable('user', {
 	id: text('id').primaryKey(),
 	email: text('email').notNull().unique(),
 	passwordHash: text('password_hash').notNull(),
-	createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	unitPreference: text('unit_preference').notNull().default('metric') // 'metric' | 'imperial'
 });
 
 // Session
@@ -80,6 +81,31 @@ export const section = sqliteTable('section', {
 	timerConfig: text('timer_config') // nullable, JSON string
 });
 
+// Exercise (predefined, seeded)
+export const exercise = sqliteTable('exercise', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	category: text('category').notNull(), // 'weightlifting' | 'benchmark' | 'gymnastics' | 'cardio'
+	measurementType: text('measurement_type').notNull(), // 'weight' | 'time' | 'reps' | 'distance'
+	sortOrder: integer('sort_order').notNull()
+});
+
+// Personal Record
+export const personalRecord = sqliteTable('personal_record', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	exerciseId: text('exercise_id')
+		.notNull()
+		.references(() => exercise.id, { onDelete: 'cascade' }),
+	value: integer('value').notNull(), // stored in base units: grams, seconds, count, centimeters
+	note: text('note'),
+	date: text('date').notNull(), // ISO date: "2025-12-27"
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+});
+
 // Type exports
 export type Session = typeof session.$inferSelect;
 export type User = typeof user.$inferSelect;
@@ -88,3 +114,5 @@ export type WorkspaceMember = typeof workspaceMember.$inferSelect;
 export type WorkspaceInvite = typeof workspaceInvite.$inferSelect;
 export type Wod = typeof wod.$inferSelect;
 export type Section = typeof section.$inferSelect;
+export type Exercise = typeof exercise.$inferSelect;
+export type PersonalRecord = typeof personalRecord.$inferSelect;

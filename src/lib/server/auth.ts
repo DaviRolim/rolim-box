@@ -231,7 +231,8 @@ export async function validateSessionToken(
 			user: {
 				id: table.user.id,
 				email: table.user.email,
-				createdAt: table.user.createdAt
+				createdAt: table.user.createdAt,
+				unitPreference: table.user.unitPreference
 			},
 			session: table.session
 		})
