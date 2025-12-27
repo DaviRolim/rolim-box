@@ -48,7 +48,7 @@
 			{@const active = isActive(item.path)}
 			<a
 				href={item.disabled ? undefined : item.path}
-				class="group relative flex min-h-[64px] flex-col items-center justify-center gap-1.5 py-3 transition-colors duration-300"
+				class="group relative flex min-h-[var(--bottom-nav-min-height)] flex-col items-center justify-center gap-1.5 py-3 transition-colors duration-300"
 				class:text-accent-400={active}
 				class:text-text-muted={!active}
 				class:pointer-events-none={item.disabled}

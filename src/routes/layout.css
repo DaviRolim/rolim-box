@@ -43,6 +43,10 @@
 	--glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
+:root {
+	--bottom-nav-min-height: 64px;
+}
+
 @layer utilities {
 	.glass {
 		background: var(--glass-bg);
