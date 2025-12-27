@@ -69,7 +69,7 @@
 			<div class="mt-4 flex flex-wrap gap-4">
 				<select
 					bind:value={inviteRole}
-					class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white"
+					class="rounded-lg border border-white/10 bg-gray-800 px-4 py-2 pr-10 text-white [&>option]:bg-gray-800 [&>option]:text-white"
 				>
 					<option value="member">Member (view only)</option>
 					<option value="coach">Coach (can edit)</option>
