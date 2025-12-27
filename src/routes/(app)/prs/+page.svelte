@@ -14,6 +14,7 @@
 	} from '$lib/types/pr';
 	import type { PageData } from './$types';
 	import PRModal from './PRModal.svelte';
+	import ImportPRModal from './ImportPRModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -22,6 +23,7 @@
 	let activeCategory = $state<ExerciseCategory>('weightlifting');
 	let selectedExercise = $state<ExerciseWithBestPR | null>(null);
 	let modalOpen = $state(false);
+	let importModalOpen = $state(false);
 
 	// Derived
 	let filteredExercises = $derived.by(() => {
@@ -62,6 +64,11 @@
 		toastStore.success('PR deleted');
 	}
 
+	async function handleImportSuccess() {
+		await invalidateAll();
+		toastStore.success('PRs imported successfully!');
+	}
+
 	function formatDate(dateStr: string): string {
 		const date = new Date(dateStr + 'T00:00:00');
 		return date.toLocaleDateString('en-US', {
@@ -92,15 +99,33 @@
 	/>
 {/if}
 
+<ImportPRModal
+	bind:open={importModalOpen}
+	unitPreference={data.unitPreference}
+	onClose={() => (importModalOpen = false)}
+	onImported={handleImportSuccess}
+/>
+
 <div class="flex flex-col gap-6 p-4 pb-24 md:p-6">
 	<!-- Header -->
-	<header class="border-b border-white/10 pb-4">
-		<h1
-			class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
+	<header class="flex items-start justify-between border-b border-white/10 pb-4">
+		<div>
+			<h1
+				class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
+			>
+				Personal Records
+			</h1>
+			<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+		</div>
+		<button
+			onclick={() => (importModalOpen = true)}
+			class="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:bg-white/10 hover:text-white"
 		>
-			Personal Records
-		</h1>
-		<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round" />
+			</svg>
+			Import
+		</button>
 	</header>
 
 	<!-- Search Bar -->
