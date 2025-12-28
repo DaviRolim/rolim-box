@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
 
-	let { data } = $props();
+	let { data, form } = $props();
 
-	let email = $state('');
-	let password = $state('');
 	let loading = $state(false);
 	let error = $state('');
 
@@ -30,35 +29,6 @@
 			} finally {
 				loading = false;
 			}
-		}
-	}
-
-	async function handleRegister(event: Event) {
-		event.preventDefault();
-		loading = true;
-		error = '';
-
-		try {
-			const formData = new FormData();
-			formData.append('email', email);
-			formData.append('password', password);
-			formData.append('inviteCode', data.invite?.code || '');
-
-			const res = await fetch('/join/' + data.invite?.code, {
-				method: 'POST',
-				body: formData
-			});
-
-			if (res.redirected) {
-				window.location.href = res.url;
-			} else {
-				const result = await res.json();
-				error = result.error || 'Registration failed';
-			}
-		} catch {
-			error = 'Registration failed';
-		} finally {
-			loading = false;
 		}
 	}
 </script>
@@ -126,13 +96,13 @@
 					</p>
 				</div>
 
-				<form onsubmit={handleRegister} class="mt-6 space-y-4">
+				<form method="POST" use:enhance class="mt-6 space-y-4">
 					<div>
 						<label for="email" class="block text-sm font-medium text-text-secondary">Email</label>
 						<input
 							type="email"
 							id="email"
-							bind:value={email}
+							name="email"
 							required
 							class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-text-muted focus:border-accent-500 focus:outline-none"
 							placeholder="you@example.com"
@@ -145,7 +115,7 @@
 						<input
 							type="password"
 							id="password"
-							bind:value={password}
+							name="password"
 							required
 							minlength="8"
 							class="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-text-muted focus:border-accent-500 focus:outline-none"
@@ -153,16 +123,15 @@
 						/>
 					</div>
 
-					{#if error}
-						<p class="text-center text-sm text-error">{error}</p>
+					{#if form?.error}
+						<p class="text-center text-sm text-error">{form.error}</p>
 					{/if}
 
 					<button
 						type="submit"
-						disabled={loading}
 						class="w-full rounded-lg bg-accent-500 py-3 font-bold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
 					>
-						{loading ? 'Creating account...' : 'Create Account & Join'}
+						Create Account & Join
 					</button>
 				</form>
 
