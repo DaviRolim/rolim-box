@@ -3,18 +3,20 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { exercise } from '$lib/server/db/schema';
 import { asc } from 'drizzle-orm';
+import { seedExercises } from '$lib/server/db/seed-exercises';
 
-/**
- * GET /api/exercises
- * Returns all predefined exercises ordered by sortOrder
- */
-export const GET: RequestHandler = async ({ locals }) => {
-	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
+export const GET: RequestHandler = async () => {
+	// Ensure exercises are seeded
+	await seedExercises();
 
 	const exercises = await db
-		.select()
+		.select({
+			id: exercise.id,
+			name: exercise.name,
+			category: exercise.category,
+			measurementType: exercise.measurementType,
+			sortOrder: exercise.sortOrder
+		})
 		.from(exercise)
 		.orderBy(asc(exercise.sortOrder));
 
