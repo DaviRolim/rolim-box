@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request, cookies, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email');
 		const password = formData.get('password');
@@ -40,6 +40,11 @@ export const actions: Actions = {
 			path: '/'
 		});
 
-		throw redirect(302, '/');
+		// Redirect to the requested page or default to home
+		const redirectTo = url.searchParams.get('redirect');
+		// Validate redirect is a safe internal path (prevent open redirect)
+		const safeRedirect = redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
+
+		throw redirect(302, safeRedirect);
 	}
 };
