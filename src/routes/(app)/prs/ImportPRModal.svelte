@@ -6,7 +6,9 @@
 		convertValueForDisplay,
 		convertValueForStorage,
 		getWeightUnit,
-		getDistanceUnit
+		getDistanceUnit,
+		formatTime,
+		parseTime
 	} from '$lib/types/pr';
 
 	interface EnrichedImportedPR extends ImportedPR {
@@ -156,7 +158,8 @@
 			);
 
 			if (matchedPRs.length === 0) {
-				error = 'No personal records found in this image. Make sure the image clearly shows exercise names and values.';
+				error =
+					'No personal records found in this image. Make sure the image clearly shows exercise names and values.';
 				modalState = 'upload';
 				return;
 			}
@@ -189,7 +192,8 @@
 			.filter((pr) => selectedPRs.has(pr.exerciseId))
 			.map((pr) => {
 				// Get the display value (from edited or original converted)
-				const displayValue = editedValues.get(pr.exerciseId) ??
+				const displayValue =
+					editedValues.get(pr.exerciseId) ??
 					convertValueForDisplay(pr.value, pr.measurementType, unitPreference);
 				// Convert back to storage units
 				return {
@@ -226,7 +230,9 @@
 
 	// Count selected PRs
 	let selectedCount = $derived(selectedPRs.size);
-	let hasConflicts = $derived(matchedPRs.some((pr) => pr.hasConflict && selectedPRs.has(pr.exerciseId)));
+	let hasConflicts = $derived(
+		matchedPRs.some((pr) => pr.hasConflict && selectedPRs.has(pr.exerciseId))
+	);
 
 	// Get unit label for measurement type
 	function getUnitLabel(measurementType: MeasurementType): string {
@@ -236,7 +242,7 @@
 			case 'distance':
 				return getDistanceUnit(unitPreference);
 			case 'time':
-				return 's';
+				return 'min';
 			case 'reps':
 				return '';
 			default:
@@ -262,8 +268,8 @@
 		<div class="border-b border-white/10 p-4">
 			<div class="flex items-start justify-between">
 				<div>
-					<h2 class="text-xl font-black text-white">Import PRs</h2>
-					<p class="text-sm text-text-muted">
+					<h2 class="text-2xl font-black tracking-tight text-white">Import PRs</h2>
+					<p class="mt-0.5 text-sm text-text-muted">
 						{#if modalState === 'upload'}
 							Upload a screenshot of your PRs
 						{:else if modalState === 'processing'}
@@ -278,7 +284,13 @@
 					aria-label="Close"
 					class="rounded-lg p-2 text-text-muted hover:bg-white/10 hover:text-white"
 				>
-					<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<svg
+						class="h-5 w-5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
 						<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
 					</svg>
 				</button>
@@ -301,10 +313,20 @@
 						ondrop={handleDrop}
 						ondragover={handleDragOver}
 					>
-						<svg class="mb-4 h-12 w-12 text-text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-							<path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" />
+						<svg
+							class="mb-4 h-12 w-12 text-text-muted"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<path
+								d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							/>
 						</svg>
-						<p class="mb-1 text-white font-medium">Drop image or click to upload</p>
+						<p class="mb-1 font-medium text-white">Drop image or click to upload</p>
 						<p class="text-sm text-text-muted">PNG, JPG, or WEBP (max 5MB)</p>
 						<input
 							type="file"
@@ -325,35 +347,46 @@
 							<button
 								onclick={clearFile}
 								aria-label="Clear selected file"
-								class="absolute -right-2 -top-2 rounded-full bg-bg-surface p-1 text-text-muted hover:text-white"
+								class="absolute -top-2 -right-2 rounded-full bg-bg-surface p-1 text-text-muted hover:text-white"
 							>
-								<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+								<svg
+									class="h-5 w-5"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
 									<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
 								</svg>
 							</button>
 						</div>
-						<p class="text-sm text-text-muted truncate">{selectedFile.name}</p>
+						<p class="truncate text-sm text-text-muted">{selectedFile.name}</p>
 					</div>
 				{/if}
-
 			{:else if modalState === 'processing'}
 				<!-- Processing State -->
 				<div class="flex flex-col items-center justify-center py-12">
-					<div class="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-accent-500 border-t-transparent"></div>
+					<div
+						class="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-accent-500 border-t-transparent"
+					></div>
 					<p class="text-text-muted">Analyzing your PRs...</p>
 				</div>
-
 			{:else if modalState === 'review'}
 				<!-- Review State -->
 				<div class="space-y-4">
 					<!-- Summary -->
-					<div class="flex items-center gap-2 text-sm">
-						<span class="text-white font-medium">Found {matchedPRs.length} PRs</span>
-						{#if unmatchedExercises.length > 0}
-							<span class="rounded-full bg-warning/20 px-2 py-0.5 text-xs text-warning">
-								{unmatchedExercises.length} skipped
-							</span>
-						{/if}
+					<!-- Summary -->
+					<div class="flex items-center justify-between px-1">
+						<div class="flex items-center gap-2">
+							<span class="text-lg font-bold text-white">Found {matchedPRs.length} PRs</span>
+							{#if unmatchedExercises.length > 0}
+								<span
+									class="bg-warning/20 border-warning/20 rounded-full border px-3 py-1 text-xs font-medium text-amber-400"
+								>
+									{unmatchedExercises.length} skipped
+								</span>
+							{/if}
+						</div>
 					</div>
 
 					<!-- PR List -->
@@ -362,46 +395,106 @@
 							{@const isSelected = selectedPRs.has(pr.exerciseId)}
 							{@const currentValue = editedValues.get(pr.exerciseId) ?? pr.value}
 							<div
-								class="rounded-lg border p-3 transition-colors {isSelected
-									? 'border-accent-500/30 bg-accent-500/10'
-									: 'border-white/10 bg-white/5 opacity-50'}"
+								class="group flex items-center justify-between gap-4 rounded-xl border p-4 transition-all duration-200 {isSelected
+									? 'border-accent-500 bg-accent-500/10 shadow-[0_0_15px_rgba(236,72,153,0.1)]'
+									: 'bg-surface-800 hover:bg-surface-700 border-white/5 hover:border-white/10'}"
 							>
-								<div class="flex items-start gap-3">
-									<input
-										type="checkbox"
-										checked={isSelected}
-										onchange={() => togglePR(pr.exerciseId)}
-										class="mt-1 h-4 w-4 rounded border-white/20 bg-white/5 text-accent-500 focus:ring-accent-500"
-									/>
-									<div class="flex-1 min-w-0">
+								<!-- Left: Checkbox & Info -->
+								<div class="flex flex-1 items-start gap-4">
+									<div class="relative flex h-6 w-6 items-center justify-center">
+										<input
+											type="checkbox"
+											checked={isSelected}
+											onchange={() => togglePR(pr.exerciseId)}
+											class="peer bg-surface-900 h-5 w-5 cursor-pointer appearance-none rounded-md border border-white/20 transition-all checked:border-accent-500 checked:bg-accent-500 focus:ring-0 focus:ring-offset-0"
+										/>
+										<svg
+											class="pointer-events-none absolute h-3.5 w-3.5 text-white opacity-0 transition-opacity peer-checked:opacity-100"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="3"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
+											<polyline points="20 6 9 17 4 12" />
+										</svg>
+									</div>
+
+									<div class="min-w-0 flex-1 pt-0.5">
 										<div class="flex items-center gap-2">
-											<p class="font-medium text-white truncate">{pr.exerciseName}</p>
+											<p class="truncate text-lg font-bold text-white">{pr.exerciseName}</p>
 											{#if pr.confidence !== 'high'}
-												<span class="rounded bg-warning/20 px-1.5 py-0.5 text-xs text-warning">
+												<span
+													class="rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase {pr.confidence ===
+													'medium'
+														? 'bg-warning/20 text-warning'
+														: 'bg-error/20 text-error'}"
+												>
 													{pr.confidence}
 												</span>
 											{/if}
 										</div>
-										<p class="text-xs text-text-muted truncate">{pr.originalText}</p>
+										<p class="mt-0.5 truncate text-xs text-text-muted">{pr.originalText}</p>
 										{#if pr.hasConflict && pr.existingValue}
-											{@const existingDisplayValue = convertValueForDisplay(pr.existingValue, pr.measurementType, unitPreference)}
+											{@const existingDisplayValue = convertValueForDisplay(
+												pr.existingValue,
+												pr.measurementType,
+												unitPreference
+											)}
 											{@const unit = getUnitLabel(pr.measurementType)}
-											<p class="mt-1 text-xs text-warning">
-												Existing: {existingDisplayValue}{unit} → {currentValue}{unit}
-											</p>
+											<div
+												class="text-warning bg-warning/10 mt-2 flex w-fit items-center gap-2 rounded-lg px-2 py-1 text-xs"
+											>
+												<svg
+													class="h-3 w-3"
+													viewBox="0 0 24 24"
+													fill="none"
+													stroke="currentColor"
+													stroke-width="2"
+												>
+													<path
+														d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+														stroke-linecap="round"
+														stroke-linejoin="round"
+													/>
+												</svg>
+												<span>Update: {existingDisplayValue}{unit} → {currentValue}{unit}</span>
+											</div>
 										{/if}
 									</div>
-									<div class="flex items-center gap-1">
-										<input
-											type="number"
-											step="any"
-											value={currentValue}
-											onchange={(e) => updateValue(pr.exerciseId, Number((e.target as HTMLInputElement).value))}
-											disabled={!isSelected}
-											class="w-20 rounded border border-white/10 bg-white/5 px-2 py-1 text-right text-white disabled:opacity-50"
-										/>
+								</div>
+
+								<!-- Right: Value Input -->
+								<div class="flex flex-col items-end gap-1">
+									<div class="flex items-center gap-2">
+										{#if pr.measurementType === 'time'}
+											<input
+												type="text"
+												value={formatTime(currentValue)}
+												onchange={(e) =>
+													updateValue(
+														pr.exerciseId,
+														parseTime((e.target as HTMLInputElement).value)
+													)}
+												disabled={!isSelected}
+												class="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-right text-lg font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50"
+											/>
+										{:else}
+											<input
+												type="number"
+												step="any"
+												value={currentValue}
+												onchange={(e) =>
+													updateValue(pr.exerciseId, Number((e.target as HTMLInputElement).value))}
+												disabled={!isSelected}
+												class="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-right text-lg font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50"
+											/>
+										{/if}
 										{#if getUnitLabel(pr.measurementType)}
-											<span class="text-xs text-text-muted w-6">{getUnitLabel(pr.measurementType)}</span>
+											<span class="w-6 text-xs font-medium text-text-muted">
+												{getUnitLabel(pr.measurementType)}
+											</span>
 										{/if}
 									</div>
 								</div>
@@ -431,12 +524,7 @@
 		<!-- Footer -->
 		<div class="border-t border-white/10 p-4">
 			{#if modalState === 'upload'}
-				<Button
-					onclick={analyzeImage}
-					variant="primary"
-					class="w-full"
-					disabled={!selectedFile}
-				>
+				<Button onclick={analyzeImage} variant="primary" class="w-full" disabled={!selectedFile}>
 					Analyze Image
 				</Button>
 			{:else if modalState === 'review'}
