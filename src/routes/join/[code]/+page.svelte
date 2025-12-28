@@ -72,7 +72,7 @@
 				<a href="/login" class="mt-4 inline-block text-accent-400 hover:underline">Go to login</a>
 			</div>
 		{:else if data.error === 'expired'}
-			<div class="rounded-xl border border-warning/20 bg-warning/5 p-8 text-center">
+			<div class="rounded-xl border border-warning/20 bg-warning/10 p-8 text-center">
 				<h1 class="text-xl font-bold text-warning">Invite Expired</h1>
 				<p class="mt-2 text-text-secondary">This invite has expired. Ask for a new one.</p>
 				<a href="/login" class="mt-4 inline-block text-accent-400 hover:underline">Go to login</a>
@@ -83,7 +83,10 @@
 				<p class="mt-2 text-text-secondary">
 					You're already a member of <strong>{data.invite?.workspaceName}</strong>.
 				</p>
-				<a href="/workouts" class="mt-4 inline-block rounded-lg bg-accent-500 px-4 py-2 font-bold text-white hover:bg-accent-600">
+				<a
+					href="/workouts"
+					class="mt-4 inline-block rounded-lg bg-accent-500 px-4 py-2 font-bold text-white hover:bg-accent-600"
+				>
 					Go to Workouts
 				</a>
 			</div>
@@ -136,7 +139,9 @@
 						/>
 					</div>
 					<div>
-						<label for="password" class="block text-sm font-medium text-text-secondary">Password</label>
+						<label for="password" class="block text-sm font-medium text-text-secondary"
+							>Password</label
+						>
 						<input
 							type="password"
 							id="password"
@@ -163,7 +168,10 @@
 
 				<p class="mt-4 text-center text-sm text-text-muted">
 					Already have an account?
-					<a href="/login?redirect=/join/{data.invite?.code}" class="text-accent-400 hover:underline">Log in</a>
+					<a
+						href="/login?redirect=/join/{data.invite?.code}"
+						class="text-accent-400 hover:underline">Log in</a
+					>
 				</p>
 			</div>
 		{/if}

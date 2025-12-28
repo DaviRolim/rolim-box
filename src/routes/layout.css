@@ -36,6 +36,7 @@
 	/* Semantic Colors */
 	--color-error: #ef4444;
 	--color-success: #10b981;
+	--color-warning: #f59e0b; /* Amber 500 */
 
 	/* Glassmorphism */
 	--glass-bg: rgba(30, 41, 59, 0.7);

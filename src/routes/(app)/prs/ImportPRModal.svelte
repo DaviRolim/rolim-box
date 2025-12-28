@@ -381,7 +381,7 @@
 							<span class="text-lg font-bold text-white">Found {matchedPRs.length} PRs</span>
 							{#if unmatchedExercises.length > 0}
 								<span
-									class="bg-warning/20 border-warning/20 rounded-full border px-3 py-1 text-xs font-medium text-amber-400"
+									class="rounded-full border border-warning/20 bg-warning/10 px-3 py-1 text-xs font-medium text-warning"
 								>
 									{unmatchedExercises.length} skipped
 								</span>
@@ -395,13 +395,13 @@
 							{@const isSelected = selectedPRs.has(pr.exerciseId)}
 							{@const currentValue = editedValues.get(pr.exerciseId) ?? pr.value}
 							<div
-								class="group flex items-center justify-between gap-4 rounded-xl border p-4 transition-all duration-200 {isSelected
+								class="group flex items-start gap-3 rounded-xl border p-3 transition-all duration-200 md:items-center md:justify-between md:gap-4 md:p-4 {isSelected
 									? 'border-accent-500 bg-accent-500/10 shadow-[0_0_15px_rgba(236,72,153,0.1)]'
 									: 'bg-surface-800 hover:bg-surface-700 border-white/5 hover:border-white/10'}"
 							>
 								<!-- Left: Checkbox & Info -->
-								<div class="flex flex-1 items-start gap-4">
-									<div class="relative flex h-6 w-6 items-center justify-center">
+								<div class="flex flex-1 items-start gap-3 md:gap-4">
+									<div class="relative mt-1 flex h-6 w-6 items-center justify-center md:mt-0">
 										<input
 											type="checkbox"
 											checked={isSelected}
@@ -421,9 +421,11 @@
 										</svg>
 									</div>
 
-									<div class="min-w-0 flex-1 pt-0.5">
-										<div class="flex items-center gap-2">
-											<p class="truncate text-lg font-bold text-white">{pr.exerciseName}</p>
+									<div class="min-w-0 flex-1">
+										<div class="flex flex-wrap items-center gap-2">
+											<p class="truncate text-base font-bold text-white md:text-lg">
+												{pr.exerciseName}
+											</p>
 											{#if pr.confidence !== 'high'}
 												<span
 													class="rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase {pr.confidence ===
@@ -444,7 +446,7 @@
 											)}
 											{@const unit = getUnitLabel(pr.measurementType)}
 											<div
-												class="text-warning bg-warning/10 mt-2 flex w-fit items-center gap-2 rounded-lg px-2 py-1 text-xs"
+												class="mt-2 flex w-fit items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-2 py-1 text-xs text-warning"
 											>
 												<svg
 													class="h-3 w-3"
@@ -466,8 +468,8 @@
 								</div>
 
 								<!-- Right: Value Input -->
-								<div class="flex flex-col items-end gap-1">
-									<div class="flex items-center gap-2">
+								<div class="flex flex-shrink-0 items-center gap-2">
+									<div class="flex items-center gap-1.5 md:gap-2">
 										{#if pr.measurementType === 'time'}
 											<input
 												type="text"
@@ -478,7 +480,7 @@
 														parseTime((e.target as HTMLInputElement).value)
 													)}
 												disabled={!isSelected}
-												class="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-right text-lg font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50"
+												class="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-right text-base font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50 md:w-28 md:px-3 md:py-2 md:text-lg"
 											/>
 										{:else}
 											<input
@@ -488,11 +490,13 @@
 												onchange={(e) =>
 													updateValue(pr.exerciseId, Number((e.target as HTMLInputElement).value))}
 												disabled={!isSelected}
-												class="w-24 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-right text-lg font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50"
+												class="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-right text-base font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50 md:w-24 md:px-3 md:py-2 md:text-lg"
 											/>
 										{/if}
 										{#if getUnitLabel(pr.measurementType)}
-											<span class="w-6 text-xs font-medium text-text-muted">
+											<span
+												class="w-6 flex-shrink-0 text-[10px] font-medium text-text-muted md:text-xs"
+											>
 												{getUnitLabel(pr.measurementType)}
 											</span>
 										{/if}
