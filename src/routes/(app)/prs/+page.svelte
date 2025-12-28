@@ -17,7 +17,13 @@
 	import ImportPRModal from './ImportPRModal.svelte';
 	import LeaderboardTab from './LeaderboardTab.svelte';
 
-	let { data }: { data: PageData } = $props();
+	// Access props without destructuring to maintain reactivity during navigation
+	const props = $props<{ data: PageData }>();
+
+	// Create reactive derived values from props to ensure proper reactivity
+	let exercises = $derived(props.data.exercises);
+	let unitPreference = $derived(props.data.unitPreference);
+	let activeWorkspaceId = $derived(props.data.activeWorkspaceId);
 
 	// Tab state
 	type TabId = 'my-prs' | 'leaderboard';
@@ -28,27 +34,62 @@
 		{ id: 'leaderboard', label: 'Leaderboard' }
 	];
 
+	// Category state - 'recorded' is a special filter showing all exercises with PRs
+	type ActiveCategory = ExerciseCategory | 'recorded';
+
+	// Check if user has any PRs to determine default category
+	let hasAnyPRs = $derived(exercises.some((ex: ExerciseWithBestPR) => ex.bestPR !== null));
+	let defaultCategory = $derived<ActiveCategory>(hasAnyPRs ? 'recorded' : 'weightlifting');
+
 	// State
 	let searchQuery = $state('');
-	let activeCategory = $state<ExerciseCategory>('weightlifting');
+	let activeCategory = $state<ActiveCategory | null>(null);
+
+	// Use default category if none selected yet
+	let effectiveCategory = $derived<ActiveCategory>(activeCategory ?? defaultCategory);
 	let selectedExercise = $state<ExerciseWithBestPR | null>(null);
 	let modalOpen = $state(false);
 	let importModalOpen = $state(false);
 
 	// Derived
 	let filteredExercises = $derived.by(() => {
-		let result = data.exercises;
+		let result = exercises;
 
 		// Filter by search
 		if (searchQuery.trim()) {
 			const query = searchQuery.toLowerCase();
-			result = result.filter((ex) => ex.name.toLowerCase().includes(query));
+			result = result.filter((ex: ExerciseWithBestPR) => ex.name.toLowerCase().includes(query));
+		} else if (effectiveCategory === 'recorded') {
+			// Show only exercises with recorded PRs (from all categories)
+			result = result.filter((ex: ExerciseWithBestPR) => ex.bestPR !== null);
 		} else {
 			// Filter by category only when not searching
-			result = result.filter((ex) => ex.category === activeCategory);
+			result = result.filter((ex: ExerciseWithBestPR) => ex.category === effectiveCategory);
 		}
 
 		return result;
+	});
+
+	// Group exercises by category (used when 'recorded' is active)
+	let groupedExercises = $derived.by(() => {
+		if (effectiveCategory !== 'recorded') return null;
+
+		const groups: Record<ExerciseCategory, ExerciseWithBestPR[]> = {
+			weightlifting: [],
+			benchmark: [],
+			gymnastics: [],
+			cardio: []
+		};
+
+		for (const ex of filteredExercises as ExerciseWithBestPR[]) {
+			groups[ex.category].push(ex);
+		}
+
+		// Return only non-empty groups in the correct order
+		return EXERCISE_CATEGORIES.map((category) => ({
+			category,
+			exercises: groups[category]
+		})).filter((group) => group.exercises.length > 0);
 	});
 
 	let isSearching = $derived(searchQuery.trim().length > 0);
@@ -102,8 +143,8 @@
 	<PRModal
 		bind:open={modalOpen}
 		exercise={selectedExercise}
-		unitPreference={data.unitPreference}
-		workspaceId={data.activeWorkspaceId}
+		unitPreference={unitPreference}
+		workspaceId={activeWorkspaceId}
 		onClose={handleModalClose}
 		onSaved={handlePRSaved}
 		onDeleted={handlePRDeleted}
@@ -112,7 +153,7 @@
 
 <ImportPRModal
 	bind:open={importModalOpen}
-	unitPreference={data.unitPreference}
+	unitPreference={unitPreference}
 	onClose={() => (importModalOpen = false)}
 	onImported={handleImportSuccess}
 />
@@ -182,10 +223,20 @@
 		<!-- Category Tabs (hidden when searching) -->
 		{#if !isSearching}
 			<div class="flex gap-2 overflow-x-auto pb-2">
+				<!-- Recorded PRs tab (special filter) -->
+				<button
+					onclick={() => (activeCategory = 'recorded')}
+					class="whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold uppercase transition-all {effectiveCategory ===
+					'recorded'
+						? 'bg-accent-500 text-white'
+						: 'bg-white/5 text-text-muted hover:bg-white/10 hover:text-white'}"
+				>
+					Recorded
+				</button>
 				{#each EXERCISE_CATEGORIES as category}
 					<button
 						onclick={() => (activeCategory = category)}
-						class="whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold uppercase transition-all {activeCategory ===
+						class="whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold uppercase transition-all {effectiveCategory ===
 						category
 							? 'bg-accent-500 text-white'
 							: 'bg-white/5 text-text-muted hover:bg-white/10 hover:text-white'}"
@@ -197,41 +248,80 @@
 		{/if}
 
 		<!-- Exercise Grid -->
-		<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-			{#each filteredExercises as exercise (exercise.id)}
-				<button
-					onclick={() => handleExerciseClick(exercise)}
-					class="group relative overflow-hidden rounded-xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-white/10"
-				>
-					<h3 class="font-bold text-white line-clamp-2">{exercise.name}</h3>
-					{#if exercise.bestPR}
-						<p class="mt-2 text-lg font-black text-accent-400">
-							{formatPRValue(exercise.bestPR.value, exercise.measurementType, data.unitPreference)}
-						</p>
-						<p class="text-xs text-text-muted">{formatDate(exercise.bestPR.date)}</p>
-					{:else}
-						<p class="mt-2 text-sm text-text-muted">No PR yet</p>
-					{/if}
+		{#if effectiveCategory === 'recorded' && groupedExercises}
+			<!-- Grouped view for recorded PRs -->
+			{#each groupedExercises as group (group.category)}
+				<div class="flex flex-col gap-3">
+					<h2 class="text-sm font-bold uppercase text-text-muted">
+						{categoryLabels[group.category]}
+					</h2>
+					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+						{#each group.exercises as exercise (exercise.id)}
+							<button
+								onclick={() => handleExerciseClick(exercise)}
+								class="group relative overflow-hidden rounded-xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-white/10"
+							>
+								<h3 class="font-bold text-white line-clamp-2">{exercise.name}</h3>
+								{#if exercise.bestPR}
+									<p class="mt-2 text-lg font-black text-accent-400">
+										{formatPRValue(exercise.bestPR.value, exercise.measurementType, unitPreference)}
+									</p>
+									<p class="text-xs text-text-muted">{formatDate(exercise.bestPR.date)}</p>
+								{/if}
 
-					<!-- Hover indicator -->
-					<div
-						class="absolute bottom-0 left-0 h-1 w-0 bg-accent-500 transition-all group-hover:w-full"
-					></div>
-				</button>
+								<!-- Hover indicator -->
+								<div
+									class="absolute bottom-0 left-0 h-1 w-0 bg-accent-500 transition-all group-hover:w-full"
+								></div>
+							</button>
+						{/each}
+					</div>
+				</div>
 			{/each}
-		</div>
+		{:else}
+			<!-- Regular grid view -->
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+				{#each filteredExercises as exercise (exercise.id)}
+					<button
+						onclick={() => handleExerciseClick(exercise)}
+						class="group relative overflow-hidden rounded-xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-white/10"
+					>
+						<h3 class="font-bold text-white line-clamp-2">{exercise.name}</h3>
+						{#if exercise.bestPR}
+							<p class="mt-2 text-lg font-black text-accent-400">
+								{formatPRValue(exercise.bestPR.value, exercise.measurementType, unitPreference)}
+							</p>
+							<p class="text-xs text-text-muted">{formatDate(exercise.bestPR.date)}</p>
+						{:else}
+							<p class="mt-2 text-sm text-text-muted">No PR yet</p>
+						{/if}
+
+						<!-- Hover indicator -->
+						<div
+							class="absolute bottom-0 left-0 h-1 w-0 bg-accent-500 transition-all group-hover:w-full"
+						></div>
+					</button>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- Empty state -->
 		{#if filteredExercises.length === 0}
 			<div class="flex flex-col items-center justify-center py-12 text-center">
 				<p class="text-text-muted">
-					{isSearching ? 'No exercises found' : 'No exercises in this category'}
+					{#if isSearching}
+						No exercises found
+					{:else if effectiveCategory === 'recorded'}
+						No PRs recorded yet. Select a category to start tracking!
+					{:else}
+						No exercises in this category
+					{/if}
 				</p>
 			</div>
 		{/if}
 	{:else if activeTab === 'leaderboard'}
-		{#if data.activeWorkspaceId}
-			<LeaderboardTab workspaceId={data.activeWorkspaceId} unitPreference={data.unitPreference} />
+		{#if activeWorkspaceId}
+			<LeaderboardTab workspaceId={activeWorkspaceId} unitPreference={unitPreference} />
 		{:else}
 			<div class="py-12 text-center">
 				<p class="text-text-muted">No workspace selected</p>
