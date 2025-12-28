@@ -4,39 +4,24 @@ import { db } from '$lib/server/db';
 import { personalRecord, exercise } from '$lib/server/db/schema';
 import { createPRSchema } from '$lib/types/pr';
 import { generateId } from '$lib/server/auth';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
-/**
- * GET /api/prs?exerciseId={id}
- * Returns user's PRs, optionally filtered by exerciseId
- */
-export const GET: RequestHandler = async ({ locals, url }) => {
+export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const exerciseId = url.searchParams.get('exerciseId');
-
-	let query = db
-		.select()
+	const prs = await db
+		.select({
+			id: personalRecord.id,
+			exerciseId: personalRecord.exerciseId,
+			value: personalRecord.value,
+			date: personalRecord.date,
+			note: personalRecord.note
+		})
 		.from(personalRecord)
-		.where(eq(personalRecord.userId, locals.user.id))
-		.orderBy(desc(personalRecord.date));
+		.where(eq(personalRecord.userId, locals.user.id));
 
-	if (exerciseId) {
-		query = db
-			.select()
-			.from(personalRecord)
-			.where(
-				and(
-					eq(personalRecord.userId, locals.user.id),
-					eq(personalRecord.exerciseId, exerciseId)
-				)
-			)
-			.orderBy(desc(personalRecord.date));
-	}
-
-	const prs = await query;
 	return json(prs);
 };
 
