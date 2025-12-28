@@ -1,29 +1,35 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import Card from '$lib/components/Card.svelte';
-	import Button from '$lib/components/Button.svelte';
+	import { onMount } from 'svelte';
 	import Toast from '$lib/components/Toast.svelte';
-	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import {
 		formatPRValue,
 		type ExerciseWithBestPR,
 		type ExerciseCategory,
-		type UnitPreference,
 		EXERCISE_CATEGORIES
 	} from '$lib/types/pr';
 	import type { PageData } from './$types';
 	import PRModal from './PRModal.svelte';
 	import ImportPRModal from './ImportPRModal.svelte';
 	import LeaderboardTab from './LeaderboardTab.svelte';
+	import { getExercisesWithPRs, invalidatePRCache } from '$lib/services/pr';
 
-	// Access props without destructuring to maintain reactivity during navigation
-	const props = $props<{ data: PageData }>();
+	let { data }: { data: PageData } = $props();
 
-	// Create reactive derived values from props to ensure proper reactivity
-	let exercises = $derived(props.data.exercises);
-	let unitPreference = $derived(props.data.unitPreference);
-	let activeWorkspaceId = $derived(props.data.activeWorkspaceId);
+	// Reactive derived values from props
+	let unitPreference = $derived(data.unitPreference);
+	let activeWorkspaceId = $derived(data.activeWorkspaceId);
+
+	// Client-side state
+	let exercises = $state<ExerciseWithBestPR[]>([]);
+	let loading = $state(true);
+
+	// Load exercises on mount
+	onMount(async () => {
+		exercises = await getExercisesWithPRs();
+		loading = false;
+	});
 
 	// Tab state
 	type TabId = 'my-prs' | 'leaderboard';
@@ -106,17 +112,20 @@
 	}
 
 	async function handlePRSaved() {
-		await invalidateAll();
+		await invalidatePRCache();
+		exercises = await getExercisesWithPRs();
 		toastStore.success('PR saved!');
 	}
 
 	async function handlePRDeleted() {
-		await invalidateAll();
+		await invalidatePRCache();
+		exercises = await getExercisesWithPRs();
 		toastStore.success('PR deleted');
 	}
 
 	async function handleImportSuccess() {
-		await invalidateAll();
+		await invalidatePRCache();
+		exercises = await getExercisesWithPRs();
 		toastStore.success('PRs imported successfully!');
 	}
 
@@ -200,6 +209,18 @@
 	</div>
 
 	{#if activeTab === 'my-prs'}
+		{#if loading}
+			<!-- Loading skeleton -->
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+				{#each Array(8) as _}
+					<div class="rounded-xl border border-white/5 bg-white/5 p-4">
+						<Skeleton variant="text" height="1.25rem" width="80%" />
+						<Skeleton variant="text" height="1.5rem" width="50%" class="mt-2" />
+						<Skeleton variant="text" height="0.75rem" width="60%" class="mt-1" />
+					</div>
+				{/each}
+			</div>
+		{:else}
 		<!-- Search Bar -->
 		<div class="relative">
 			<svg
@@ -318,6 +339,7 @@
 					{/if}
 				</p>
 			</div>
+		{/if}
 		{/if}
 	{:else if activeTab === 'leaderboard'}
 		{#if activeWorkspaceId}
