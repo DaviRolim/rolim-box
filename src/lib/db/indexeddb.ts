@@ -56,10 +56,36 @@ interface RolimBoxDB extends DBSchema {
 			'by-entity': string;
 		};
 	};
+	exercises: {
+		key: string;
+		value: {
+			id: string;
+			name: string;
+			category: string;
+			measurementType: string;
+			sortOrder: number;
+		};
+		indexes: {
+			'by-category': string;
+		};
+	};
+	personalRecords: {
+		key: string;
+		value: {
+			id: string;
+			exerciseId: string;
+			value: number;
+			date: string;
+			note: string | null;
+		};
+		indexes: {
+			'by-exercise': string;
+		};
+	};
 }
 
 const DB_NAME = 'rolimbox';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<RolimBoxDB>> | null = null;
 
@@ -93,6 +119,18 @@ function getDB(): Promise<IDBPDatabase<RolimBoxDB>> {
 				if (!db.objectStoreNames.contains('syncQueue')) {
 					const queueStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
 					queueStore.createIndex('by-entity', 'entityId');
+				}
+
+				// Exercises store
+				if (!db.objectStoreNames.contains('exercises')) {
+					const exerciseStore = db.createObjectStore('exercises', { keyPath: 'id' });
+					exerciseStore.createIndex('by-category', 'category');
+				}
+
+				// Personal Records store
+				if (!db.objectStoreNames.contains('personalRecords')) {
+					const prStore = db.createObjectStore('personalRecords', { keyPath: 'id' });
+					prStore.createIndex('by-exercise', 'exerciseId');
 				}
 			}
 		});
@@ -166,6 +204,67 @@ export async function clearCachedSections(): Promise<void> {
 	await db.clear('sections');
 }
 
+// Exercise operations
+export async function cacheExercises(exercises: RolimBoxDB['exercises']['value'][]): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('exercises', 'readwrite');
+	await Promise.all([...exercises.map((ex) => tx.store.put(ex)), tx.done]);
+}
+
+export async function getCachedExercises(): Promise<RolimBoxDB['exercises']['value'][]> {
+	const db = await getDB();
+	return db.getAll('exercises');
+}
+
+export async function clearCachedExercises(): Promise<void> {
+	const db = await getDB();
+	await db.clear('exercises');
+}
+
+// Personal Record operations
+export async function cachePersonalRecords(prs: RolimBoxDB['personalRecords']['value'][]): Promise<void> {
+	const db = await getDB();
+	const tx = db.transaction('personalRecords', 'readwrite');
+	await Promise.all([...prs.map((pr) => tx.store.put(pr)), tx.done]);
+}
+
+export async function getCachedPersonalRecords(): Promise<RolimBoxDB['personalRecords']['value'][]> {
+	const db = await getDB();
+	return db.getAll('personalRecords');
+}
+
+export async function cachePersonalRecord(pr: RolimBoxDB['personalRecords']['value']): Promise<void> {
+	const db = await getDB();
+	await db.put('personalRecords', pr);
+}
+
+export async function deleteCachedPersonalRecord(id: string): Promise<void> {
+	const db = await getDB();
+	await db.delete('personalRecords', id);
+}
+
+export async function clearCachedPersonalRecords(): Promise<void> {
+	const db = await getDB();
+	await db.clear('personalRecords');
+}
+
+// Cache status flags
+export async function setCacheFlag(key: string): Promise<void> {
+	const db = await getDB();
+	await db.put('syncMeta', { key, timestamp: Date.now() });
+}
+
+export async function hasCacheFlag(key: string): Promise<boolean> {
+	const db = await getDB();
+	const meta = await db.get('syncMeta', key);
+	return !!meta;
+}
+
+export async function clearCacheFlag(key: string): Promise<void> {
+	const db = await getDB();
+	await db.delete('syncMeta', key);
+}
+
 // Sync metadata
 export async function setLastSync(timestamp: number): Promise<void> {
 	const db = await getDB();
@@ -181,7 +280,14 @@ export async function getLastSync(): Promise<number | null> {
 // Clear all data (for logout)
 export async function clearAllCachedData(): Promise<void> {
 	const db = await getDB();
-	await Promise.all([db.clear('wods'), db.clear('sections'), db.clear('syncMeta'), db.clear('syncQueue')]);
+	await Promise.all([
+		db.clear('wods'),
+		db.clear('sections'),
+		db.clear('syncMeta'),
+		db.clear('syncQueue'),
+		db.clear('exercises'),
+		db.clear('personalRecords')
+	]);
 }
 
 // Sync queue operations
