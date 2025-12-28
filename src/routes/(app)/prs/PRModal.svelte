@@ -18,6 +18,7 @@
 		type PersonalRecord,
 		type ExerciseRankingsResponse
 	} from '$lib/types/pr';
+	import { getUserPRs, invalidatePRCache } from '$lib/services/pr';
 
 	interface Props {
 		open: boolean;
@@ -32,8 +33,9 @@
 	let { open = $bindable(), exercise, unitPreference, workspaceId, onClose, onSaved, onDeleted }: Props =
 		$props();
 
-	// State
-	let history = $state<PersonalRecord[]>([]);
+	// State - using a subset of PersonalRecord fields that match the cache
+	type HistoryPR = { id: string; exerciseId: string; value: number; date: string; note: string | null };
+	let history = $state<HistoryPR[]>([]);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
 	let showNoteField = $state(false);
@@ -73,10 +75,11 @@
 	async function loadHistory() {
 		isLoading = true;
 		try {
-			const res = await fetch(`/api/prs?exerciseId=${exercise.id}`);
-			if (res.ok) {
-				history = await res.json();
-			}
+			const allPRs = await getUserPRs();
+			// Filter by exerciseId and sort by date descending
+			history = allPRs
+				.filter((pr) => pr.exerciseId === exercise.id)
+				.sort((a, b) => b.date.localeCompare(a.date));
 		} catch (error) {
 			console.error('Failed to load PR history:', error);
 		}
@@ -153,6 +156,7 @@
 
 			if (res.ok) {
 				resetForm();
+				await invalidatePRCache();
 				await loadHistory();
 				await loadRankings();
 				onSaved();
@@ -174,6 +178,7 @@
 		try {
 			const res = await fetch(`/api/prs/${prToDelete}`, { method: 'DELETE' });
 			if (res.ok) {
+				await invalidatePRCache();
 				await loadHistory();
 				onDeleted();
 			}
@@ -231,7 +236,7 @@
 		return history.reduce((best, pr) => {
 			if (!best) return pr;
 			return isBetterPR(pr.value, best.value, exercise.measurementType) ? pr : best;
-		}, null as PersonalRecord | null);
+		}, null as HistoryPR | null);
 	});
 
 	function getRankEmoji(rank: number): string {
