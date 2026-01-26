@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rolimbox-v5';
+const CACHE_NAME = 'rolimbox-v6';
 const STATIC_ASSETS = [
 	'/',
 	'/manifest.json',
@@ -60,26 +60,25 @@ self.addEventListener('fetch', (event) => {
 	if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
 
 	// Handle navigation requests (opening the app)
-	// Use stale-while-revalidate for fast PWA startup
+	// Network-first for navigation to ensure fresh auth state
 	if (event.request.mode === 'navigate') {
 		event.respondWith(
-			caches.match('/').then((cached) => {
-				// Start network fetch in background
-				const networkFetch = fetch(event.request).then((response) => {
-					// Update cache with fresh response
+			fetch(event.request)
+				.then((response) => {
+					// Cache successful navigation responses
 					if (response.status === 200) {
 						const clone = response.clone();
 						caches.open(CACHE_NAME).then((cache) => cache.put('/', clone));
 					}
 					return response;
-				});
-
-				// Return cached immediately if available, otherwise wait for network
-				if (cached) {
-					return cached;
-				}
-				return networkFetch;
-			})
+				})
+				.catch(() => {
+					// Only use cached version when offline
+					return caches.match('/').then((cached) => {
+						if (cached) return cached;
+						return new Response('Offline', { status: 503 });
+					});
+				})
 		);
 		return;
 	}

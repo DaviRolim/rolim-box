@@ -157,7 +157,30 @@ export async function invalidatePRCache(): Promise<void> {
 	await clearCachedPersonalRecords();
 }
 
-export async function refreshPRCache(): Promise<void> {
-	await invalidatePRCache();
-	await getUserPRs(); // Re-fetch and cache
+export async function refreshPRCache(): Promise<boolean> {
+	if (!browser) return false;
+
+	// Fetch fresh data FIRST, only invalidate cache if fetch succeeds
+	// This prevents leaving users with empty cache on network failure
+	try {
+		const response = await fetch('/api/prs');
+		if (!response.ok) {
+			if (response.status === 401) return false;
+			throw new Error('Failed to fetch PRs');
+		}
+
+		const prs: CachedPR[] = await response.json();
+
+		// Only clear and update cache after successful fetch
+		await clearCacheFlag(PRS_CACHE_KEY);
+		await clearCachedPersonalRecords();
+		await cachePersonalRecords(prs);
+		await setCacheFlag(PRS_CACHE_KEY);
+
+		return true;
+	} catch (error) {
+		console.error('Failed to refresh PR cache:', error);
+		// Keep existing cache intact on failure
+		return false;
+	}
 }

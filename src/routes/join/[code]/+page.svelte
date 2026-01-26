@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { enhance } from '$app/forms';
 
 	let { data, form } = $props();
 
 	let loading = $state(false);
 	let error = $state('');
+	let formLoading = $state(false);
 
 	async function handleJoin() {
 		if (data.isLoggedIn) {
@@ -96,7 +97,24 @@
 					</p>
 				</div>
 
-				<form method="POST" use:enhance class="mt-6 space-y-4">
+				<form
+					method="POST"
+					use:enhance={() => {
+						formLoading = true;
+						return async ({ result, update }) => {
+							formLoading = false;
+							if (result.type === 'redirect') {
+								// Invalidate all cached data before redirect to ensure fresh auth state
+								await invalidateAll();
+								// Force a hard navigation to clear any stale state
+								window.location.href = result.location;
+							} else {
+								await update();
+							}
+						};
+					}}
+					class="mt-6 space-y-4"
+				>
 					<div>
 						<label for="email" class="block text-sm font-medium text-text-secondary">Email</label>
 						<input
@@ -129,9 +147,10 @@
 
 					<button
 						type="submit"
-						class="w-full rounded-lg bg-accent-500 py-3 font-bold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
+						disabled={formLoading}
+						class="w-full rounded-lg bg-accent-500 py-3 font-bold text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						Create Account & Join
+						{formLoading ? 'Creating account...' : 'Create Account & Join'}
 					</button>
 				</form>
 

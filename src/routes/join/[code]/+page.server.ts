@@ -85,7 +85,10 @@ export const actions: Actions = {
 
 		cookies.set(auth.sessionCookieName, token, {
 			expires: session.expiresAt,
-			path: '/'
+			path: '/',
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax'
 		});
 
 		// Set the joined workspace as active
