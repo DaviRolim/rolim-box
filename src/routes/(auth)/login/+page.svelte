@@ -64,7 +64,7 @@
 			<button
 				type="submit"
 				disabled={isLoading}
-				class="w-full rounded bg-accent-500 px-4 py-2 font-semibold text-white transition hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+				class="cyberpunk-btn w-full rounded bg-accent-500 px-4 py-2 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
 			>
 				{isLoading ? 'Logging in...' : 'Log In'}
 			</button>
@@ -76,3 +76,97 @@
 		</p>
 	</div>
 </div>
+
+<style>
+	/* Cyberpunk electric hover effect - desktop only */
+	@media (min-width: 768px) {
+		.cyberpunk-btn {
+			position: relative;
+			overflow: hidden;
+			transition: all 0.3s ease;
+		}
+
+		.cyberpunk-btn::before,
+		.cyberpunk-btn::after {
+			content: '';
+			position: absolute;
+			width: 0;
+			height: 100%;
+			top: 0;
+			opacity: 0;
+			transition: all 0.3s ease;
+		}
+
+		.cyberpunk-btn::before {
+			left: 50%;
+			background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.4), transparent);
+			transform: translateX(-50%);
+		}
+
+		.cyberpunk-btn::after {
+			right: 50%;
+			background: linear-gradient(90deg, transparent, rgba(255, 0, 128, 0.4), transparent);
+			transform: translateX(50%);
+		}
+
+		.cyberpunk-btn:hover:not(:disabled) {
+			box-shadow:
+				0 0 15px rgba(0, 255, 255, 0.5),
+				0 0 30px rgba(255, 0, 128, 0.3),
+				inset 0 0 15px rgba(0, 255, 255, 0.1);
+			text-shadow:
+				0 0 5px rgba(255, 255, 255, 0.8),
+				0 0 10px rgba(0, 255, 255, 0.5);
+			border: 1px solid rgba(0, 255, 255, 0.5);
+		}
+
+		.cyberpunk-btn:hover:not(:disabled)::before,
+		.cyberpunk-btn:hover:not(:disabled)::after {
+			width: 100%;
+			opacity: 1;
+			animation: electric-sweep 0.6s ease-in-out infinite alternate;
+		}
+
+		.cyberpunk-btn:hover:not(:disabled)::after {
+			animation-delay: 0.3s;
+		}
+
+		@keyframes electric-sweep {
+			0% {
+				opacity: 0.3;
+				filter: blur(2px);
+			}
+			100% {
+				opacity: 0.7;
+				filter: blur(4px);
+			}
+		}
+
+		/* Electric border animation */
+		.cyberpunk-btn:hover:not(:disabled) {
+			animation: glitch-border 0.3s ease-in-out infinite alternate;
+		}
+
+		@keyframes glitch-border {
+			0% {
+				box-shadow:
+					0 0 15px rgba(0, 255, 255, 0.5),
+					0 0 30px rgba(255, 0, 128, 0.3),
+					inset 0 0 15px rgba(0, 255, 255, 0.1);
+			}
+			100% {
+				box-shadow:
+					0 0 20px rgba(255, 0, 128, 0.5),
+					0 0 35px rgba(0, 255, 255, 0.3),
+					inset 0 0 20px rgba(255, 0, 128, 0.1);
+			}
+		}
+	}
+
+	/* Mobile: simple hover */
+	@media (max-width: 767px) {
+		.cyberpunk-btn:hover:not(:disabled) {
+			filter: brightness(1.1);
+		}
+	}
+</style>
