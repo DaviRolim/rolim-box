@@ -20,5 +20,7 @@ export const GET: RequestHandler = async () => {
 		.from(exercise)
 		.orderBy(asc(exercise.sortOrder));
 
-	return json(exercises);
+	return json(exercises, {
+		headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' }
+	});
 };

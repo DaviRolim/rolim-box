@@ -7,7 +7,6 @@
 	import EditSectionForm from '$lib/components/sections/EditSectionForm.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
-	import Toast from '$lib/components/Toast.svelte';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import { createWoD } from '$lib/services/wod';
@@ -329,9 +328,6 @@
 		doGenerateSections();
 	}
 </script>
-
-``````
-<Toast />
 
 <ConfirmModal
 	bind:open={showReplaceConfirm}

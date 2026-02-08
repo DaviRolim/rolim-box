@@ -11,6 +11,7 @@ export interface TimerEngine {
 	resume: () => void;
 	stop: () => void;
 	isRunning: () => boolean;
+	destroy: () => void;
 }
 
 const TICK_INTERVAL = 100; // 100ms for smooth UI updates
@@ -27,11 +28,18 @@ export function createTimerEngine(callbacks: TimerEngineCallbacks): TimerEngine 
 		callbacks.onTick(delta);
 	}
 
+	function handleVisibilityChange() {
+		if (document.visibilityState === 'visible' && running) {
+			tick();
+		}
+	}
+
 	function start() {
 		if (running) return;
 		running = true;
 		lastTickTime = performance.now();
 		intervalId = setInterval(tick, TICK_INTERVAL);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
 	}
 
 	function pause() {
@@ -58,9 +66,14 @@ export function createTimerEngine(callbacks: TimerEngineCallbacks): TimerEngine 
 		}
 	}
 
+	function destroy() {
+		stop();
+		document.removeEventListener('visibilitychange', handleVisibilityChange);
+	}
+
 	function isRunning() {
 		return running;
 	}
 
-	return { start, pause, resume, stop, isRunning };
+	return { start, pause, resume, stop, isRunning, destroy };
 }

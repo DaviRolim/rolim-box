@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { syncStore } from '$lib/stores/sync.svelte';
 import { queueOperation, processQueue } from '$lib/services/sync-queue';
+import { authFetch } from '$lib/services/auth-fetch';
 import {
 	cacheWod,
 	getCachedWod,
@@ -111,7 +112,7 @@ export async function getWoD(id: string, skipBackgroundRefresh = false): Promise
 	// 3. If not in cache and online, fetch from API
 	if (syncStore.isOnline) {
 		try {
-			const response = await fetch(`/api/wods/${id}`);
+			const response = await authFetch(`/api/wods/${id}`);
 			if (response.ok) {
 				const wod = await response.json();
 
@@ -129,21 +130,32 @@ export async function getWoD(id: string, skipBackgroundRefresh = false): Promise
 }
 
 /**
- * Background fetch to update cache with fresh data from API
+ * Background fetch to update cache with fresh data from API (paginated)
  */
 async function fetchAndUpdateCache(workspaceId: string): Promise<void> {
 	try {
-		const response = await fetch(`/api/wods?workspaceId=${workspaceId}`);
-		if (response.ok) {
-			const wods = await response.json();
+		let cursor: string | null = null;
+		do {
+			const params = new URLSearchParams({ workspaceId });
+			if (cursor) params.set('cursor', cursor);
 
-			// Update cache with fresh data
-			for (const wod of wods.map(mapApiWoDToWoD)) {
-				// Delete old sections first to prevent duplication
+			const response = await authFetch(`/api/wods?${params}`);
+			if (!response.ok) break;
+
+			const { wods, nextCursor } = await response.json();
+
+			for (const wod of (wods as any[]).map(mapApiWoDToWoD)) {
+				// Race condition guard: don't overwrite newer local edits
+				const cached = await getCachedWod(wod.id);
+				if (cached && cached.updatedAt > wod.updatedAt.getTime()) {
+					continue;
+				}
 				await deleteCachedSectionsByWod(wod.id);
 				await cacheWodWithSections(wod);
 			}
-		}
+
+			cursor = nextCursor;
+		} while (cursor);
 	} catch (error) {
 		console.error('Failed to fetch WoDs from API:', error);
 	}
@@ -154,14 +166,18 @@ async function fetchAndUpdateCache(workspaceId: string): Promise<void> {
  */
 async function fetchSingleWoDAndUpdateCache(id: string): Promise<void> {
 	try {
-		const response = await fetch(`/api/wods/${id}`);
+		const response = await authFetch(`/api/wods/${id}`);
 		if (response.ok) {
-			const wod = await response.json();
+			const apiWod = mapApiWoDToWoD(await response.json());
 
-			// Delete old sections first to prevent duplication
+			// Race condition guard: don't overwrite newer local edits
+			const cached = await getCachedWod(id);
+			if (cached && cached.updatedAt > apiWod.updatedAt.getTime()) {
+				return;
+			}
+
 			await deleteCachedSectionsByWod(id);
-			// Update cache with fresh data
-			await cacheWodWithSections(mapApiWoDToWoD(wod));
+			await cacheWodWithSections(apiWod);
 		}
 	} catch (error) {
 		console.error('Failed to fetch WoD from API:', error);

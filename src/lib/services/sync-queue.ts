@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { syncStore } from '$lib/stores/sync.svelte';
+import { toastStore } from '$lib/stores/toast.svelte';
 import {
 	addToSyncQueue,
 	getAllSyncQueueOperations,
@@ -16,7 +17,7 @@ import { generateId } from '$lib/utils';
 export interface SyncOperation {
 	id: string;
 	type: 'create' | 'update' | 'delete';
-	entity: 'wod';
+	entity: 'wod' | 'pr';
 	entityId: string;
 	payload: unknown;
 	createdAt: number;
@@ -178,7 +179,10 @@ async function processOperation(operation: SyncOperation): Promise<void> {
 			);
 			operation.status = 'failed';
 			operation.failedAt = Date.now();
-			// TODO: Show user notification when toast system is available (Task 5)
+			toastStore.error(
+				'Failed to sync changes. Your edits are saved locally and will retry when possible.',
+				0
+			);
 			try {
 				await updateSyncQueueOperation(operation);
 			} catch (updateError) {
@@ -186,6 +190,9 @@ async function processOperation(operation: SyncOperation): Promise<void> {
 			}
 		} else {
 			// Schedule retry with exponential backoff
+			if (operation.retries === 1) {
+				toastStore.info('Syncing changes...retrying');
+			}
 			const delay = RETRY_DELAYS[operation.retries - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
 
 			try {
@@ -214,75 +221,120 @@ async function processOperation(operation: SyncOperation): Promise<void> {
 async function executeSyncOperation(operation: SyncOperation): Promise<void> {
 	const { type, entity, entityId, payload } = operation;
 
-	if (entity !== 'wod') {
+	if (entity === 'wod') {
+		switch (type) {
+			case 'create': {
+				const response = await fetch('/api/wods', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(payload)
+				});
+
+				if (!response.ok) {
+					let errorMessage = 'Failed to create WoD';
+					try {
+						const error = await response.json();
+						errorMessage = error.error || errorMessage;
+					} catch {
+						// Response has no JSON body
+					}
+					throw new Error(errorMessage);
+				}
+				break;
+			}
+
+			case 'update': {
+				const response = await fetch(`/api/wods/${entityId}`, {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(payload)
+				});
+
+				if (!response.ok) {
+					let errorMessage = 'Failed to update WoD';
+					try {
+						const error = await response.json();
+						errorMessage = error.error || errorMessage;
+					} catch {
+						// Response has no JSON body
+					}
+					throw new Error(errorMessage);
+				}
+				break;
+			}
+
+			case 'delete': {
+				const response = await fetch(`/api/wods/${entityId}`, {
+					method: 'DELETE'
+				});
+
+				if (!response.ok && response.status !== 204) {
+					let errorMessage = 'Failed to delete WoD';
+					try {
+						const error = await response.json();
+						errorMessage = error.error || errorMessage;
+					} catch {
+						// Response has no JSON body
+					}
+					throw new Error(errorMessage);
+				}
+				break;
+			}
+
+			default:
+				throw new Error(`Unsupported operation type: ${type}`);
+		}
+	} else if (entity === 'pr') {
+		switch (type) {
+			case 'create': {
+				const response = await fetch('/api/prs', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify(payload)
+				});
+
+				if (!response.ok) {
+					let errorMessage = 'Failed to create PR';
+					try {
+						const error = await response.json();
+						errorMessage = error.error || errorMessage;
+					} catch {
+						// Response has no JSON body
+					}
+					throw new Error(errorMessage);
+				}
+				break;
+			}
+
+			case 'delete': {
+				const response = await fetch(`/api/prs/${entityId}`, {
+					method: 'DELETE'
+				});
+
+				if (!response.ok && response.status !== 204) {
+					let errorMessage = 'Failed to delete PR';
+					try {
+						const error = await response.json();
+						errorMessage = error.error || errorMessage;
+					} catch {
+						// Response has no JSON body
+					}
+					throw new Error(errorMessage);
+				}
+				break;
+			}
+
+			default:
+				throw new Error(`Unsupported operation type for PR: ${type}`);
+		}
+	} else {
 		throw new Error(`Unsupported entity type: ${entity}`);
-	}
-
-	switch (type) {
-		case 'create': {
-			const response = await fetch('/api/wods', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(payload)
-			});
-
-			if (!response.ok) {
-				let errorMessage = 'Failed to create WoD';
-				try {
-					const error = await response.json();
-					errorMessage = error.error || errorMessage;
-				} catch {
-					// Response has no JSON body
-				}
-				throw new Error(errorMessage);
-			}
-			break;
-		}
-
-		case 'update': {
-			const response = await fetch(`/api/wods/${entityId}`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(payload)
-			});
-
-			if (!response.ok) {
-				let errorMessage = 'Failed to update WoD';
-				try {
-					const error = await response.json();
-					errorMessage = error.error || errorMessage;
-				} catch {
-					// Response has no JSON body
-				}
-				throw new Error(errorMessage);
-			}
-			break;
-		}
-
-		case 'delete': {
-			const response = await fetch(`/api/wods/${entityId}`, {
-				method: 'DELETE'
-			});
-
-			if (!response.ok && response.status !== 204) {
-				let errorMessage = 'Failed to delete WoD';
-				try {
-					const error = await response.json();
-					errorMessage = error.error || errorMessage;
-				} catch {
-					// Response has no JSON body
-				}
-				throw new Error(errorMessage);
-			}
-			break;
-		}
-
-		default:
-			throw new Error(`Unsupported operation type: ${type}`);
 	}
 }
 

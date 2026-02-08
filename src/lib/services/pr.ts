@@ -1,14 +1,21 @@
 import { browser } from '$app/environment';
+import { authFetch } from '$lib/services/auth-fetch';
 import {
 	cacheExercises,
 	getCachedExercises,
 	cachePersonalRecords,
 	getCachedPersonalRecords,
+	cachePersonalRecord,
+	deleteCachedPersonalRecord,
 	clearCachedPersonalRecords,
 	setCacheFlag,
 	hasCacheFlag,
 	clearCacheFlag
 } from '$lib/db/indexeddb';
+import { queueOperation } from '$lib/services/sync-queue';
+import { syncStore } from '$lib/stores/sync.svelte';
+import { toastStore } from '$lib/stores/toast.svelte';
+import { generateId } from '$lib/utils';
 import type {
 	Exercise,
 	ExerciseWithBestPR,
@@ -52,7 +59,7 @@ export async function getExercises(): Promise<Exercise[]> {
 
 	// Fetch from API
 	try {
-		const response = await fetch('/api/exercises');
+		const response = await authFetch('/api/exercises');
 		if (!response.ok) throw new Error('Failed to fetch exercises');
 
 		const exercises: CachedExercise[] = await response.json();
@@ -94,11 +101,8 @@ export async function getUserPRs(): Promise<CachedPR[]> {
 
 	// Fetch from API
 	try {
-		const response = await fetch('/api/prs');
-		if (!response.ok) {
-			if (response.status === 401) return [];
-			throw new Error('Failed to fetch PRs');
-		}
+		const response = await authFetch('/api/prs');
+		if (!response.ok) throw new Error('Failed to fetch PRs');
 
 		const prs: CachedPR[] = await response.json();
 
@@ -145,6 +149,87 @@ export async function getExercisesWithPRs(): Promise<ExerciseWithBestPR[]> {
 		...ex,
 		bestPR: prsByExercise.get(ex.id) ?? null
 	}));
+}
+
+// ============================================================================
+// OFFLINE-AWARE CREATE / DELETE
+// ============================================================================
+
+interface CreatePRData {
+	exerciseId: string;
+	value: number;
+	date: string;
+	note: string | null;
+}
+
+export async function createPR(data: CreatePRData): Promise<boolean> {
+	if (!browser) return false;
+
+	// Try online first
+	if (syncStore.isOnline) {
+		try {
+			const response = await authFetch('/api/prs', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(data)
+			});
+
+			if (response.ok) {
+				const pr = await response.json();
+				await cachePersonalRecord(pr);
+				await invalidatePRCache();
+				return true;
+			}
+		} catch {
+			// Network error -- fall through to offline path
+		}
+	}
+
+	// Offline (or online fetch failed): optimistic write + queue sync
+	const tempId = generateId();
+	const offlinePR = { id: tempId, ...data };
+	await cachePersonalRecord(offlinePR);
+	await queueOperation({
+		type: 'create',
+		entity: 'pr',
+		entityId: tempId,
+		payload: data,
+		status: 'pending'
+	});
+	toastStore.info('PR saved offline -- will sync when back online');
+	await invalidatePRCache();
+	return true;
+}
+
+export async function deletePR(prId: string): Promise<boolean> {
+	if (!browser) return false;
+
+	// Try online first
+	if (syncStore.isOnline) {
+		try {
+			const response = await authFetch(`/api/prs/${prId}`, { method: 'DELETE' });
+			if (response.ok || response.status === 204) {
+				await deleteCachedPersonalRecord(prId);
+				await invalidatePRCache();
+				return true;
+			}
+		} catch {
+			// Network error -- fall through to offline path
+		}
+	}
+
+	// Offline (or online fetch failed): optimistic delete + queue sync
+	await deleteCachedPersonalRecord(prId);
+	await queueOperation({
+		type: 'delete',
+		entity: 'pr',
+		entityId: prId,
+		payload: null,
+		status: 'pending'
+	});
+	toastStore.info('PR deleted offline -- will sync when back online');
+	await invalidatePRCache();
+	return true;
 }
 
 // ============================================================================
