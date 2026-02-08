@@ -7,8 +7,18 @@ import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
+const SESSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const sessionCookieName = 'auth-session';
+
+type CachedSession = {
+	result: { session: table.Session | null; user: Omit<table.User, 'passwordHash'> | null };
+	expiresAt: number;
+};
+
+// In-memory session validation cache to reduce DB queries
+const sessionCache = new Map<string, CachedSession>();
+let sessionCacheLookups = 0;
 
 export function generateSessionToken(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(18));
@@ -226,6 +236,22 @@ export async function validateSessionToken(
 	token: string
 ): Promise<{ session: table.Session | null; user: Omit<table.User, 'passwordHash'> | null }> {
 	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
+
+	// Check cache first
+	const cached = sessionCache.get(sessionId);
+	if (cached && Date.now() < cached.expiresAt) {
+		return cached.result;
+	}
+
+	// Periodic cache cleanup (every 100 lookups)
+	sessionCacheLookups++;
+	if (sessionCacheLookups % 100 === 0) {
+		const now = Date.now();
+		for (const [key, entry] of sessionCache) {
+			if (now >= entry.expiresAt) sessionCache.delete(key);
+		}
+	}
+
 	const [result] = await db
 		.select({
 			user: {
@@ -249,6 +275,7 @@ export async function validateSessionToken(
 	const sessionExpired = Date.now() >= session.expiresAt.getTime();
 	if (sessionExpired) {
 		await db.delete(table.session).where(eq(table.session.id, session.id));
+		sessionCache.delete(sessionId);
 		return { session: null, user: null };
 	}
 
@@ -259,15 +286,24 @@ export async function validateSessionToken(
 			.update(table.session)
 			.set({ expiresAt: session.expiresAt })
 			.where(eq(table.session.id, session.id));
+		// Invalidate cache on renewal so next request gets fresh expiry
+		sessionCache.delete(sessionId);
 	}
 
-	return { session, user };
+	const validationResult = { session, user };
+	sessionCache.set(sessionId, {
+		result: validationResult,
+		expiresAt: Date.now() + SESSION_CACHE_TTL
+	});
+
+	return validationResult;
 }
 
 export type SessionValidationResult = Awaited<ReturnType<typeof validateSessionToken>>;
 
 export async function invalidateSession(sessionId: string): Promise<void> {
 	await db.delete(table.session).where(eq(table.session.id, sessionId));
+	sessionCache.delete(sessionId);
 }
 
 export function setSessionTokenCookie(event: RequestEvent, token: string, expiresAt: Date): void {

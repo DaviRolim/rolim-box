@@ -41,6 +41,7 @@
 	}
 
 	function handleStart() {
+		audioService.unlockAudio();
 		enterFullscreen();
 		timerStore.start();
 	}

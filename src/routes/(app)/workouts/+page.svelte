@@ -3,8 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { listWoDs, deleteWoD, duplicateWoD } from '$lib/services/wod';
 	import { toastStore } from '$lib/stores/toast.svelte';
+	import { authFetch } from '$lib/services/auth-fetch';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
-	import Toast from '$lib/components/Toast.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -16,6 +16,8 @@
 	// State management
 	let wods = $state<WoD[]>([]);
 	let isLoading = $state(true);
+	let isLoadingMore = $state(false);
+	let nextCursor = $state<string | null>(null);
 	let deleteModalOpen = $state(false);
 	let duplicateModalOpen = $state(false);
 	let selectedWodId = $state<string | null>(null);
@@ -25,6 +27,13 @@
 		if (data.workspaceId) {
 			try {
 				wods = await listWoDs(data.workspaceId);
+				// Determine if there are more pages based on cached count
+				// The background fetch in listWoDs will paginate through all data,
+				// but for the "Load More" UI, check the API for the initial cursor
+				if (wods.length >= 20) {
+					const oldest = wods[wods.length - 1];
+					nextCursor = oldest?.date ?? null;
+				}
 			} catch (error) {
 				console.error('Failed to load workouts:', error);
 				toastStore.error('Failed to load workouts');
@@ -32,6 +41,36 @@
 		}
 		isLoading = false;
 	});
+
+	async function loadMore() {
+		if (!data.workspaceId || !nextCursor || isLoadingMore) return;
+		isLoadingMore = true;
+		try {
+			const params = new URLSearchParams({
+				workspaceId: data.workspaceId,
+				cursor: nextCursor
+			});
+			const response = await authFetch(`/api/wods?${params}`);
+			if (response.ok) {
+				const { wods: newWods, nextCursor: newCursor } = await response.json();
+				const mapped: WoD[] = newWods.map((w: any) => ({
+					...w,
+					createdAt: new Date(w.createdAt),
+					updatedAt: new Date(w.updatedAt)
+				}));
+				// Deduplicate by id (cache may already have some)
+				const existingIds = new Set(wods.map((w) => w.id));
+				const unique = mapped.filter((w) => !existingIds.has(w.id));
+				wods = [...wods, ...unique];
+				nextCursor = newCursor;
+			}
+		} catch (error) {
+			console.error('Failed to load more workouts:', error);
+			toastStore.error('Failed to load more workouts');
+		} finally {
+			isLoadingMore = false;
+		}
+	}
 
 	// Format date in a human-readable way
 	function formatDate(dateStr: string): string {
@@ -129,8 +168,6 @@
 		goto('/workouts/new');
 	}
 </script>
-
-<Toast />
 
 <!-- Delete Confirmation Modal -->
 <ConfirmModal
@@ -379,6 +416,19 @@
 					</Card>
 				{/each}
 			</div>
+
+			{#if nextCursor}
+				<div class="flex justify-center pt-4">
+					<Button
+						variant="secondary"
+						size="sm"
+						onclick={loadMore}
+						disabled={isLoadingMore}
+					>
+						{isLoadingMore ? 'Loading...' : 'LOAD MORE'}
+					</Button>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </div>

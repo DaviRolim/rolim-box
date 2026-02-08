@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { enhance } from '$app/forms';
 	import { audioService } from '$lib/services/audio.svelte';
+	import { clearAllCachedData } from '$lib/db/indexeddb';
 	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import Toast from '$lib/components/Toast.svelte';
 	import WorkspaceSwitcher from '$lib/components/WorkspaceSwitcher.svelte';
 
 	let { data, children } = $props();
@@ -15,8 +18,15 @@
 			// Fallback for Safari
 			setTimeout(() => audioService.preload(), 1000);
 		}
+
+		// Unlock AudioContext on first user interaction (required for iOS Safari)
+		const unlock = () => audioService.unlockAudio();
+		document.addEventListener('touchstart', unlock, { once: true });
+		document.addEventListener('click', unlock, { once: true });
 	});
 </script>
+
+<Toast />
 
 <div class="min-h-screen bg-bg-base text-text-primary">
 	<OfflineBanner />
@@ -49,7 +59,16 @@
 						/>
 					</svg>
 				</a>
-				<form action="/logout" method="POST">
+				<form
+					action="/logout"
+					method="POST"
+					use:enhance={() => {
+						clearAllCachedData().catch(() => {});
+						if ('caches' in window) {
+							caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
+						}
+					}}
+				>
 					<button
 						type="submit"
 						class="glass-hover rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-xs font-bold tracking-wider text-text-muted uppercase transition-all hover:border-error/30 hover:bg-error/5 hover:text-error"

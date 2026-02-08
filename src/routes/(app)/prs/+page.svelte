@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Toast from '$lib/components/Toast.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import {
@@ -14,6 +13,7 @@
 	import ImportPRModal from './ImportPRModal.svelte';
 	import LeaderboardTab from './LeaderboardTab.svelte';
 	import { getExercisesWithPRs, invalidatePRCache } from '$lib/services/pr';
+	import { debounce } from '$lib/utils';
 
 	let { data }: { data: PageData } = $props();
 
@@ -49,6 +49,13 @@
 
 	// State
 	let searchQuery = $state('');
+	let debouncedSearchQuery = $state('');
+	const updateSearch = debounce((v: string) => {
+		debouncedSearchQuery = v;
+	}, 250);
+	$effect(() => {
+		updateSearch(searchQuery);
+	});
 	let activeCategory = $state<ActiveCategory | null>(null);
 
 	// Use default category if none selected yet
@@ -61,9 +68,9 @@
 	let filteredExercises = $derived.by(() => {
 		let result = exercises;
 
-		// Filter by search
-		if (searchQuery.trim()) {
-			const query = searchQuery.toLowerCase();
+		// Filter by search (uses debounced value for performance)
+		if (debouncedSearchQuery.trim()) {
+			const query = debouncedSearchQuery.toLowerCase();
 			result = result.filter((ex: ExerciseWithBestPR) => ex.name.toLowerCase().includes(query));
 		} else if (effectiveCategory === 'recorded') {
 			// Show only exercises with recorded PRs (from all categories)
@@ -98,7 +105,7 @@
 		})).filter((group) => group.exercises.length > 0);
 	});
 
-	let isSearching = $derived(searchQuery.trim().length > 0);
+	let isSearching = $derived(debouncedSearchQuery.trim().length > 0);
 
 	// Handlers
 	function handleExerciseClick(exercise: ExerciseWithBestPR) {
@@ -145,8 +152,6 @@
 		cardio: 'Cardio'
 	};
 </script>
-
-<Toast />
 
 {#if selectedExercise}
 	<PRModal

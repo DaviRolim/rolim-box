@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // User account
 export const user = sqliteTable('user', {
@@ -57,29 +57,37 @@ export const workspaceInvite = sqliteTable('workspace_invite', {
 });
 
 // Workout of the Day
-export const wod = sqliteTable('wod', {
-	id: text('id').primaryKey(),
-	workspaceId: text('workspace_id')
-		.notNull()
-		.references(() => workspace.id),
-	date: text('date').notNull(), // ISO date: "2025-12-22"
-	description: text('description'),
-	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
-});
+export const wod = sqliteTable(
+	'wod',
+	{
+		id: text('id').primaryKey(),
+		workspaceId: text('workspace_id')
+			.notNull()
+			.references(() => workspace.id),
+		date: text('date').notNull(), // ISO date: "2025-12-22"
+		description: text('description'),
+		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => [index('wod_workspace_id_idx').on(table.workspaceId)]
+);
 
 // WoD Sections
-export const section = sqliteTable('section', {
-	id: text('id').primaryKey(),
-	wodId: text('wod_id')
-		.notNull()
-		.references(() => wod.id, { onDelete: 'cascade' }),
-	type: text('type').notNull(), // 'warmup'|'skill'|'wod'|'cooldown'|'stretches'|'custom'
-	name: text('name').notNull(),
-	content: text('content').notNull().default(''),
-	order: integer('order').notNull(),
-	timerConfig: text('timer_config') // nullable, JSON string
-});
+export const section = sqliteTable(
+	'section',
+	{
+		id: text('id').primaryKey(),
+		wodId: text('wod_id')
+			.notNull()
+			.references(() => wod.id, { onDelete: 'cascade' }),
+		type: text('type').notNull(), // 'warmup'|'skill'|'wod'|'cooldown'|'stretches'|'custom'
+		name: text('name').notNull(),
+		content: text('content').notNull().default(''),
+		order: integer('order').notNull(),
+		timerConfig: text('timer_config') // nullable, JSON string
+	},
+	(table) => [index('section_wod_id_idx').on(table.wodId)]
+);
 
 // Exercise (predefined, seeded)
 export const exercise = sqliteTable('exercise', {
@@ -91,20 +99,27 @@ export const exercise = sqliteTable('exercise', {
 });
 
 // Personal Record
-export const personalRecord = sqliteTable('personal_record', {
-	id: text('id').primaryKey(),
-	userId: text('user_id')
-		.notNull()
-		.references(() => user.id, { onDelete: 'cascade' }),
-	exerciseId: text('exercise_id')
-		.notNull()
-		.references(() => exercise.id, { onDelete: 'cascade' }),
-	value: integer('value').notNull(), // stored in base units: grams, seconds, count, centimeters
-	note: text('note'),
-	date: text('date').notNull(), // ISO date: "2025-12-27"
-	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
-});
+export const personalRecord = sqliteTable(
+	'personal_record',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		exerciseId: text('exercise_id')
+			.notNull()
+			.references(() => exercise.id, { onDelete: 'cascade' }),
+		value: integer('value').notNull(), // stored in base units: grams, seconds, count, centimeters
+		note: text('note'),
+		date: text('date').notNull(), // ISO date: "2025-12-27"
+		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => [
+		index('pr_user_id_idx').on(table.userId),
+		index('pr_user_exercise_idx').on(table.userId, table.exerciseId)
+	]
+);
 
 // Type exports
 export type Session = typeof session.$inferSelect;

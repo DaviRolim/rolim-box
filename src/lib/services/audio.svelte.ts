@@ -12,12 +12,39 @@ let audioContext: AudioContext | null = null;
 const decodedBuffers = new Map<string, AudioBuffer>();
 const rawBuffers = new Map<string, ArrayBuffer>();
 let prefetched = false;
+let audioUnlocked = false;
 
 function getAudioContext(): AudioContext {
 	if (!audioContext) {
-		audioContext = new AudioContext();
+		const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+		if (!Ctx) throw new Error('AudioContext not supported');
+		audioContext = new Ctx();
 	}
 	return audioContext;
+}
+
+/**
+ * Unlock AudioContext for iOS Safari.
+ * iOS requires a buffer source to be started during a user gesture
+ * to fully unlock the AudioContext -- ctx.resume() alone is not sufficient.
+ */
+function unlockAudioContext(): void {
+	if (audioUnlocked) return;
+	try {
+		const ctx = getAudioContext();
+		// Play a silent buffer (1 sample) to unlock
+		const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+		const source = ctx.createBufferSource();
+		source.buffer = buffer;
+		source.connect(ctx.destination);
+		source.start(0);
+		if (ctx.state === 'suspended') {
+			ctx.resume();
+		}
+		audioUnlocked = true;
+	} catch (e) {
+		console.warn('Failed to unlock audio context:', e);
+	}
 }
 
 async function ensureContextResumed(): Promise<void> {
@@ -159,6 +186,12 @@ class AudioService {
 
 	toggleMute() {
 		this.isMuted = !this.isMuted;
+	}
+
+	unlockAudio = unlockAudioContext;
+
+	get isUnlocked(): boolean {
+		return audioUnlocked;
 	}
 
 	preload = preload;

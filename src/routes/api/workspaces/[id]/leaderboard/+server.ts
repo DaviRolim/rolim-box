@@ -35,21 +35,21 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			return json({ error: 'Not a member of this workspace' }, { status: 403 });
 		}
 
-		// Get all workspace members
-		const members = await db
-			.select({
-				userId: workspaceMember.userId,
-				email: user.email
-			})
-			.from(workspaceMember)
-			.innerJoin(user, eq(workspaceMember.userId, user.id))
-			.where(eq(workspaceMember.workspaceId, workspaceId));
+		// Get all workspace members and exercises in parallel
+		const [members, exercises] = await Promise.all([
+			db
+				.select({
+					userId: workspaceMember.userId,
+					email: user.email
+				})
+				.from(workspaceMember)
+				.innerJoin(user, eq(workspaceMember.userId, user.id))
+				.where(eq(workspaceMember.workspaceId, workspaceId)),
+			db.select().from(exercise)
+		]);
 
 		const memberIds = members.map((m) => m.userId);
 		const memberMap = new Map(members.map((m) => [m.userId, m.email]));
-
-		// Get all exercises
-		const exercises = await db.select().from(exercise);
 
 		// Create exercise lookup map once
 		const exerciseMap = new Map(exercises.map((e) => [e.id, e]));

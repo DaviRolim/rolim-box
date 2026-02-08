@@ -18,7 +18,7 @@
 		type PersonalRecord,
 		type ExerciseRankingsResponse
 	} from '$lib/types/pr';
-	import { getUserPRs, invalidatePRCache } from '$lib/services/pr';
+	import { getUserPRs, invalidatePRCache, createPR, deletePR } from '$lib/services/pr';
 
 	interface Props {
 		open: boolean;
@@ -143,20 +143,15 @@
 					break;
 			}
 
-			const res = await fetch('/api/prs', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					exerciseId: exercise.id,
-					value: storageValue,
-					date: inputDate,
-					note: inputNote.trim() || null
-				})
+			const success = await createPR({
+				exerciseId: exercise.id,
+				value: storageValue,
+				date: inputDate,
+				note: inputNote.trim() || null
 			});
 
-			if (res.ok) {
+			if (success) {
 				resetForm();
-				await invalidatePRCache();
 				await loadHistory();
 				await loadRankings();
 				onSaved();
@@ -176,9 +171,8 @@
 		if (!prToDelete) return;
 
 		try {
-			const res = await fetch(`/api/prs/${prToDelete}`, { method: 'DELETE' });
-			if (res.ok) {
-				await invalidatePRCache();
+			const success = await deletePR(prToDelete);
+			if (success) {
 				await loadHistory();
 				onDeleted();
 			}

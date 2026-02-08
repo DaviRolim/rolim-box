@@ -3,7 +3,6 @@
 	import { goto } from '$app/navigation';
 	import { getWoD } from '$lib/services/wod';
 	import { toastStore } from '$lib/stores/toast.svelte';
-	import Toast from '$lib/components/Toast.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
@@ -57,8 +56,6 @@
 		}
 	}
 </script>
-
-<Toast />
 
 <div class="flex flex-col gap-8 p-4 pb-24 md:p-6 lg:mx-auto lg:max-w-5xl">
 	{#if isLoading}

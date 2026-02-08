@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import { wod, section, workspaceMember } from '$lib/server/db/schema';
 import { createWoDSchema } from '$lib/types/wod';
 import { generateId } from '$lib/server/auth';
-import { eq, and, desc, inArray, asc } from 'drizzle-orm';
+import { eq, and, desc, inArray, asc, lt } from 'drizzle-orm';
 
 /**
  * GET /api/wods?workspaceId={id}
@@ -38,12 +38,30 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		return json({ error: 'Access denied: not a member of this workspace' }, { status: 403 });
 	}
 
-	// Fetch WoDs with sections
+	// Pagination params
+	const limit = Math.min(Number(url.searchParams.get('limit')) || 20, 100);
+	const cursor = url.searchParams.get('cursor'); // ISO date string
+
+	// Build query conditions
+	const conditions = [eq(wod.workspaceId, workspaceId)];
+	if (cursor) {
+		conditions.push(lt(wod.date, cursor));
+	}
+
+	// Fetch one extra to determine if there are more pages
 	const wods = await db
 		.select()
 		.from(wod)
-		.where(eq(wod.workspaceId, workspaceId))
-		.orderBy(desc(wod.date));
+		.where(and(...conditions))
+		.orderBy(desc(wod.date))
+		.limit(limit + 1);
+
+	// Determine next cursor
+	let nextCursor: string | null = null;
+	if (wods.length > limit) {
+		const extra = wods.pop()!;
+		nextCursor = extra.date;
+	}
 
 	// Fetch ALL sections for ALL wods in ONE query (fixes N+1 issue)
 	const wodIds = wods.map((w) => w.id);
@@ -75,7 +93,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		updatedAt: w.updatedAt
 	}));
 
-	return json(wodsWithSections);
+	return json({ wods: wodsWithSections, nextCursor });
 };
 
 /**

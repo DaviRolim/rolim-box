@@ -44,7 +44,7 @@ interface RolimBoxDB extends DBSchema {
 		value: {
 			id: string;
 			type: 'create' | 'update' | 'delete';
-			entity: 'wod';
+			entity: 'wod' | 'pr';
 			entityId: string;
 			payload: unknown;
 			createdAt: number;

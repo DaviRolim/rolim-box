@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import Card from '$lib/components/Card.svelte';
-	import Toast from '$lib/components/Toast.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import type { PageData } from './$types';
 
@@ -35,8 +34,6 @@
 		isSaving = false;
 	}
 </script>
-
-<Toast />
 
 <div class="flex flex-col gap-6 p-4 pb-24 md:p-6">
 	<!-- Header -->

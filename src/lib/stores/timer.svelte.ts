@@ -126,14 +126,14 @@ class TimerStore {
 	}
 
 	stop() {
-		this.engine?.stop();
+		this.engine?.destroy();
 		this.state = 'completed';
 		// Play completion sound
 		audioService.playVoiceCue('time');
 	}
 
 	reset() {
-		this.engine?.stop();
+		this.engine?.destroy();
 		this.engine = null;
 		this.state = 'idle';
 		this.elapsedMs = 0;
