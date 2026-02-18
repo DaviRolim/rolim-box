@@ -144,7 +144,7 @@ async function fetchAndUpdateCache(workspaceId: string): Promise<void> {
 
 			const { wods, nextCursor } = await response.json();
 
-			for (const wod of (wods as any[]).map(mapApiWoDToWoD)) {
+			for (const wod of (wods as ApiWoD[]).map(mapApiWoDToWoD)) {
 				// Race condition guard: don't overwrite newer local edits
 				const cached = await getCachedWod(wod.id);
 				if (cached && cached.updatedAt > wod.updatedAt.getTime()) {
@@ -277,7 +277,7 @@ export async function updateWoD(id: string, data: UpdateWoDInput): Promise<WoD> 
 			name: section.name,
 			content: section.content,
 			order: section.order ?? index,
-			timerConfig: (section as any).timerConfig ?? null
+			timerConfig: section.timerConfig ?? null
 		}));
 	}
 
@@ -457,21 +457,44 @@ async function cacheWodWithSections(wod: WoD): Promise<void> {
 }
 
 /**
+ * Shape of a WoD as returned by the API (dates are serialized strings)
+ */
+interface ApiSection {
+	id: string;
+	wodId: string;
+	type: string;
+	name: string;
+	content: string;
+	order: number;
+	timerConfig: string | null;
+}
+
+interface ApiWoD {
+	id: string;
+	workspaceId: string;
+	date: string;
+	description: string | null;
+	sections: ApiSection[];
+	createdAt: string;
+	updatedAt: string;
+}
+
+/**
  * Map API response to WoD type
  * Handles conversion of dates and ensures proper typing
  */
-function mapApiWoDToWoD(apiWod: any): WoD {
+function mapApiWoDToWoD(apiWod: ApiWoD): WoD {
 	return {
 		id: apiWod.id,
 		workspaceId: apiWod.workspaceId,
 		date: apiWod.date,
 		description: apiWod.description,
 		sections: (apiWod.sections || [])
-			.sort((a: any, b: any) => a.order - b.order)
-			.map((s: any) => ({
+			.sort((a, b) => a.order - b.order)
+			.map((s) => ({
 				id: s.id,
 				wodId: s.wodId,
-				type: s.type,
+				type: s.type as Section['type'],
 				name: s.name,
 				content: s.content,
 				order: s.order,

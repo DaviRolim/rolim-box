@@ -43,13 +43,6 @@ export const TIMER_LABELS: Record<TimerType, string> = {
 	tabata: 'TABATA'
 };
 
-export const TIMER_DESCRIPTIONS: Record<TimerType, string> = {
-	amrap: 'As Many Rounds As Possible',
-	emom: 'Every Minute On the Minute',
-	fortime: 'Complete workout for time',
-	tabata: 'Work/Rest intervals'
-};
-
 // ============================================================================
 // Zod Validation Schemas
 // ============================================================================
@@ -109,10 +102,10 @@ export function getTotalDuration(config: TimerConfig): number {
 	switch (config.type) {
 		case 'amrap':
 		case 'fortime':
-			return config.duration!;
+			return config.duration ?? 0;
 		case 'emom':
-			return config.rounds! * config.intervalWork!;
+			return (config.rounds ?? 0) * (config.intervalWork ?? 0);
 		case 'tabata':
-			return config.rounds! * (config.intervalWork! + config.intervalRest!);
+			return (config.rounds ?? 0) * ((config.intervalWork ?? 0) + (config.intervalRest ?? 0));
 	}
 }

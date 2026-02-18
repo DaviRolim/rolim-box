@@ -14,7 +14,10 @@
 		size?: 'xs' | 'sm' | 'md' | 'lg';
 		class?: string;
 		onclick?: () => void;
-		[key: string]: any;
+		disabled?: boolean;
+		type?: 'button' | 'submit' | 'reset';
+		title?: string;
+		[key: string]: unknown;
 	}>();
 
 	const variants: Record<string, string> = {
