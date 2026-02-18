@@ -168,17 +168,7 @@ export async function deleteCachedWod(id: string): Promise<void> {
 	await db.delete('wods', id);
 }
 
-export async function clearCachedWods(): Promise<void> {
-	const db = await getDB();
-	await db.clear('wods');
-}
-
 // Section operations
-export async function cacheSection(section: RolimBoxDB['sections']['value']): Promise<void> {
-	const db = await getDB();
-	await db.put('sections', section);
-}
-
 export async function cacheSections(sections: RolimBoxDB['sections']['value'][]): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction('sections', 'readwrite');
@@ -199,11 +189,6 @@ export async function deleteCachedSectionsByWod(wodId: string): Promise<void> {
 	await Promise.all([...sections.map((s) => tx.store.delete(s.id)), tx.done]);
 }
 
-export async function clearCachedSections(): Promise<void> {
-	const db = await getDB();
-	await db.clear('sections');
-}
-
 // Exercise operations
 export async function cacheExercises(exercises: RolimBoxDB['exercises']['value'][]): Promise<void> {
 	const db = await getDB();
@@ -216,24 +201,25 @@ export async function getCachedExercises(): Promise<RolimBoxDB['exercises']['val
 	return db.getAll('exercises');
 }
 
-export async function clearCachedExercises(): Promise<void> {
-	const db = await getDB();
-	await db.clear('exercises');
-}
-
 // Personal Record operations
-export async function cachePersonalRecords(prs: RolimBoxDB['personalRecords']['value'][]): Promise<void> {
+export async function cachePersonalRecords(
+	prs: RolimBoxDB['personalRecords']['value'][]
+): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction('personalRecords', 'readwrite');
 	await Promise.all([...prs.map((pr) => tx.store.put(pr)), tx.done]);
 }
 
-export async function getCachedPersonalRecords(): Promise<RolimBoxDB['personalRecords']['value'][]> {
+export async function getCachedPersonalRecords(): Promise<
+	RolimBoxDB['personalRecords']['value'][]
+> {
 	const db = await getDB();
 	return db.getAll('personalRecords');
 }
 
-export async function cachePersonalRecord(pr: RolimBoxDB['personalRecords']['value']): Promise<void> {
+export async function cachePersonalRecord(
+	pr: RolimBoxDB['personalRecords']['value']
+): Promise<void> {
 	const db = await getDB();
 	await db.put('personalRecords', pr);
 }
@@ -263,18 +249,6 @@ export async function hasCacheFlag(key: string): Promise<boolean> {
 export async function clearCacheFlag(key: string): Promise<void> {
 	const db = await getDB();
 	await db.delete('syncMeta', key);
-}
-
-// Sync metadata
-export async function setLastSync(timestamp: number): Promise<void> {
-	const db = await getDB();
-	await db.put('syncMeta', { key: 'lastSync', timestamp });
-}
-
-export async function getLastSync(): Promise<number | null> {
-	const db = await getDB();
-	const meta = await db.get('syncMeta', 'lastSync');
-	return meta?.timestamp ?? null;
 }
 
 // Clear all data (for logout)

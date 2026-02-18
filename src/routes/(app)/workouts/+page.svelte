@@ -53,11 +53,11 @@
 			const response = await authFetch(`/api/wods?${params}`);
 			if (response.ok) {
 				const { wods: newWods, nextCursor: newCursor } = await response.json();
-				const mapped: WoD[] = newWods.map((w: any) => ({
+				const mapped: WoD[] = (newWods as Array<Record<string, unknown>>).map((w) => ({
 					...w,
-					createdAt: new Date(w.createdAt),
-					updatedAt: new Date(w.updatedAt)
-				}));
+					createdAt: new Date(w.createdAt as string),
+					updatedAt: new Date(w.updatedAt as string)
+				})) as WoD[];
 				// Deduplicate by id (cache may already have some)
 				const existingIds = new Set(wods.map((w) => w.id));
 				const unique = mapped.filter((w) => !existingIds.has(w.id));
@@ -90,7 +90,7 @@
 	}
 
 	// Get section count
-	function getSectionCount(sections: any[]): number {
+	function getSectionCount(sections: WoD['sections']): number {
 		return sections.length;
 	}
 
@@ -419,12 +419,7 @@
 
 			{#if nextCursor}
 				<div class="flex justify-center pt-4">
-					<Button
-						variant="secondary"
-						size="sm"
-						onclick={loadMore}
-						disabled={isLoadingMore}
-					>
+					<Button variant="secondary" size="sm" onclick={loadMore} disabled={isLoadingMore}>
 						{isLoadingMore ? 'Loading...' : 'LOAD MORE'}
 					</Button>
 				</div>

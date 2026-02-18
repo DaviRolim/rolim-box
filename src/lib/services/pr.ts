@@ -130,8 +130,11 @@ export async function getExercisesWithPRs(): Promise<ExerciseWithBestPR[]> {
 	// Group PRs by exercise and find the best for each
 	const prsByExercise = new Map<string, { value: number; date: string }>();
 
+	// Build O(1) lookup map for exercises
+	const exerciseMap = new Map(exercises.map((e) => [e.id, e]));
+
 	for (const pr of prs) {
-		const ex = exercises.find((e) => e.id === pr.exerciseId);
+		const ex = exerciseMap.get(pr.exerciseId);
 		if (!ex) continue;
 
 		const existing = prsByExercise.get(pr.exerciseId);
