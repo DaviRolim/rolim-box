@@ -18,7 +18,9 @@ bun dev          # Start dev server
 bun run build    # Production build
 bun run check    # TypeScript check
 bun run lint     # ESLint + Prettier check
-bun run test:e2e # Playwright E2E tests
+bun run test:unit # Unit tests (bun test, pure helpers in unit/)
+bun run test:e2e # Playwright E2E tests (builds, seeds e2e.db, never touches local.db)
+bun run db:setup # Create tables + seed a LOCAL file: database
 bun run db:push  # Push schema changes
 bun run db:studio # Open Drizzle Studio
 ```
@@ -47,7 +49,21 @@ src/
 │   └── api/            # REST endpoints
 ```
 
+## Design
+
+- Follow `docs/design-direction.md` ("Placar da Casa"). Tokens and shared classes are in
+  `src/routes/layout.css`: `display`, `legend`, `sign`, `btn`, `tag`, `input`, `module`, `notice`, `led`.
+- Colours are semantic tokens (`bg-bg`, `text-ink`, `text-dim`, `bg-pink` + `text-on-fill`, ...).
+  Both grounds (Sol / Noite) must stay readable; never hard-code a ground colour.
+- Pink means move. One painted (Londrina) phrase per screen. No shadows, gradients or rounded cards.
+- Modals use `ui/Sheet.svelte`; confirmations use `ui/ConfirmDialog.svelte`.
+
 ## Conventions
+
+- Screens under `(app)` have no server `load`: they read the layout data and `wodStore`, so
+  navigation works offline. Keep it that way.
+- Links and `goto()` use `resolve()` from `$app/paths` (dynamic routes need the full id, e.g.
+  `resolve('/(app)/workouts/[id]', { id })`).
 
 - Use Svelte 5 runes (`$state`, `$derived`, `$effect`) - no legacy stores
 - Stores use `.svelte.ts` extension with class-based pattern

@@ -28,7 +28,10 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			.select()
 			.from(workspaceMember)
 			.where(
-				and(eq(workspaceMember.userId, locals.user.id), eq(workspaceMember.workspaceId, workspaceId))
+				and(
+					eq(workspaceMember.userId, locals.user.id),
+					eq(workspaceMember.workspaceId, workspaceId)
+				)
 			);
 
 		if (!membership) {
@@ -57,10 +60,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		// Get all PRs for workspace members
 		const allPRs =
 			memberIds.length > 0
-				? await db
-						.select()
-						.from(personalRecord)
-						.where(inArray(personalRecord.userId, memberIds))
+				? await db.select().from(personalRecord).where(inArray(personalRecord.userId, memberIds))
 				: [];
 
 		// Calculate best PR per user per exercise
@@ -105,7 +105,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 				// Find the best value for this exercise
 				let bestValue: number | null = null;
 
-				for (const [userId, pr] of exercisePRs) {
+				for (const pr of exercisePRs.values()) {
 					if (bestValue === null) {
 						bestValue = pr.value;
 					} else if (ex.measurementType === 'time') {

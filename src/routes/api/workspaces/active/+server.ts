@@ -25,10 +25,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 		.select()
 		.from(workspaceMember)
 		.where(
-			and(
-				eq(workspaceMember.userId, locals.user.id),
-				eq(workspaceMember.workspaceId, workspaceId)
-			)
+			and(eq(workspaceMember.userId, locals.user.id), eq(workspaceMember.workspaceId, workspaceId))
 		);
 
 	if (!membership) {

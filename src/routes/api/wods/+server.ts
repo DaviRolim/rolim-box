@@ -151,7 +151,8 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			.returning();
 
 		const rows = await buildSectionRows(tx, wodId, data.sections);
-		const createdSections = rows.length > 0 ? await tx.insert(section).values(rows).returning() : [];
+		const createdSections =
+			rows.length > 0 ? await tx.insert(section).values(rows).returning() : [];
 		createdSections.sort((a, b) => a.order - b.order);
 
 		return serializeWod(newWod, createdSections);

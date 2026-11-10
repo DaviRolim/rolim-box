@@ -164,13 +164,20 @@ const after = {
 	async openLeaderboard(page) {
 		await page.getByRole('tab', { name: /leaderboard/i }).click();
 	},
+	/** On a phone the row actions live behind the "..." button; on desktop they are inline. */
+	async openRowActions(page) {
+		const more = page.getByRole('button', { name: /^actions for/i }).first();
+		if (await more.isVisible()) await more.click();
+	},
 	async openDuplicate(page) {
+		await this.openRowActions(page);
 		await page
 			.getByRole('button', { name: /^duplicate/i })
 			.first()
 			.click();
 	},
 	async openDelete(page) {
+		await this.openRowActions(page);
 		await page
 			.getByRole('button', { name: /^delete/i })
 			.first()
@@ -184,7 +191,7 @@ const A = VARIANT === 'after' ? after : before;
 // Shots
 // ---------------------------------------------------------------------------
 
-/** @type {{name: string, as: keyof typeof USERS | 'anon', full?: boolean, fresh?: boolean, run: (page: import('@playwright/test').Page, ctx: import('@playwright/test').BrowserContext) => Promise<void>, cleanup?: (page: import('@playwright/test').Page) => Promise<void>}[]} */
+/** @type {{name: string, as: keyof typeof USERS | 'anon', full?: boolean, fresh?: boolean, light?: boolean, run: (page: import('@playwright/test').Page, ctx: import('@playwright/test').BrowserContext) => Promise<void>, cleanup?: (page: import('@playwright/test').Page) => Promise<void>}[]} */
 const SHOTS = [
 	// --- Auth -------------------------------------------------------------
 	{
@@ -567,6 +574,182 @@ const SHOTS = [
 		}
 	},
 
+	// --- Only in the revamp -------------------------------------------------
+	...(VARIANT === 'after'
+		? [
+				{
+					name: '16-today-light',
+					as: 'athlete',
+					full: true,
+					light: true,
+					run: async (page) => {
+						await go(page, `${BASE}/dashboard`);
+						await settle(page, 1200);
+					}
+				},
+				{
+					name: '17-placar-mode',
+					as: 'athlete',
+					run: async (page) => {
+						await go(page, `${BASE}/dashboard`);
+						await settle(page, 1200);
+						await page.getByRole('button', { name: /placar mode/i }).click();
+						await settle(page, 700);
+					}
+				},
+				{
+					name: '18-placar-mode-light',
+					as: 'athlete',
+					light: true,
+					run: async (page) => {
+						await go(page, `${BASE}/dashboard`);
+						await settle(page, 1200);
+						await page.getByRole('button', { name: /placar mode/i }).click();
+						await settle(page, 700);
+						await page.getByRole('button', { name: /previous section/i }).click();
+						await page.getByRole('button', { name: /previous section/i }).click();
+						await settle(page, 500);
+					}
+				},
+				{
+					name: '28-wods-search',
+					as: 'athlete',
+					run: async (page) => {
+						await go(page, `${BASE}/workouts`);
+						await settle(page, 1200);
+						await page.getByLabel(/search wods/i).fill('burpee');
+						await settle(page, 600);
+					}
+				},
+				{
+					name: '34-wod-edit-preview',
+					as: 'coach',
+					full: true,
+					run: async (page) => {
+						await go(page, `${BASE}/workouts/${TODAY_WOD}/edit`);
+						await settle(page, 1500);
+						const preview = page.getByRole('tab', { name: /preview/i });
+						if (await preview.isVisible()) await preview.click();
+						await settle(page, 500);
+					}
+				},
+				{
+					name: '35-wod-new-validation',
+					as: 'coach',
+					run: async (page) => {
+						await go(page, `${BASE}/workouts/new`);
+						await settle(page, 800);
+						await page
+							.getByRole('button', { name: /^save wod$/i })
+							.first()
+							.click();
+						await settle(page, 600);
+					}
+				},
+				{
+					name: '43b-timer-go',
+					as: 'athlete',
+					run: async (page) => {
+						await go(page, `${BASE}/timers/${FRAN_SECTION}?wod=${TODAY_WOD}`);
+						await settle(page, 1500);
+						await A.timerStart(page);
+						await settle(page, 3150);
+					}
+				},
+				{
+					name: '44b-timer-running-fortime-light',
+					as: 'athlete',
+					light: true,
+					run: async (page) => {
+						await go(page, `${BASE}/timers/${FRAN_SECTION}?wod=${TODAY_WOD}`);
+						await settle(page, 1500);
+						await A.timerStart(page);
+						await settle(page, 9500);
+					}
+				},
+				{
+					name: '48b-timer-tabata-work',
+					as: 'athlete',
+					run: async (page) => {
+						await go(page, `${BASE}/timers?type=tabata`);
+						await settle(page, 600);
+						await A.startStandalone(page);
+						await settle(page, 3600 + 6000);
+					}
+				},
+				{
+					name: '46b-timer-finished-amrap',
+					as: 'athlete',
+					run: async (page) => {
+						await go(page, `${BASE}/timers?type=amrap`);
+						await settle(page, 600);
+						await A.startStandalone(page);
+						await settle(page, 5500);
+						for (let i = 0; i < 7; i++) {
+							await page.getByRole('button', { name: /count one round/i }).click();
+						}
+						await A.timerPause(page);
+						await A.timerFinish(page);
+						await settle(page, 800);
+					}
+				},
+				{
+					name: '52-pr-detail',
+					as: 'athlete',
+					run: async (page) => {
+						await go(page, `${BASE}/prs`);
+						await settle(page, 1500);
+						await page
+							.getByRole('button', { name: /back squat/i })
+							.first()
+							.click();
+						await settle(page, 1500);
+					}
+				},
+				{
+					name: '53-prs-light',
+					as: 'athlete',
+					light: true,
+					run: async (page) => {
+						await go(page, `${BASE}/prs`);
+						await settle(page, 1500);
+					}
+				},
+				{
+					name: '62-settings-light',
+					as: 'coach',
+					full: true,
+					light: true,
+					run: async (page) => {
+						await go(page, `${BASE}/settings`);
+						await settle(page, 800);
+					}
+				},
+				{
+					name: '63-login-light',
+					as: 'anon',
+					light: true,
+					run: async (page) => {
+						await go(page, `${BASE}/login`);
+						await settle(page);
+					}
+				},
+				{
+					name: '64-switch-box',
+					as: 'coach',
+					run: async (page) => {
+						await go(page, `${BASE}/dashboard`);
+						await settle(page, 1200);
+						await page
+							.getByRole('button', { name: /switch box/i })
+							.first()
+							.click();
+						await settle(page, 600);
+					}
+				}
+			]
+		: []),
+
 	// --- Errors -----------------------------------------------------------
 	{
 		name: '70-not-found',
@@ -589,7 +772,7 @@ for (const [size, device] of Object.entries(VIEWPORTS)) {
 	// One warm, logged-in storage state per user and viewport.
 	const states = {};
 	for (const [role, email] of Object.entries(USERS)) {
-		const ctx = await browser.newContext(device);
+		const ctx = await browser.newContext({ ...device, colorScheme: 'dark' });
 		const page = await ctx.newPage();
 		await A.login(page, email);
 		await page.waitForURL(/dashboard|no-workspace|workouts/, { timeout: 15000 });
@@ -611,6 +794,7 @@ for (const [size, device] of Object.entries(VIEWPORTS)) {
 		if (ONLY && !ONLY.test(shot.name)) continue;
 		const ctx = await browser.newContext({
 			...device,
+			colorScheme: shot.light ? 'light' : 'dark',
 			...(shot.as !== 'anon' && !shot.fresh ? { storageState: states[shot.as].storage } : {})
 		});
 		const page = await ctx.newPage();

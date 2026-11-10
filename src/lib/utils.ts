@@ -14,10 +14,13 @@ export function generateId(): string {
  * The function will only execute after `delay` ms have elapsed
  * since the last invocation.
  */
-export function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T {
+export function debounce<A extends unknown[]>(
+	fn: (...args: A) => void,
+	delay: number
+): (...args: A) => void {
 	let timeoutId: ReturnType<typeof setTimeout>;
-	return ((...args: any[]) => {
+	return (...args: A) => {
 		clearTimeout(timeoutId);
 		timeoutId = setTimeout(() => fn(...args), delay);
-	}) as T;
+	};
 }

@@ -45,8 +45,8 @@ Two grounds and one signal. **Pink means move.**
   hairlines and 2px rules, not by cards. Corners are square (2px at most).
 - Every module is labelled like a panel on an instrument: mono legend top-left, index or value
   top-right.
-- Touch targets are at least 56px; the primary action of a screen is a full-width slab of 72px or
-  more, anchored where a thumb or a chalky knuckle lands.
+- Buttons are 56px tall, small controls never under 44px; the primary action of a screen is a
+  full-width slab of 72px or more, anchored where a thumb or a chalky knuckle lands.
 - Numbers are right-aligned or in their own column. Reps never sit inside a sentence.
 
 ## Motion

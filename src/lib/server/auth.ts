@@ -189,7 +189,9 @@ export async function createWorkspaceInvite(
 	return invite;
 }
 
-export async function getInviteByCode(code: string): Promise<(table.WorkspaceInvite & { workspaceName: string }) | undefined> {
+export async function getInviteByCode(
+	code: string
+): Promise<(table.WorkspaceInvite & { workspaceName: string }) | undefined> {
 	const [result] = await db
 		.select({
 			id: table.workspaceInvite.id,

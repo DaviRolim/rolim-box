@@ -43,10 +43,13 @@ export const POST: RequestHandler = async ({ params, locals, cookies }) => {
 		);
 
 	if (existingMembership) {
-		return json({
-			error: 'You are already a member of this workspace',
-			workspaceId: invite.workspaceId
-		}, { status: 409 });
+		return json(
+			{
+				error: 'You are already a member of this workspace',
+				workspaceId: invite.workspaceId
+			},
+			{ status: 409 }
+		);
 	}
 
 	// Add user to workspace

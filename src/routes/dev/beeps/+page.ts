@@ -8,5 +8,3 @@ export const load: PageLoad = async () => {
 	if (!dev) throw error(404, 'Not found');
 	return {};
 };
-
-

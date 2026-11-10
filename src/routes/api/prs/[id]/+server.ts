@@ -19,12 +19,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 	const [pr] = await db
 		.select()
 		.from(personalRecord)
-		.where(
-			and(
-				eq(personalRecord.id, id),
-				eq(personalRecord.userId, locals.user.id)
-			)
-		);
+		.where(and(eq(personalRecord.id, id), eq(personalRecord.userId, locals.user.id)));
 
 	if (!pr) {
 		return json({ error: 'PR not found' }, { status: 404 });

@@ -90,7 +90,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		console.error('AI generation error:', error);
 
 		const message = error instanceof Error ? error.message.toLowerCase() : '';
-		if (message.includes('api key') || message.includes('unauthorized') || message.includes('401')) {
+		if (
+			message.includes('api key') ||
+			message.includes('unauthorized') ||
+			message.includes('401')
+		) {
 			return json(
 				{
 					error: 'The Magic Wand key was rejected. Check OPENROUTER_API_KEY on the server.',
