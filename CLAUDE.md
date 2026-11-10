@@ -65,6 +65,14 @@ src/
 - Links and `goto()` use `resolve()` from `$app/paths` (dynamic routes need the full id, e.g.
   `resolve('/(app)/workouts/[id]', { id })`).
 
+- Every user-facing string goes through `t` from `$lib/i18n` (English default, pt-BR second).
+  Add the key to `src/lib/i18n/en/<area>.ts` and `pt/<area>.ts`; pt is typed as en's shape, so a
+  missing key fails `bun run check`. Read `t` in markup, a function or `$derived` (never freeze it
+  in a top-level const) so the EN | PT switch updates live. Server code uses
+  `dictFor(locals.locale)`. Dates go through `$lib/date` (Intl with the active locale).
+  Painted Londrina phrases ("Vai doer", "Bora!", "Acabou!") stay Portuguese in both languages;
+  CrossFit terms (WoD, AMRAP, EMOM, For Time, PR...) stay English in both.
+
 - Use Svelte 5 runes (`$state`, `$derived`, `$effect`) - no legacy stores
 - Stores use `.svelte.ts` extension with class-based pattern
 - API routes return JSON with consistent error handling
