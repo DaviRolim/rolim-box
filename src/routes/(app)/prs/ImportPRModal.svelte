@@ -1,8 +1,7 @@
 <script lang="ts">
-	import Button from '$lib/components/Button.svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { UnitPreference, ImportedPR, MeasurementType } from '$lib/types/pr';
 	import {
-		formatPRValue,
 		convertValueForDisplay,
 		convertValueForStorage,
 		getWeightUnit,
@@ -10,7 +9,13 @@
 		formatTime,
 		parseTime
 	} from '$lib/types/pr';
+	import Sheet from '$lib/components/ui/Sheet.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 
+	/**
+	 * Import PRs from a screenshot of another app: upload the picture, let the server read it,
+	 * then check every line (and fix it) before anything is saved.
+	 */
 	interface EnrichedImportedPR extends ImportedPR {
 		hasConflict: boolean;
 		existingValue: number | null;
@@ -25,43 +30,36 @@
 
 	let { open = $bindable(), unitPreference, onClose, onImported }: Props = $props();
 
-	// State
 	type ModalState = 'upload' | 'processing' | 'review';
 	let modalState = $state<ModalState>('upload');
+	let processingWhat = $state<'reading' | 'saving'>('reading');
 	let selectedFile = $state<File | null>(null);
 	let previewUrl = $state<string | null>(null);
 	let error = $state<string | null>(null);
+	let dragging = $state(false);
 
 	// Analysis results
 	let matchedPRs = $state<EnrichedImportedPR[]>([]);
 	let unmatchedExercises = $state<string[]>([]);
-	let selectedPRs = $state<Set<string>>(new Set());
-	let editedValues = $state<Map<string, number>>(new Map());
+	const selectedPRs = new SvelteSet<string>();
+	/** Values as the person sees and edits them (display units), by exercise id. */
+	const editedValues = new SvelteMap<string, number>();
 
-	// Dialog ref
-	let dialogElement: HTMLDialogElement;
-
-	// Handle dialog open/close
+	// A fresh start every time the sheet opens.
+	let wasOpen = false;
 	$effect(() => {
-		if (!dialogElement) return;
-
-		if (open) {
-			dialogElement.showModal();
-			resetModal();
-		} else {
-			dialogElement.close();
-		}
+		if (open && !wasOpen) resetModal();
+		wasOpen = open;
 	});
 
 	function resetModal() {
 		modalState = 'upload';
-		selectedFile = null;
-		previewUrl = null;
+		clearFile();
 		error = null;
 		matchedPRs = [];
 		unmatchedExercises = [];
-		selectedPRs = new Set();
-		editedValues = new Map();
+		selectedPRs.clear();
+		editedValues.clear();
 	}
 
 	function handleClose() {
@@ -69,55 +67,39 @@
 		onClose();
 	}
 
-	function handleBackdropClick(e: MouseEvent) {
-		if (e.target === dialogElement) {
-			handleClose();
-		}
-	}
-
-	function handleFileSelect(e: Event) {
-		const input = e.target as HTMLInputElement;
+	function handleFileSelect(event: Event) {
+		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
-		if (file) {
-			selectFile(file);
-		}
+		if (file) selectFile(file);
+		input.value = '';
 	}
 
-	function handleDrop(e: DragEvent) {
-		e.preventDefault();
-		const file = e.dataTransfer?.files[0];
-		if (file) {
-			selectFile(file);
-		}
-	}
-
-	function handleDragOver(e: DragEvent) {
-		e.preventDefault();
+	function handleDrop(event: DragEvent) {
+		event.preventDefault();
+		dragging = false;
+		const file = event.dataTransfer?.files[0];
+		if (file) selectFile(file);
 	}
 
 	function selectFile(file: File) {
-		// Validate type
 		const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
 		if (!validTypes.includes(file.type)) {
 			error = 'Please upload a PNG, JPG, or WEBP image';
 			return;
 		}
-
-		// Validate size (5MB)
 		if (file.size > 5 * 1024 * 1024) {
 			error = 'Image must be smaller than 5MB';
 			return;
 		}
 
 		error = null;
+		if (previewUrl) URL.revokeObjectURL(previewUrl);
 		selectedFile = file;
 		previewUrl = URL.createObjectURL(file);
 	}
 
 	function clearFile() {
-		if (previewUrl) {
-			URL.revokeObjectURL(previewUrl);
-		}
+		if (previewUrl) URL.revokeObjectURL(previewUrl);
 		selectedFile = null;
 		previewUrl = null;
 	}
@@ -126,17 +108,14 @@
 		if (!selectedFile) return;
 
 		modalState = 'processing';
+		processingWhat = 'reading';
 		error = null;
 
 		try {
 			const formData = new FormData();
 			formData.append('image', selectedFile);
 
-			const res = await fetch('/api/prs/import', {
-				method: 'POST',
-				body: formData
-			});
-
+			const res = await fetch('/api/prs/import', { method: 'POST', body: formData });
 			const data = await res.json();
 
 			if (!res.ok) {
@@ -146,16 +125,16 @@
 			matchedPRs = data.matched;
 			unmatchedExercises = data.unmatched;
 
-			// Select all PRs by default
-			selectedPRs = new Set(matchedPRs.map((pr) => pr.exerciseId));
-
-			// Initialize edited values with display values (converted from storage units)
-			editedValues = new Map(
-				matchedPRs.map((pr) => [
+			// Everything is selected to begin with.
+			selectedPRs.clear();
+			editedValues.clear();
+			for (const pr of matchedPRs) {
+				selectedPRs.add(pr.exerciseId);
+				editedValues.set(
 					pr.exerciseId,
 					convertValueForDisplay(pr.value, pr.measurementType, unitPreference)
-				])
-			);
+				);
+			}
 
 			if (matchedPRs.length === 0) {
 				error =
@@ -172,39 +151,34 @@
 	}
 
 	function togglePR(exerciseId: string) {
-		const newSet = new Set(selectedPRs);
-		if (newSet.has(exerciseId)) {
-			newSet.delete(exerciseId);
-		} else {
-			newSet.add(exerciseId);
-		}
-		selectedPRs = newSet;
+		if (selectedPRs.has(exerciseId)) selectedPRs.delete(exerciseId);
+		else selectedPRs.add(exerciseId);
 	}
 
 	function updateValue(exerciseId: string, value: number) {
-		const newMap = new Map(editedValues);
-		newMap.set(exerciseId, value);
-		editedValues = newMap;
+		if (Number.isFinite(value)) editedValues.set(exerciseId, value);
+	}
+
+	function displayValue(pr: EnrichedImportedPR): number {
+		return (
+			editedValues.get(pr.exerciseId) ??
+			convertValueForDisplay(pr.value, pr.measurementType, unitPreference)
+		);
 	}
 
 	async function importPRs() {
 		const prsToImport = matchedPRs
 			.filter((pr) => selectedPRs.has(pr.exerciseId))
-			.map((pr) => {
-				// Get the display value (from edited or original converted)
-				const displayValue =
-					editedValues.get(pr.exerciseId) ??
-					convertValueForDisplay(pr.value, pr.measurementType, unitPreference);
-				// Convert back to storage units
-				return {
-					exerciseId: pr.exerciseId,
-					value: convertValueForStorage(displayValue, pr.measurementType, unitPreference)
-				};
-			});
+			.map((pr) => ({
+				exerciseId: pr.exerciseId,
+				// Back to storage units (grams, seconds, centimetres).
+				value: convertValueForStorage(displayValue(pr), pr.measurementType, unitPreference)
+			}));
 
 		if (prsToImport.length === 0) return;
 
 		modalState = 'processing';
+		processingWhat = 'saving';
 		error = null;
 
 		try {
@@ -213,7 +187,6 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ prs: prsToImport })
 			});
-
 			const data = await res.json();
 
 			if (!res.ok) {
@@ -228,13 +201,11 @@
 		}
 	}
 
-	// Count selected PRs
-	let selectedCount = $derived(selectedPRs.size);
-	let hasConflicts = $derived(
-		matchedPRs.some((pr) => pr.hasConflict && selectedPRs.has(pr.exerciseId))
+	const selectedCount = $derived(selectedPRs.size);
+	const conflictCount = $derived(
+		matchedPRs.filter((pr) => pr.hasConflict && selectedPRs.has(pr.exerciseId)).length
 	);
 
-	// Get unit label for measurement type
 	function getUnitLabel(measurementType: MeasurementType): string {
 		switch (measurementType) {
 			case 'weight':
@@ -242,332 +213,327 @@
 			case 'distance':
 				return getDistanceUnit(unitPreference);
 			case 'time':
-				return 'min';
-			case 'reps':
-				return '';
+				return 'm:ss';
 			default:
 				return '';
 		}
 	}
+
+	function show(value: number, measurementType: MeasurementType): string {
+		return measurementType === 'time' ? formatTime(value) : String(value);
+	}
+
+	const legend = $derived(
+		modalState === 'upload'
+			? 'Step 1 of 2 · upload'
+			: modalState === 'processing'
+				? processingWhat === 'reading'
+					? 'Reading the image'
+					: 'Saving'
+				: 'Step 2 of 2 · review'
+	);
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<dialog
-	bind:this={dialogElement}
-	onclick={handleBackdropClick}
-	onkeydown={(e) => e.key === 'Escape' && handleClose()}
-	class="m-0 h-full max-h-full w-full max-w-full bg-transparent p-0 md:m-auto md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-2xl"
->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		onclick={(e) => e.stopPropagation()}
-		class="flex h-full flex-col bg-bg-surface md:max-h-[85vh] md:rounded-2xl md:border md:border-white/10"
-	>
-		<!-- Header -->
-		<div class="border-b border-white/10 p-4">
-			<div class="flex items-start justify-between">
-				<div>
-					<h2 class="text-2xl font-black tracking-tight text-white">Import PRs</h2>
-					<p class="mt-0.5 text-sm text-text-muted">
-						{#if modalState === 'upload'}
-							Upload a screenshot of your PRs
-						{:else if modalState === 'processing'}
-							Analyzing image...
-						{:else}
-							Review and confirm import
-						{/if}
-					</p>
+<Sheet bind:open title="Import PRs" {legend} wide onclose={onClose}>
+	{#if error}
+		<div class="notice notice-danger mb-4" role="alert">
+			<span class="mt-0.5 flex-none text-danger-ink"
+				><Icon name="alert" size={20} stroke={2.6} /></span
+			>
+			<p>{error}</p>
+		</div>
+	{/if}
+
+	{#if modalState === 'upload'}
+		{#if !selectedFile}
+			<label
+				class="drop gridlines"
+				class:dragging
+				ondrop={handleDrop}
+				ondragover={(event) => {
+					event.preventDefault();
+					dragging = true;
+				}}
+				ondragleave={() => (dragging = false)}
+			>
+				<Icon name="upload" size={36} stroke={2.2} />
+				<span class="mt-3 display text-[2rem]">Pick a screenshot</span>
+				<span class="mt-2 max-w-xs text-base leading-snug text-dim">
+					A picture of the PR list from another app or a notes page. Drop it here or tap to choose.
+				</span>
+				<span class="mt-3 legend text-mute">PNG, JPG or WEBP · 5 MB max</span>
+				<input
+					type="file"
+					accept="image/png,image/jpeg,image/webp"
+					onchange={handleFileSelect}
+					class="sr-only"
+				/>
+			</label>
+		{:else}
+			<div class="border-2 border-line-strong">
+				<img src={previewUrl} alt="The screenshot you picked" class="preview" />
+				<div class="flex items-center gap-3 border-t-2 border-line-strong p-2 pl-3">
+					<p class="min-w-0 flex-1 truncate legend text-dim normal-case">{selectedFile.name}</p>
+					<button type="button" class="btn btn-sm btn-quiet flex-none" onclick={clearFile}>
+						<Icon name="x" size={16} stroke={3} />
+						Remove
+					</button>
 				</div>
-				<button
-					onclick={handleClose}
-					aria-label="Close"
-					class="rounded-lg p-2 text-text-muted hover:bg-white/10 hover:text-white"
-				>
-					<svg
-						class="h-5 w-5"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
-					</svg>
-				</button>
 			</div>
+		{/if}
+	{:else if modalState === 'processing'}
+		<div class="py-10" role="status" aria-live="polite">
+			<p class="display text-[2.5rem]">
+				{processingWhat === 'reading' ? 'Reading your PRs' : 'Saving your PRs'}
+			</p>
+			<p class="mt-2 text-lg text-dim">
+				{processingWhat === 'reading'
+					? 'Matching every line to an exercise. This takes a few seconds.'
+					: 'Almost there.'}
+			</p>
+			<div class="led mt-5 h-3"></div>
+		</div>
+	{:else}
+		<div class="module-head border-t-2 border-ink">
+			<span>Found {matchedPRs.length} {matchedPRs.length === 1 ? 'PR' : 'PRs'}</span>
+			<span>
+				{selectedCount} selected{unmatchedExercises.length > 0
+					? ` · ${unmatchedExercises.length} skipped`
+					: ''}
+			</span>
 		</div>
 
-		<!-- Content -->
-		<div class="flex-1 overflow-y-auto p-4">
-			{#if error}
-				<div class="mb-4 rounded-lg border border-error/30 bg-error/10 p-3 text-sm text-error">
-					{error}
-				</div>
-			{/if}
+		{#if conflictCount > 0}
+			<p class="notice notice-warn mb-3" role="status">
+				{conflictCount === 1
+					? '1 selected line replaces a PR you already have.'
+					: `${conflictCount} selected lines replace PRs you already have.`}
+			</p>
+		{/if}
 
-			{#if modalState === 'upload'}
-				<!-- Upload State -->
-				{#if !selectedFile}
-					<label
-						class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/20 bg-white/5 p-8 transition-colors hover:border-accent-500/50 hover:bg-white/10"
-						ondrop={handleDrop}
-						ondragover={handleDragOver}
-					>
-						<svg
-							class="mb-4 h-12 w-12 text-text-muted"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.5"
-						>
-							<path
-								d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							/>
-						</svg>
-						<p class="mb-1 font-medium text-white">Drop image or click to upload</p>
-						<p class="text-sm text-text-muted">PNG, JPG, or WEBP (max 5MB)</p>
+		<ul>
+			{#each matchedPRs as pr (pr.exerciseId)}
+				{@const isSelected = selectedPRs.has(pr.exerciseId)}
+				{@const currentValue = displayValue(pr)}
+				{@const unit = getUnitLabel(pr.measurementType)}
+				<li class="line" class:off={!isSelected}>
+					<label class="pick">
 						<input
-							type="file"
-							accept="image/png,image/jpeg,image/webp"
-							onchange={handleFileSelect}
-							class="hidden"
+							type="checkbox"
+							class="sr-only"
+							checked={isSelected}
+							onchange={() => togglePR(pr.exerciseId)}
 						/>
-					</label>
-				{:else}
-					<!-- Preview -->
-					<div class="rounded-xl border border-white/10 bg-white/5 p-4">
-						<div class="relative mb-4">
-							<img
-								src={previewUrl}
-								alt="Preview"
-								class="max-h-64 w-full rounded-lg object-contain"
-							/>
-							<button
-								onclick={clearFile}
-								aria-label="Clear selected file"
-								class="absolute -top-2 -right-2 rounded-full bg-bg-surface p-1 text-text-muted hover:text-white"
+						<span class="box" aria-hidden="true">
+							{#if isSelected}<Icon name="check" size={18} stroke={3.6} />{/if}
+						</span>
+						<span class="min-w-0 flex-1">
+							<span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+								<span class="display text-[1.5rem] leading-[0.95]">{pr.exerciseName}</span>
+								{#if pr.confidence !== 'high'}
+									<span class="tag {pr.confidence === 'medium' ? 'tag-warn' : 'tag-ink'}">
+										{pr.confidence === 'medium' ? 'Check this' : 'Unsure'}
+									</span>
+								{/if}
+							</span>
+							<span
+								class="mt-1.5 block truncate legend text-mute normal-case"
+								style="letter-spacing: 0.02em"
 							>
-								<svg
-									class="h-5 w-5"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
-								</svg>
-							</button>
-						</div>
-						<p class="truncate text-sm text-text-muted">{selectedFile.name}</p>
-					</div>
-				{/if}
-			{:else if modalState === 'processing'}
-				<!-- Processing State -->
-				<div class="flex flex-col items-center justify-center py-12">
-					<div
-						class="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-accent-500 border-t-transparent"
-					></div>
-					<p class="text-text-muted">Analyzing your PRs...</p>
-				</div>
-			{:else if modalState === 'review'}
-				<!-- Review State -->
-				<div class="space-y-4">
-					<!-- Summary -->
-					<!-- Summary -->
-					<div class="flex items-center justify-between px-1">
-						<div class="flex items-center gap-2">
-							<span class="text-lg font-bold text-white">Found {matchedPRs.length} PRs</span>
-							{#if unmatchedExercises.length > 0}
-								<span
-									class="rounded-full border border-warning/20 bg-warning/10 px-3 py-1 text-xs font-medium text-warning"
-								>
-									{unmatchedExercises.length} skipped
+								Read as: {pr.originalText}
+							</span>
+							{#if pr.hasConflict && pr.existingValue}
+								{@const existing = convertValueForDisplay(
+									pr.existingValue,
+									pr.measurementType,
+									unitPreference
+								)}
+								<span class="mt-1.5 flex items-center gap-1.5 legend text-warn-ink">
+									<Icon name="alert" size={14} stroke={2.8} />
+									Replaces {show(existing, pr.measurementType)} → {show(
+										currentValue,
+										pr.measurementType
+									)}{pr.measurementType === 'time' ? '' : ` ${unit}`}
 								</span>
 							{/if}
-						</div>
+						</span>
+					</label>
+
+					<div class="amount">
+						<label for="import-{pr.exerciseId}" class="sr-only">
+							Value for {pr.exerciseName}{unit ? ` (${unit})` : ''}
+						</label>
+						{#if pr.measurementType === 'time'}
+							<input
+								id="import-{pr.exerciseId}"
+								type="text"
+								inputmode="text"
+								class="input num"
+								value={formatTime(currentValue)}
+								onchange={(event) =>
+									updateValue(pr.exerciseId, parseTime(event.currentTarget.value))}
+								disabled={!isSelected}
+							/>
+						{:else}
+							<input
+								id="import-{pr.exerciseId}"
+								type="number"
+								inputmode="decimal"
+								step="any"
+								class="input num"
+								value={currentValue}
+								onchange={(event) => updateValue(pr.exerciseId, Number(event.currentTarget.value))}
+								disabled={!isSelected}
+							/>
+						{/if}
+						<span class="w-8 flex-none legend text-mute normal-case">{unit}</span>
 					</div>
+				</li>
+			{/each}
+		</ul>
 
-					<!-- PR List -->
-					<div class="space-y-2">
-						{#each matchedPRs as pr (pr.exerciseId)}
-							{@const isSelected = selectedPRs.has(pr.exerciseId)}
-							{@const currentValue = editedValues.get(pr.exerciseId) ?? pr.value}
-							<div
-								class="group flex items-start gap-3 rounded-xl border p-3 transition-all duration-200 md:items-center md:justify-between md:gap-4 md:p-4 {isSelected
-									? 'border-accent-500 bg-accent-500/10 shadow-[0_0_15px_rgba(236,72,153,0.1)]'
-									: 'bg-surface-800 hover:bg-surface-700 border-white/5 hover:border-white/10'}"
-							>
-								<!-- Left: Checkbox & Info -->
-								<div class="flex flex-1 items-start gap-3 md:gap-4">
-									<div class="relative mt-1 flex h-6 w-6 items-center justify-center md:mt-0">
-										<input
-											type="checkbox"
-											checked={isSelected}
-											onchange={() => togglePR(pr.exerciseId)}
-											class="peer bg-surface-900 h-5 w-5 cursor-pointer appearance-none rounded-md border border-white/20 transition-all checked:border-accent-500 checked:bg-accent-500 focus:ring-0 focus:ring-offset-0"
-										/>
-										<svg
-											class="pointer-events-none absolute h-3.5 w-3.5 text-white opacity-0 transition-opacity peer-checked:opacity-100"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="3"
-											stroke-linecap="round"
-											stroke-linejoin="round"
-										>
-											<polyline points="20 6 9 17 4 12" />
-										</svg>
-									</div>
+		{#if unmatchedExercises.length > 0}
+			<details class="skipped">
+				<summary class="legend">
+					<span>
+						{unmatchedExercises.length}
+						{unmatchedExercises.length === 1 ? 'line' : 'lines'} could not be matched
+					</span>
+					<Icon name="chevron-down" size={16} stroke={3} />
+				</summary>
+				<ul class="pb-3">
+					{#each unmatchedExercises as name, index (index)}
+						<li class="border-t border-line py-2 text-base text-dim">{name}</li>
+					{/each}
+				</ul>
+			</details>
+		{/if}
+	{/if}
 
-									<div class="min-w-0 flex-1">
-										<div class="flex flex-wrap items-center gap-2">
-											<p class="truncate text-base font-bold text-white md:text-lg">
-												{pr.exerciseName}
-											</p>
-											{#if pr.confidence !== 'high'}
-												<span
-													class="rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase {pr.confidence ===
-													'medium'
-														? 'bg-warning/20 text-warning'
-														: 'bg-error/20 text-error'}"
-												>
-													{pr.confidence}
-												</span>
-											{/if}
-										</div>
-										<p class="mt-0.5 truncate text-xs text-text-muted">{pr.originalText}</p>
-										{#if pr.hasConflict && pr.existingValue}
-											{@const existingDisplayValue = convertValueForDisplay(
-												pr.existingValue,
-												pr.measurementType,
-												unitPreference
-											)}
-											{@const unit = getUnitLabel(pr.measurementType)}
-											<div
-												class="mt-2 flex w-fit items-center gap-2 rounded-lg border border-warning/20 bg-warning/10 px-2 py-1 text-xs text-warning"
-											>
-												<svg
-													class="h-3 w-3"
-													viewBox="0 0 24 24"
-													fill="none"
-													stroke="currentColor"
-													stroke-width="2"
-												>
-													<path
-														d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-														stroke-linecap="round"
-														stroke-linejoin="round"
-													/>
-												</svg>
-												<span>Update: {existingDisplayValue}{unit} → {currentValue}{unit}</span>
-											</div>
-										{/if}
-									</div>
-								</div>
-
-								<!-- Right: Value Input -->
-								<div class="flex flex-shrink-0 items-center gap-2">
-									<div class="flex items-center gap-1.5 md:gap-2">
-										{#if pr.measurementType === 'time'}
-											<input
-												type="text"
-												value={formatTime(currentValue)}
-												onchange={(e) =>
-													updateValue(
-														pr.exerciseId,
-														parseTime((e.target as HTMLInputElement).value)
-													)}
-												disabled={!isSelected}
-												class="w-24 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-right text-base font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50 md:w-28 md:px-3 md:py-2 md:text-lg"
-											/>
-										{:else}
-											<input
-												type="number"
-												step="any"
-												value={currentValue}
-												onchange={(e) =>
-													updateValue(pr.exerciseId, Number((e.target as HTMLInputElement).value))}
-												disabled={!isSelected}
-												class="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-right text-base font-bold text-white transition-colors focus:border-accent-500 focus:ring-1 focus:ring-accent-500 focus:outline-none disabled:opacity-50 md:w-24 md:px-3 md:py-2 md:text-lg"
-											/>
-										{/if}
-										{#if getUnitLabel(pr.measurementType)}
-											<span
-												class="w-6 flex-shrink-0 text-[10px] font-medium text-text-muted md:text-xs"
-											>
-												{getUnitLabel(pr.measurementType)}
-											</span>
-										{/if}
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-
-					<!-- Unmatched exercises -->
-					{#if unmatchedExercises.length > 0}
-						<details class="rounded-lg border border-white/10 bg-white/5">
-							<summary class="cursor-pointer p-3 text-sm text-text-muted hover:text-white">
-								{unmatchedExercises.length} exercises couldn't be matched
-							</summary>
-							<div class="border-t border-white/10 p-3">
-								<ul class="space-y-1 text-sm text-text-muted">
-									{#each unmatchedExercises as name}
-										<li>• {name}</li>
-									{/each}
-								</ul>
-							</div>
-						</details>
-					{/if}
-				</div>
-			{/if}
-		</div>
-
-		<!-- Footer -->
-		<div class="border-t border-white/10 p-4">
-			{#if modalState === 'upload'}
-				<Button onclick={analyzeImage} variant="primary" class="w-full" disabled={!selectedFile}>
-					Analyze Image
-				</Button>
-			{:else if modalState === 'review'}
-				<div class="flex gap-3">
-					<Button onclick={() => (modalState = 'upload')} variant="secondary" class="flex-1">
-						Back
-					</Button>
-					<Button
-						onclick={importPRs}
-						variant="primary"
-						class="flex-1"
-						disabled={selectedCount === 0}
-					>
-						Import {selectedCount} PR{selectedCount !== 1 ? 's' : ''}
-					</Button>
-				</div>
-			{/if}
-		</div>
-	</div>
-</dialog>
+	{#snippet actions()}
+		{#if modalState === 'upload'}
+			<button type="button" class="btn btn-pink" onclick={analyzeImage} disabled={!selectedFile}>
+				Read the image
+			</button>
+			<button type="button" class="btn btn-quiet" onclick={handleClose}>Cancel</button>
+		{:else if modalState === 'review'}
+			<button type="button" class="btn btn-pink" onclick={importPRs} disabled={selectedCount === 0}>
+				Import {selectedCount}
+				{selectedCount === 1 ? 'PR' : 'PRs'}
+			</button>
+			<button type="button" class="btn btn-quiet" onclick={() => (modalState = 'upload')}>
+				Back
+			</button>
+		{:else}
+			<button type="button" class="btn btn-quiet" disabled>Working</button>
+		{/if}
+	{/snippet}
+</Sheet>
 
 <style>
-	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.8);
-		backdrop-filter: blur(4px);
+	.drop {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		padding: 1.5rem 1.25rem;
+		border: 2px dashed var(--c-line-strong);
+		color: var(--c-ink);
+		cursor: pointer;
 	}
-
-	dialog[open] {
-		animation: slide-up 0.2s ease-out;
+	.drop.dragging,
+	.drop:focus-within {
+		border-style: solid;
+		border-color: var(--c-ink);
 	}
-
-	@keyframes slide-up {
-		from {
-			opacity: 0;
-			transform: translateY(20px);
+	@media (hover: hover) {
+		.drop:hover {
+			border-color: var(--c-ink);
 		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
+	}
+	.preview {
+		display: block;
+		width: 100%;
+		max-height: 18rem;
+		object-fit: contain;
+		background: var(--c-panel);
+	}
+	.line {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.75rem 0;
+		border-top: 1px solid var(--c-line);
+	}
+	.pick {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.75rem;
+		min-width: 0;
+		flex: 1;
+		min-height: 2.75rem;
+		cursor: pointer;
+	}
+	.box {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex: none;
+		width: 2rem;
+		height: 2rem;
+		border: 2px solid var(--c-ink);
+		border-radius: 2px;
+		color: var(--c-on-fill);
+	}
+	.pick input:checked + .box {
+		background: var(--c-pink);
+		border-color: var(--c-pink);
+	}
+	.pick input:focus-visible + .box {
+		outline: 3px solid var(--c-ink);
+		outline-offset: 2px;
+	}
+	.off .pick {
+		color: var(--c-mute);
+	}
+	.amount {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding-left: 2.75rem;
+	}
+	.amount .input {
+		width: 8rem;
+		min-height: 3rem;
+		padding-block: 0.5rem;
+		font-stretch: 62%;
+		font-weight: 900;
+		font-size: 1.5rem;
+		line-height: 1.1;
+		text-align: right;
+	}
+	.skipped {
+		border-top: 2px solid var(--c-ink);
+	}
+	.skipped summary {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: 3rem;
+		color: var(--c-dim);
+		list-style: none;
+	}
+	.skipped summary::-webkit-details-marker {
+		display: none;
+	}
+	@media (min-width: 640px) {
+		.line {
+			flex-direction: row;
+			align-items: center;
+			gap: 1rem;
+		}
+		.amount {
+			flex: none;
+			padding-left: 0;
 		}
 	}
 </style>

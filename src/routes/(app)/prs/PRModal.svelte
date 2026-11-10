@@ -1,25 +1,24 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import Button from '$lib/components/Button.svelte';
-	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
+	import { formatDayMonth, todayIso } from '$lib/date';
 	import {
-		formatPRValue,
-		formatTime,
 		parseTime,
-		convertWeightForDisplay,
 		convertWeightForStorage,
-		convertDistanceForDisplay,
 		convertDistanceForStorage,
 		getWeightUnit,
 		getDistanceUnit,
 		isBetterPR,
 		type ExerciseWithBestPR,
 		type UnitPreference,
-		type PersonalRecord,
 		type ExerciseRankingsResponse
 	} from '$lib/types/pr';
-	import { getUserPRs, invalidatePRCache, createPR, deletePR } from '$lib/services/pr';
+	import { getUserPRs, createPR, deletePR } from '$lib/services/pr';
+	import Sheet from '$lib/components/ui/Sheet.svelte';
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
+	import RankRow from './RankRow.svelte';
+	import { CATEGORY_LABELS, MEASUREMENT_LABELS, athleteName, prParts } from './pr-format';
 
+	/** One exercise: log a new mark, see your history, see where you stand in the box. */
 	interface Props {
 		open: boolean;
 		exercise: ExerciseWithBestPR;
@@ -30,53 +29,59 @@
 		onDeleted: () => void;
 	}
 
-	let { open = $bindable(), exercise, unitPreference, workspaceId, onClose, onSaved, onDeleted }: Props =
-		$props();
+	let {
+		open = $bindable(),
+		exercise,
+		unitPreference,
+		workspaceId,
+		onClose,
+		onSaved,
+		onDeleted
+	}: Props = $props();
 
-	// State - using a subset of PersonalRecord fields that match the cache
-	type HistoryPR = { id: string; exerciseId: string; value: number; date: string; note: string | null };
+	// The subset of PersonalRecord fields the device cache keeps.
+	type HistoryPR = {
+		id: string;
+		exerciseId: string;
+		value: number;
+		date: string;
+		note: string | null;
+	};
 	let history = $state<HistoryPR[]>([]);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
+	let saveError = $state<string | null>(null);
 	let showNoteField = $state(false);
 	let deleteModalOpen = $state(false);
+	let deleting = $state(false);
 	let prToDelete = $state<string | null>(null);
 	let rankings = $state<ExerciseRankingsResponse | null>(null);
 	let rankingsLoading = $state(false);
+	let rankingsFailed = $state(false);
 
-	// Form state
 	let inputValue = $state('');
-	let inputDate = $state(new Date().toISOString().split('T')[0]);
+	let inputDate = $state(todayIso());
 	let inputNote = $state('');
 
-	// Dialog ref
-	let dialogElement: HTMLDialogElement;
-
-	// Load history and rankings when exercise changes
+	// Start clean and load whenever the sheet opens on an exercise.
+	let loadedFor: string | null = null;
 	$effect(() => {
-		if (open && exercise) {
-			loadHistory();
-			loadRankings();
+		if (!open) {
+			loadedFor = null;
+			return;
 		}
-	});
-
-	// Handle dialog open/close
-	$effect(() => {
-		if (!dialogElement) return;
-
-		if (open) {
-			dialogElement.showModal();
-			resetForm();
-		} else {
-			dialogElement.close();
-		}
+		if (loadedFor === exercise.id) return;
+		loadedFor = exercise.id;
+		resetForm();
+		rankings = null;
+		void loadHistory();
+		void loadRankings();
 	});
 
 	async function loadHistory() {
 		isLoading = true;
 		try {
 			const allPRs = await getUserPRs();
-			// Filter by exerciseId and sort by date descending
 			history = allPRs
 				.filter((pr) => pr.exerciseId === exercise.id)
 				.sort((a, b) => b.date.localeCompare(a.date));
@@ -89,60 +94,58 @@
 	async function loadRankings() {
 		if (!workspaceId) return;
 		rankingsLoading = true;
+		rankingsFailed = false;
 		try {
 			const res = await fetch(`/api/workspaces/${workspaceId}/exercises/${exercise.id}/rankings`);
-			if (res.ok) {
-				rankings = await res.json();
-			}
+			if (res.ok) rankings = await res.json();
+			else rankingsFailed = true;
 		} catch (error) {
 			console.error('Failed to load rankings:', error);
+			rankingsFailed = true;
 		}
 		rankingsLoading = false;
 	}
 
 	function resetForm() {
 		inputValue = '';
-		inputDate = new Date().toISOString().split('T')[0];
+		inputDate = todayIso();
 		inputNote = '';
 		showNoteField = false;
-		rankings = null;
-		rankingsLoading = false;
+		saveError = null;
 	}
 
-	function handleClose() {
-		open = false;
-		onClose();
-	}
+	async function handleSubmit(event: Event) {
+		event.preventDefault();
+		const raw = String(inputValue).trim();
+		if (!raw) return;
 
-	function handleBackdropClick(e: MouseEvent) {
-		if (e.target === dialogElement) {
-			handleClose();
+		let storageValue: number;
+		switch (exercise.measurementType) {
+			case 'weight':
+				storageValue = convertWeightForStorage(parseFloat(raw), unitPreference);
+				break;
+			case 'distance':
+				storageValue = convertDistanceForStorage(parseFloat(raw), unitPreference);
+				break;
+			case 'time':
+				storageValue = parseTime(raw);
+				break;
+			case 'reps':
+				storageValue = parseInt(raw);
+				break;
 		}
-	}
 
-	async function handleSubmit(e: Event) {
-		e.preventDefault();
-		if (!String(inputValue).trim()) return;
+		if (!Number.isFinite(storageValue) || storageValue <= 0) {
+			saveError =
+				exercise.measurementType === 'time'
+					? 'Write the time as minutes:seconds, for example 5:30.'
+					: 'Enter a number above zero.';
+			return;
+		}
 
 		isSaving = true;
+		saveError = null;
 		try {
-			// Convert input value to storage format
-			let storageValue: number;
-			switch (exercise.measurementType) {
-				case 'weight':
-					storageValue = convertWeightForStorage(parseFloat(inputValue), unitPreference);
-					break;
-				case 'distance':
-					storageValue = convertDistanceForStorage(parseFloat(inputValue), unitPreference);
-					break;
-				case 'time':
-					storageValue = parseTime(inputValue);
-					break;
-				case 'reps':
-					storageValue = parseInt(inputValue);
-					break;
-			}
-
 			const success = await createPR({
 				exerciseId: exercise.id,
 				value: storageValue,
@@ -155,9 +158,12 @@
 				await loadHistory();
 				await loadRankings();
 				onSaved();
+			} else {
+				saveError = 'This PR could not be saved. Try again.';
 			}
 		} catch (error) {
 			console.error('Failed to save PR:', error);
+			saveError = 'This PR could not be saved. Try again.';
 		}
 		isSaving = false;
 	}
@@ -169,48 +175,36 @@
 
 	async function confirmDelete() {
 		if (!prToDelete) return;
-
+		deleting = true;
 		try {
 			const success = await deletePR(prToDelete);
 			if (success) {
 				await loadHistory();
+				await loadRankings();
 				onDeleted();
 			}
 		} catch (error) {
 			console.error('Failed to delete PR:', error);
 		}
+		deleting = false;
 		deleteModalOpen = false;
 		prToDelete = null;
 	}
 
-	function cancelDelete() {
-		deleteModalOpen = false;
-		prToDelete = null;
-	}
-
-	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr + 'T00:00:00');
-		return date.toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		});
-	}
-
-	function getInputPlaceholder(): string {
+	const inputPlaceholder = $derived.by(() => {
 		switch (exercise.measurementType) {
 			case 'weight':
-				return `e.g., 100 (${getWeightUnit(unitPreference)})`;
+				return '100';
 			case 'time':
-				return 'e.g., 5:30 or 1:23:45';
+				return '5:30';
 			case 'reps':
-				return 'e.g., 25';
+				return '25';
 			case 'distance':
-				return `e.g., 5000 (${getDistanceUnit(unitPreference)})`;
+				return '5000';
 		}
-	}
+	});
 
-	function getInputLabel(): string {
+	const inputLabel = $derived.by(() => {
 		switch (exercise.measurementType) {
 			case 'weight':
 				return `Weight (${getWeightUnit(unitPreference)})`;
@@ -221,284 +215,275 @@
 			case 'distance':
 				return `Distance (${getDistanceUnit(unitPreference)})`;
 		}
-	}
+	});
 
-	// Find best PR in history
-	let bestPR = $derived.by(() => {
+	const bestPR = $derived.by(() => {
 		if (history.length === 0) return null;
-
-		return history.reduce((best, pr) => {
-			if (!best) return pr;
-			return isBetterPR(pr.value, best.value, exercise.measurementType) ? pr : best;
-		}, null as HistoryPR | null);
+		return history.reduce(
+			(best, pr) =>
+				!best || isBetterPR(pr.value, best.value, exercise.measurementType) ? pr : best,
+			null as HistoryPR | null
+		);
 	});
 
-	function getRankEmoji(rank: number): string {
-		if (rank === 1) return '🥇';
-		if (rank === 2) return '🥈';
-		if (rank === 3) return '🥉';
-		return `#${rank}`;
-	}
+	const currentUserRanking = $derived(
+		rankings ? (rankings.rankings.find((r) => r.userId === rankings?.currentUserId) ?? null) : null
+	);
 
-	let currentUserRanking = $derived.by(() => {
-		if (!rankings) return null;
-		const currentUserId = rankings.currentUserId;
-		return rankings.rankings.find(r => r.userId === currentUserId);
-	});
-
-	const categoryLabels: Record<string, string> = {
-		weightlifting: 'Weightlifting',
-		benchmark: 'Benchmark',
-		gymnastics: 'Gymnastics',
-		cardio: 'Cardio'
-	};
-
-	const measurementLabels: Record<string, string> = {
-		weight: 'Weight',
-		time: 'Time',
-		reps: 'Reps',
-		distance: 'Distance'
-	};
+	const deleteTarget = $derived(history.find((pr) => pr.id === prToDelete) ?? null);
 </script>
 
-<ConfirmModal
-	bind:open={deleteModalOpen}
-	title="Delete PR"
-	message="Are you sure you want to delete this PR entry? This cannot be undone."
-	confirmText="Delete"
-	cancelText="Cancel"
-	variant="danger"
-	onConfirm={confirmDelete}
-	onCancel={cancelDelete}
-/>
-
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<dialog
-	bind:this={dialogElement}
-	onclick={handleBackdropClick}
-	onkeydown={(e) => e.key === 'Escape' && handleClose()}
-	class="m-0 h-full max-h-full w-full max-w-full bg-transparent p-0 md:m-auto md:h-auto md:max-h-[85vh] md:max-w-lg md:rounded-2xl"
+<Sheet
+	bind:open
+	title={exercise.name}
+	legend="{CATEGORY_LABELS[exercise.category]} · {MEASUREMENT_LABELS[exercise.measurementType]}"
+	onclose={onClose}
 >
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		onclick={(e) => e.stopPropagation()}
-		class="flex h-full flex-col bg-bg-surface md:max-h-[85vh] md:rounded-2xl md:border md:border-white/10"
-	>
-		<!-- Header -->
-		<div class="border-b border-white/10 p-4">
-			<div class="flex items-start justify-between">
-				<div>
-					<h2 class="text-xl font-black text-white">{exercise.name}</h2>
-					<p class="text-sm text-text-muted">
-						{categoryLabels[exercise.category]} · {measurementLabels[exercise.measurementType]}
-					</p>
-				</div>
-				<button
-					onclick={handleClose}
-					aria-label="Close"
-					class="rounded-lg p-2 text-text-muted hover:bg-white/10 hover:text-white"
-				>
-					<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" />
-					</svg>
-				</button>
-			</div>
-		</div>
-
-		<!-- Content -->
-		<div class="flex-1 overflow-y-auto p-4">
-			<!-- Add PR Form -->
-			<form onsubmit={handleSubmit} class="mb-6 rounded-xl border border-white/10 bg-white/5 p-4">
-				<h3 class="mb-4 text-sm font-bold uppercase text-text-secondary">Log New PR</h3>
-
-				<div class="flex gap-3">
-					<div class="flex-1">
-						<label for="pr-value" class="mb-1 block text-xs font-bold text-text-muted">
-							{getInputLabel()}
-						</label>
-						<input
-							id="pr-value"
-							type={exercise.measurementType === 'time' ? 'text' : 'number'}
-							step={exercise.measurementType === 'weight' || exercise.measurementType === 'distance'
-								? '0.01'
-								: '1'}
-							placeholder={getInputPlaceholder()}
-							bind:value={inputValue}
-							required
-							class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-text-muted outline-none focus:border-accent-500/50"
-						/>
-					</div>
-					<div class="w-32">
-						<label for="pr-date" class="mb-1 block text-xs font-bold text-text-muted">Date</label>
-						<input
-							id="pr-date"
-							type="date"
-							bind:value={inputDate}
-							required
-							class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent-500/50"
-						/>
-					</div>
-				</div>
-
-				{#if showNoteField}
-					<div class="mt-3">
-						<label for="pr-note" class="mb-1 block text-xs font-bold text-text-muted">Note</label>
-						<input
-							id="pr-note"
-							type="text"
-							placeholder="e.g., Felt strong, competition PR..."
-							bind:value={inputNote}
-							maxlength="500"
-							class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-text-muted outline-none focus:border-accent-500/50"
-						/>
-					</div>
-				{:else}
-					<button
-						type="button"
-						onclick={() => (showNoteField = true)}
-						class="mt-2 text-xs text-accent-400 hover:underline"
-					>
-						+ Add note
-					</button>
-				{/if}
-
-				<div class="mt-4">
-					<Button type="submit" variant="primary" class="w-full" disabled={isSaving}>
-						{isSaving ? 'Saving...' : 'Save PR'}
-					</Button>
-				</div>
-			</form>
-
-			<!-- History -->
-			<div>
-				<h3 class="mb-3 text-sm font-bold uppercase text-text-secondary">History</h3>
-
-				{#if isLoading}
-					<div class="space-y-2">
-						{#each Array(3) as _}
-							<div class="h-16 animate-pulse rounded-lg bg-white/5"></div>
-						{/each}
-					</div>
-				{:else if history.length === 0}
-					<p class="text-center text-sm text-text-muted py-8">No PRs logged yet</p>
-				{:else}
-					<div class="space-y-2">
-						{#each history as pr (pr.id)}
-							{@const isBest = bestPR?.id === pr.id}
-							<div
-								class="flex items-center justify-between rounded-lg border border-white/5 bg-white/5 p-3 {isBest
-									? 'border-accent-500/30 bg-accent-500/10'
-									: ''}"
-							>
-								<div class="flex items-center gap-3">
-									{#if isBest}
-										<span class="text-xl">🏆</span>
-									{/if}
-									<div>
-										<p class="font-bold text-white">
-											{formatPRValue(pr.value, exercise.measurementType, unitPreference)}
-										</p>
-										<p class="text-xs text-text-muted">
-											{formatDate(pr.date)}
-											{#if pr.note}
-												<span class="text-text-secondary"> · "{pr.note}"</span>
-											{/if}
-										</p>
-									</div>
-								</div>
-								<button
-									onclick={() => handleDeleteClick(pr.id)}
-									class="rounded-lg p-2 text-text-muted hover:bg-error/10 hover:text-error"
-									title="Delete"
-								>
-									<svg
-										class="h-4 w-4"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-									>
-										<polyline points="3 6 5 6 21 6" />
-										<path
-											d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-										/>
-									</svg>
-								</button>
-							</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-
-			<!-- Workspace Rankings -->
-			{#if workspaceId}
-				<div class="mt-6">
-					<h3 class="mb-3 text-sm font-bold uppercase text-text-secondary">Workspace Rankings</h3>
-
-					{#if rankingsLoading}
-						<div class="h-24 animate-pulse rounded-lg bg-white/5"></div>
-					{:else if rankings && rankings.rankings.length > 0}
-						<div class="rounded-xl border border-white/10 bg-white/5 p-4">
-							{#if currentUserRanking}
-								<p class="mb-3 text-sm text-text-muted">
-									You're <span class="font-bold text-white">#{currentUserRanking.rank}</span> of {rankings.totalMembers}
-								</p>
-							{:else}
-								<p class="mb-3 text-sm text-text-muted">Log a PR to join the rankings</p>
-							{/if}
-
-							<!-- Top 3 -->
-							<div class="flex flex-wrap gap-2">
-								{#each rankings.rankings.slice(0, 3) as entry (entry.userId)}
-									{@const isCurrentUser = entry.userId === rankings.currentUserId}
-									<div class="flex items-center gap-2 rounded-lg {isCurrentUser ? 'bg-accent-500/20' : 'bg-white/5'} px-3 py-2">
-										<span class="text-sm">{getRankEmoji(entry.rank)}</span>
-										<span class="text-sm font-bold text-white">
-											{isCurrentUser ? 'You' : entry.email.split('@')[0]}
-										</span>
-										<span class="text-sm text-accent-400">
-											{formatPRValue(entry.value, exercise.measurementType, unitPreference)}
-										</span>
-									</div>
-								{/each}
-							</div>
-
-							{#if rankings.rankings.length > 3}
-								<p class="mt-2 text-xs text-text-muted">
-									+{rankings.rankings.length - 3} more
-								</p>
-							{/if}
-						</div>
-					{:else if rankings}
-						<div class="rounded-xl border border-white/10 bg-white/5 p-4">
-							<p class="text-sm text-text-muted">No one has logged this exercise yet. Be the first!</p>
-						</div>
-					{/if}
-				</div>
+	<!-- Log a new mark -->
+	<form onsubmit={handleSubmit} novalidate>
+		<div class="module-head border-t-2 border-ink">
+			<span>Log a new PR</span>
+			{#if bestPR}
+				{@const best = prParts(bestPR.value, exercise.measurementType, unitPreference)}
+				<span>Best {best.figure}{best.unit ? ` ${best.unit}` : ''}</span>
 			{/if}
 		</div>
-	</div>
-</dialog>
+
+		<div class="mt-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+			<div>
+				<label for="pr-value" class="field-label">{inputLabel}</label>
+				<input
+					id="pr-value"
+					type={exercise.measurementType === 'time' ? 'text' : 'number'}
+					inputmode={exercise.measurementType === 'time'
+						? 'text'
+						: exercise.measurementType === 'reps'
+							? 'numeric'
+							: 'decimal'}
+					step={exercise.measurementType === 'weight' || exercise.measurementType === 'distance'
+						? '0.01'
+						: '1'}
+					min="0"
+					placeholder={inputPlaceholder}
+					autocomplete="off"
+					bind:value={inputValue}
+					required
+					aria-invalid={!!saveError}
+					aria-describedby={saveError ? 'pr-save-error' : undefined}
+					class="input value-input"
+				/>
+			</div>
+			<div>
+				<label for="pr-date" class="field-label">Date</label>
+				<input id="pr-date" type="date" bind:value={inputDate} required class="input" />
+			</div>
+		</div>
+
+		{#if showNoteField}
+			<div class="mt-3">
+				<label for="pr-note" class="field-label">Note</label>
+				<input
+					id="pr-note"
+					type="text"
+					placeholder="Felt strong, belt on, competition day"
+					bind:value={inputNote}
+					maxlength="500"
+					autocomplete="off"
+					class="input"
+				/>
+			</div>
+		{:else}
+			<button
+				type="button"
+				class="mt-1 inline-flex min-h-11 items-center gap-1.5 legend text-dim"
+				onclick={() => (showNoteField = true)}
+			>
+				<Icon name="plus" size={14} stroke={3.4} />
+				Add a note
+			</button>
+		{/if}
+
+		{#if saveError}
+			<p id="pr-save-error" class="notice notice-danger mt-3" role="alert">{saveError}</p>
+		{/if}
+
+		<button
+			type="submit"
+			class="btn btn-pink btn-slab mt-3"
+			disabled={isSaving || !String(inputValue).trim()}
+		>
+			{isSaving ? 'Saving' : 'Save PR'}
+		</button>
+	</form>
+
+	<!-- History -->
+	<section class="mt-7">
+		<div class="module-head border-t-2 border-ink">
+			<h3>History</h3>
+			<span>{isLoading ? '' : history.length}</span>
+		</div>
+
+		{#if isLoading}
+			<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading history">
+				{#each [0, 1, 2] as row (row)}
+					<div class="led h-14"></div>
+				{/each}
+			</div>
+		{:else if history.length === 0}
+			<p class="border-t border-line py-4 text-lg text-dim">
+				Nothing logged yet. The first one is always a PR.
+			</p>
+		{:else}
+			<ul>
+				{#each history as pr (pr.id)}
+					{@const isBest = bestPR?.id === pr.id}
+					{@const parts = prParts(pr.value, exercise.measurementType, unitPreference)}
+					<li class="entry" class:best={isBest}>
+						<span class="mark" aria-hidden="true"></span>
+						<span class="min-w-0 flex-1">
+							<span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+								<span class="display text-[2rem] leading-[0.9]">{parts.figure}</span>
+								{#if parts.unit}<span class="legend text-dim">{parts.unit}</span>{/if}
+								{#if isBest}<span class="tag tag-pink">Best</span>{/if}
+							</span>
+							<span class="mt-1.5 block legend text-mute">{formatDayMonth(pr.date)}</span>
+							{#if pr.note}
+								<span class="mt-1 block text-base leading-snug text-dim">{pr.note}</span>
+							{/if}
+						</span>
+						<button
+							type="button"
+							class="icon-btn"
+							onclick={() => handleDeleteClick(pr.id)}
+							aria-label="Delete the PR of {formatDayMonth(pr.date)}"
+							title="Delete"
+						>
+							<Icon name="trash" size={20} stroke={2.4} />
+						</button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<!-- Where you stand in the box -->
+	{#if workspaceId}
+		<section class="mt-7">
+			<div class="module-head border-t-2 border-ink">
+				<h3>In the box</h3>
+				{#if rankings && rankings.rankings.length > 0}
+					<span>{rankings.membersWithPR} of {rankings.totalMembers} logged</span>
+				{/if}
+			</div>
+
+			{#if rankingsLoading && !rankings}
+				<div class="led h-24" aria-busy="true" aria-label="Loading the ranking"></div>
+			{:else if rankings && rankings.rankings.length > 0}
+				{@const box = rankings}
+				<p class="border-t border-line py-3 text-lg leading-snug text-dim">
+					{#if currentUserRanking}
+						You are
+						<strong class="text-ink">
+							{String(currentUserRanking.rank).padStart(2, '0')} of {box.totalMembers}
+						</strong>
+						on this one.
+					{:else}
+						Log a PR to get on this board.
+					{/if}
+				</p>
+				<ol>
+					{#each box.rankings.slice(0, 3) as entry (entry.userId)}
+						{@const parts = prParts(entry.value, exercise.measurementType, unitPreference)}
+						<li>
+							<RankRow
+								compact
+								rank={entry.rank}
+								name={athleteName(entry.email)}
+								you={entry.userId === box.currentUserId}
+								figure={parts.figure}
+								unit={parts.unit}
+							/>
+						</li>
+					{/each}
+					{#if currentUserRanking && currentUserRanking.rank > 3 && !box.rankings
+							.slice(0, 3)
+							.some((r) => r.userId === box.currentUserId)}
+						{@const parts = prParts(
+							currentUserRanking.value,
+							exercise.measurementType,
+							unitPreference
+						)}
+						<li>
+							<RankRow
+								compact
+								rank={currentUserRanking.rank}
+								name={athleteName(currentUserRanking.email)}
+								you
+								figure={parts.figure}
+								unit={parts.unit}
+							/>
+						</li>
+					{/if}
+				</ol>
+				{#if box.rankings.length > 3}
+					<p class="mt-3 legend text-mute">
+						{box.rankings.length} ranked · the full list is on the leaderboard
+					</p>
+				{/if}
+			{:else if rankings}
+				<p class="border-t border-line py-4 text-lg text-dim">
+					Nobody in the box has logged this one yet. Be the first.
+				</p>
+			{:else if rankingsFailed}
+				<p class="notice notice-warn" role="status">
+					The box ranking needs a connection and could not be loaded.
+				</p>
+			{/if}
+		</section>
+	{/if}
+</Sheet>
+
+<ConfirmDialog
+	bind:open={deleteModalOpen}
+	title="Delete this PR?"
+	legend={deleteTarget ? `${exercise.name} · ${formatDayMonth(deleteTarget.date)}` : exercise.name}
+	message="This entry is removed from your history and from the box ranking. This cannot be undone."
+	confirmLabel={deleting ? 'Deleting' : 'Delete PR'}
+	cancelLabel="Keep it"
+	danger
+	busy={deleting}
+	onconfirm={confirmDelete}
+	oncancel={() => (prToDelete = null)}
+/>
 
 <style>
-	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.8);
-		backdrop-filter: blur(4px);
+	.value-input {
+		height: 3.5rem;
+		padding-block: 0.25rem;
+		font-stretch: 62%;
+		font-weight: 900;
+		font-size: 1.75rem;
+		line-height: 1.1;
+		font-variant-numeric: tabular-nums;
 	}
-
-	dialog[open] {
-		animation: slide-up 0.2s ease-out;
+	.value-input::placeholder {
+		font-weight: 700;
 	}
-
-	@keyframes slide-up {
-		from {
-			opacity: 0;
-			transform: translateY(20px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
+	.entry {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		min-height: 4.25rem;
+		padding: 0.5rem 0;
+		border-top: 1px solid var(--c-line);
+	}
+	.mark {
+		align-self: stretch;
+		flex: none;
+		width: 0.375rem;
+		background: var(--c-line);
+	}
+	.entry.best .mark {
+		background: var(--c-pink);
 	}
 </style>
