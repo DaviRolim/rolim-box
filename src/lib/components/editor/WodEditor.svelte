@@ -17,6 +17,7 @@
 	import SectionBlock from '$lib/components/wod/SectionBlock.svelte';
 	import SectionEditor from './SectionEditor.svelte';
 	import type { SectionDraft } from './types';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * The coach's bench. Everything is edited in place: no dialogs, no steps. The right-hand side
@@ -80,11 +81,9 @@
 
 	// --- Validation -----------------------------------------------------------
 
-	const dateError = $derived(!isIsoDate(date) ? 'Pick a date.' : '');
-	const briefError = $derived(
-		brief.length > 500 ? 'The brief is too long (500 characters max).' : ''
-	);
-	const sectionsError = $derived(drafts.length === 0 ? 'Add at least one section.' : '');
+	const dateError = $derived(!isIsoDate(date) ? t.editor.errors.pickDate : '');
+	const briefError = $derived(brief.length > 500 ? t.editor.errors.briefTooLong : '');
+	const sectionsError = $derived(drafts.length === 0 ? t.editor.errors.noSections : '');
 	const draftsValid = $derived(
 		drafts.every((d) => d.name.trim() && d.name.length <= 100 && d.content.length <= 2000)
 	);
@@ -183,9 +182,6 @@
 		wandNote?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
 	});
 
-	const WAND_OFF =
-		'The Magic Wand is not set up on this server (it needs an OPENROUTER_API_KEY). Everything else works: add the sections by hand below.';
-
 	async function runWand() {
 		if (!briefReady || wand.kind === 'working') return;
 		if (!aiEnabled) {
@@ -193,7 +189,7 @@
 			return;
 		}
 		if (syncStore.isOffline) {
-			wand = { kind: 'error', message: 'The Magic Wand needs a connection. You are offline.' };
+			wand = { kind: 'error', message: t.editor.wand.offline };
 			return;
 		}
 
@@ -211,10 +207,7 @@
 				else
 					wand = {
 						kind: 'error',
-						message:
-							typeof body?.error === 'string'
-								? body.error
-								: 'The Magic Wand could not draft this one. Try again.'
+						message: typeof body?.error === 'string' ? body.error : t.editor.wand.failed
 					};
 				return;
 			}
@@ -236,10 +229,7 @@
 					})
 				);
 			if (generated.length === 0) {
-				wand = {
-					kind: 'error',
-					message: 'The Wand came back empty. Add more detail to the brief.'
-				};
+				wand = { kind: 'error', message: t.editor.wand.empty };
 				return;
 			}
 
@@ -249,10 +239,7 @@
 			removed = null;
 			wand = { kind: 'drafted', count: generated.length, before };
 		} catch {
-			wand = {
-				kind: 'error',
-				message: 'Could not reach the server. Check the connection and try again.'
-			};
+			wand = { kind: 'error', message: t.editor.wand.unreachable };
 		}
 	}
 
@@ -279,7 +266,9 @@
 			);
 			firstInvalid?.scrollIntoView({ block: 'center', behavior: 'auto' });
 			firstInvalid?.focus?.();
-			toastStore.error(sectionsError || dateError || briefError || 'Some sections need a name.');
+			toastStore.error(
+				sectionsError || dateError || briefError || t.editor.errors.sectionsNeedName
+			);
 			return;
 		}
 
@@ -304,16 +293,16 @@
 			saved = snapshot();
 			toastStore.success(
 				syncStore.isOffline
-					? 'Saved on this phone. It goes to the server when you are back online.'
+					? t.editor.toast.savedOffline
 					: wod
-						? 'WoD updated.'
-						: `WoD saved for ${formatLong(date)}.`
+						? t.editor.toast.updated
+						: t.editor.toast.savedFor(formatLong(date))
 			);
 			leaving = true;
 			await goto(resolve('/workouts'));
 		} catch (error) {
 			console.error('Failed to save WoD:', error);
-			toastStore.error('Could not save this WoD. Nothing was lost: try again.');
+			toastStore.error(t.editor.toast.saveFailed);
 			saving = false;
 		}
 	}
@@ -350,8 +339,8 @@
 	}
 
 	const quickDates = $derived([
-		{ label: 'Today', value: today },
-		{ label: 'Tomorrow', value: addDays(today, 1) }
+		{ key: 'today', label: t.editor.today, value: today },
+		{ key: 'tomorrow', label: t.editor.tomorrow, value: addDays(today, 1) }
 	]);
 </script>
 
@@ -360,26 +349,27 @@
 <div class="editor">
 	<header class="bar">
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- built with resolve() above -->
-		<a href={backHref} class="icon-btn flex-none" aria-label="Back">
+		<a href={backHref} class="icon-btn flex-none" aria-label={t.editor.back}>
 			<Icon name="arrow-left" size={22} stroke={2.8} />
 		</a>
 		<div class="min-w-0 flex-1">
 			<h1 class="truncate display text-[2rem] lg:text-[2.5rem]">
-				{isNew ? 'New WoD' : 'Edit WoD'}
+				{isNew ? t.editor.newWod : t.editor.editWod}
 			</h1>
 			<p class="mt-0.5 truncate legend {dirty ? 'text-warn-ink' : 'text-mute'}">
-				{#if saving}Saving{:else if dirty}Unsaved{:else if isNew}Blank{:else}Saved{/if}
+				{#if saving}{t.editor.status.saving}{:else if dirty}{t.editor.status
+						.unsaved}{:else if isNew}{t.editor.status.blank}{:else}{t.editor.status.saved}{/if}
 			</p>
 		</div>
 		<button type="button" class="btn btn-pink flex-none" disabled={saving} onclick={save}>
 			<Icon name="check" size={20} stroke={3.4} />
-			{isNew ? 'Save WoD' : 'Save'}
+			{isNew ? t.editor.saveWod : t.editor.save}
 			<kbd class="hidden border border-current px-1.5 py-0.5 legend lg:inline">⌘S</kbd>
 		</button>
 	</header>
 
 	<!-- Phone: switch between the bench and the board -->
-	<div class="switch" role="tablist" aria-label="Editor view">
+	<div class="switch" role="tablist" aria-label={t.editor.viewSwitch}>
 		<button
 			type="button"
 			role="tab"
@@ -387,7 +377,7 @@
 			class:on={view === 'edit'}
 			onclick={() => (view = 'edit')}
 		>
-			Edit
+			{t.editor.tabEdit}
 		</button>
 		<button
 			type="button"
@@ -396,7 +386,7 @@
 			class:on={view === 'preview'}
 			onclick={() => (view = 'preview')}
 		>
-			Preview
+			{t.editor.tabPreview}
 		</button>
 	</div>
 
@@ -413,9 +403,9 @@
 			<!-- Date -->
 			<div class="module pb-5">
 				<div class="module-head">
-					<span>When</span><span>{isIsoDate(date) ? formatLong(date) : ''}</span>
+					<span>{t.editor.when}</span><span>{isIsoDate(date) ? formatLong(date) : ''}</span>
 				</div>
-				<label for="wod-date" class="sr-only">Date</label>
+				<label for="wod-date" class="sr-only">{t.editor.date}</label>
 				<div class="flex flex-wrap items-center gap-2">
 					<input
 						id="wod-date"
@@ -425,7 +415,7 @@
 						required
 						aria-invalid={showErrors && !!dateError}
 					/>
-					{#each quickDates as option (option.label)}
+					{#each quickDates as option (option.key)}
 						<button
 							type="button"
 							class="tag min-h-11 px-3 {date === option.value ? 'tag-ink' : ''}"
@@ -441,8 +431,10 @@
 				{/if}
 				{#if sameDay.length > 0}
 					<p class="notice notice-warn mt-3">
-						{formatLong(date)} already has {sameDay.map((w) => `"${wodTitle(w)}"`).join(' and ')}.
-						Saving adds a second WoD to that day.
+						{t.editor.sameDay(
+							formatLong(date),
+							sameDay.map((w) => wodTitle(w))
+						)}
 					</p>
 				{/if}
 			</div>
@@ -450,14 +442,14 @@
 			<!-- Brief + Magic Wand -->
 			<div class="module pb-5">
 				<div class="module-head">
-					<label for="wod-brief">Coach's brief</label>
+					<label for="wod-brief">{t.editor.brief.label}</label>
 					<span class={brief.length > 500 ? 'text-danger-ink' : ''}>{brief.length}/500</span>
 				</div>
 				<textarea
 					id="wod-brief"
 					class="input"
 					rows="3"
-					placeholder="What is today about? Athletes read this under the WoD's name."
+					placeholder={t.editor.brief.placeholder}
 					bind:value={brief}
 					aria-invalid={!!briefError}
 					aria-describedby="wod-brief-help"
@@ -475,26 +467,26 @@
 						aria-describedby="wod-brief-help"
 					>
 						<Icon name="wand" size={20} stroke={2.6} />
-						{wand.kind === 'working' ? 'Drafting' : 'Magic Wand'}
+						{wand.kind === 'working' ? t.editor.wand.drafting : t.editor.wand.button}
 					</button>
 					<p id="wod-brief-help" class="min-w-0 flex-1 basis-48 text-base leading-snug text-mute">
 						{#if !briefReady}
-							Write a line or two and the Wand drafts the sections for you.
+							{t.editor.wand.helpEmpty}
 						{:else}
-							Drafts the sections from the brief. You can edit or undo everything.
+							{t.editor.wand.helpReady}
 						{/if}
 					</p>
 				</div>
 
 				<div bind:this={wandNote} class="scroll-mb-28">
 					{#if wand.kind === 'working'}
-						<div class="led mt-3 h-3" role="status" aria-label="The Magic Wand is drafting"></div>
+						<div class="led mt-3 h-3" role="status" aria-label={t.editor.wand.draftingAria}></div>
 					{:else if wand.kind === 'off'}
 						<div class="notice notice-warn mt-3" role="status">
 							<span class="mt-0.5 flex-none text-warn-ink"
 								><Icon name="info" size={20} stroke={2.6} /></span
 							>
-							<p>{WAND_OFF}</p>
+							<p>{t.editor.wand.off}</p>
 						</div>
 					{:else if wand.kind === 'error'}
 						<div class="notice notice-danger mt-3" role="alert">
@@ -506,13 +498,11 @@
 					{:else if wand.kind === 'drafted'}
 						<div class="notice notice-pink mt-3 items-center" role="status">
 							<p class="min-w-0 flex-1">
-								The Wand drafted {wand.count}
-								{wand.count === 1 ? 'section' : 'sections'}. Check the loads and fix anything that
-								is off.
+								{t.editor.wand.drafted(wand.count)}
 							</p>
 							<button type="button" class="btn btn-sm btn-quiet flex-none" onclick={undoWand}>
 								<Icon name="undo" size={16} stroke={2.8} />
-								Undo
+								{t.editor.wand.undo}
 							</button>
 						</div>
 					{/if}
@@ -521,8 +511,8 @@
 
 			<!-- Sections -->
 			<div class="module-head border-t-2 border-ink">
-				<span>Sections</span>
-				<span>{drafts.length} {drafts.length === 1 ? 'part' : 'parts'}</span>
+				<span>{t.editor.sections.heading}</span>
+				<span>{t.editor.sections.parts(drafts.length)}</span>
 			</div>
 
 			{#each drafts as draft, index (draft.key)}
@@ -538,10 +528,12 @@
 
 			{#if removed}
 				<div class="notice mb-4 items-center" role="status">
-					<p class="min-w-0 flex-1">Removed "{removed.draft.name || 'section'}".</p>
+					<p class="min-w-0 flex-1">
+						{t.editor.sections.removed(removed.draft.name || t.editor.sections.section)}
+					</p>
 					<button type="button" class="btn btn-sm btn-quiet flex-none" onclick={undoRemove}>
 						<Icon name="undo" size={16} stroke={2.8} />
-						Undo
+						{t.editor.sections.undo}
 					</button>
 				</div>
 			{/if}
@@ -557,23 +549,21 @@
 							? 'font-semibold text-danger-ink'
 							: 'text-dim'}"
 					>
-						{showErrors
-							? sectionsError
-							: 'No sections yet. Start with the warm-up, or go straight to the WoD.'}
+						{showErrors ? sectionsError : t.editor.sections.empty}
 					</p>
 				{/if}
 				<div class="flex flex-wrap items-center gap-2">
 					<button type="button" class="btn" onclick={() => addSection()}>
 						<Icon name="plus" size={20} stroke={3.4} />
-						Add section
+						{t.editor.sections.add}
 					</button>
-					<span class="hidden legend text-mute lg:inline">or</span>
+					<span class="hidden legend text-mute lg:inline">{t.editor.sections.or}</span>
 					{#each SECTION_TYPES as type (type)}
 						<button
 							type="button"
 							class="tag min-h-11 px-3"
 							onclick={() => addSection(type)}
-							aria-label="Add a {sectionTypes[type].label} section"
+							aria-label={t.editor.sections.addTypeAria(sectionTypes[type].label)}
 						>
 							+ {sectionTypes[type].label}
 						</button>
@@ -583,25 +573,25 @@
 
 			<div class="mt-8 flex flex-col gap-2 border-t border-line pt-5 sm:flex-row-reverse">
 				<button type="submit" class="btn btn-pink btn-slab sm:flex-1" disabled={saving}>
-					{saving ? 'Saving' : isNew ? 'Save WoD' : 'Save changes'}
+					{saving ? t.editor.saving : isNew ? t.editor.saveWod : t.editor.saveChanges}
 				</button>
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- built with resolve() above -->
-				<a href={backHref} class="btn btn-quiet sm:min-h-[4.5rem] sm:px-8"> Cancel </a>
+				<a href={backHref} class="btn btn-quiet sm:min-h-[4.5rem] sm:px-8">{t.editor.cancel}</a>
 			</div>
 
 			<p class="mt-5 hidden legend text-mute lg:block">
-				⌘S save · ⌘↵ add section · ⌥↑ ⌥↓ move the section you are in
+				{t.editor.sections.shortcuts}
 			</p>
 		</form>
 
-		<aside class="board" class:hidden-phone={view !== 'preview'} aria-label="Preview">
+		<aside class="board" class:hidden-phone={view !== 'preview'} aria-label={t.editor.preview.aria}>
 			<div class="module-head border-t-2 border-ink">
-				<span>What athletes see</span>
-				<span>Live</span>
+				<span>{t.editor.preview.heading}</span>
+				<span>{t.editor.preview.live}</span>
 			</div>
 			<div class="frame">
 				{#if drafts.length === 0 && !brief.trim()}
-					<p class="py-10 text-center text-lg text-mute">The board fills in as you write.</p>
+					<p class="py-10 text-center text-lg text-mute">{t.editor.preview.empty}</p>
 				{:else}
 					<Poster wod={preview} />
 					<div class="mt-6">
@@ -622,10 +612,10 @@
 
 <ConfirmDialog
 	bind:open={leaveOpen}
-	title="Leave without saving?"
-	message="The changes you made to this WoD have not been saved."
-	confirmLabel="Discard changes"
-	cancelLabel="Keep editing"
+	title={t.editor.leave.title}
+	message={t.editor.leave.message}
+	confirmLabel={t.editor.leave.confirm}
+	cancelLabel={t.editor.leave.cancel}
 	danger
 	onconfirm={discardAndLeave}
 />

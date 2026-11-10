@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { wod, section } from '$lib/server/db/schema';
 import { generateId } from '$lib/server/auth';
@@ -20,16 +21,17 @@ const duplicateRequestSchema = z.object({
  * this endpoint is kept for API clients.
  */
 export const POST: RequestHandler = async ({ locals, params, request }) => {
+	const d = dictFor(locals.locale);
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: d.api.unauthorized }, { status: 401 });
 	}
 
-	const access = await getWodAccess(locals.user.id, params.id);
+	const access = await getWodAccess(locals.user.id, params.id, locals.locale);
 	if (!access.ok) {
 		return json({ error: access.error }, { status: access.status });
 	}
 	if (!canEditWods(access.membership.role)) {
-		return json({ error: 'Members cannot duplicate workouts' }, { status: 403 });
+		return json({ error: d.editor.api.membersCannotDuplicate }, { status: 403 });
 	}
 
 	let body;
@@ -42,7 +44,7 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 	const validation = duplicateRequestSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
-			{ error: 'Validation failed', details: validation.error.flatten() },
+			{ error: d.api.validationFailed, details: validation.error.flatten() },
 			{ status: 400 }
 		);
 	}

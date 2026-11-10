@@ -8,6 +8,7 @@
 		type TimerType
 	} from '$lib/types/timer';
 	import { clock } from '$lib/wod-format';
+	import { t } from '$lib/i18n';
 
 	/** Compact clock settings for a section in the editor: pick a format, type the numbers. */
 	interface Props {
@@ -41,8 +42,8 @@
 </script>
 
 <fieldset>
-	<legend class="field-label">Clock</legend>
-	<div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Clock format">
+	<legend class="field-label">{t.editor.timer.legend}</legend>
+	<div class="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t.editor.timer.formatAria}>
 		<button
 			type="button"
 			role="radio"
@@ -50,7 +51,7 @@
 			class="tag min-h-11 px-3 {timer === null ? 'tag-ink' : ''}"
 			onclick={() => pick(null)}
 		>
-			No clock
+			{t.editor.timer.none}
 		</button>
 		{#each TIMER_TYPES as type (type)}
 			<button
@@ -70,7 +71,7 @@
 			{#if timer.type === 'amrap' || timer.type === 'fortime'}
 				<div class="w-28">
 					<label for="{id}-minutes" class="field-label">
-						{timer.type === 'fortime' ? 'Cap (min)' : 'Minutes'}
+						{timer.type === 'fortime' ? t.editor.timer.capMin : t.editor.timer.minutes}
 					</label>
 					<input
 						id="{id}-minutes"
@@ -85,7 +86,7 @@
 				</div>
 			{:else if timer.type === 'emom'}
 				<div class="w-28">
-					<label for="{id}-rounds" class="field-label">Rounds</label>
+					<label for="{id}-rounds" class="field-label">{t.editor.timer.rounds}</label>
 					<input
 						id="{id}-rounds"
 						type="number"
@@ -98,7 +99,7 @@
 					/>
 				</div>
 				<div class="w-28">
-					<label for="{id}-every" class="field-label">Every (s)</label>
+					<label for="{id}-every" class="field-label">{t.editor.timer.every}</label>
 					<input
 						id="{id}-every"
 						type="number"
@@ -113,7 +114,7 @@
 				</div>
 			{:else}
 				<div class="w-24">
-					<label for="{id}-rounds" class="field-label">Rounds</label>
+					<label for="{id}-rounds" class="field-label">{t.editor.timer.rounds}</label>
 					<input
 						id="{id}-rounds"
 						type="number"
@@ -126,7 +127,7 @@
 					/>
 				</div>
 				<div class="w-24">
-					<label for="{id}-work" class="field-label">Work (s)</label>
+					<label for="{id}-work" class="field-label">{t.editor.timer.work}</label>
 					<input
 						id="{id}-work"
 						type="number"
@@ -140,7 +141,7 @@
 					/>
 				</div>
 				<div class="w-24">
-					<label for="{id}-rest" class="field-label">Rest (s)</label>
+					<label for="{id}-rest" class="field-label">{t.editor.timer.rest}</label>
 					<input
 						id="{id}-rest"
 						type="number"
@@ -154,7 +155,7 @@
 					/>
 				</div>
 			{/if}
-			<p class="pb-5 legend text-mute">Total {clock(getTotalDuration(timer))}</p>
+			<p class="pb-5 legend text-mute">{t.editor.timer.total(clock(getTotalDuration(timer)))}</p>
 		</div>
 	{/if}
 </fieldset>

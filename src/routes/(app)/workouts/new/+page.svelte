@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { wodStore } from '$lib/stores/wods.svelte';
 	import WodEditor from '$lib/components/editor/WodEditor.svelte';
+	import { t } from '$lib/i18n';
 
 	let { data } = $props();
 
@@ -10,12 +11,16 @@
 </script>
 
 <svelte:head>
-	<title>New WoD - RolimBox</title>
+	<title>{t.common.pageTitle(t.editor.pageTitleNew)}</title>
 </svelte:head>
 
 {#if data.canEdit && data.activeWorkspaceId && wodStore.loading}
 	<!-- The editor picks the first open day, so it waits until the board has been read. -->
-	<div class="flex flex-col gap-3 px-4 py-6 lg:px-10" aria-busy="true" aria-label="Loading">
+	<div
+		class="flex flex-col gap-3 px-4 py-6 lg:px-10"
+		aria-busy="true"
+		aria-label={t.editor.guard.loading}
+	>
 		<div class="led h-14 w-2/3"></div>
 		<div class="led h-28"></div>
 		<div class="led h-40"></div>
@@ -31,12 +36,11 @@
 	{/key}
 {:else}
 	<div class="px-4 py-8 lg:px-10">
-		<p class="legend text-mute">Coaches only</p>
-		<h1 class="mt-3 display text-[3.5rem]">Not your whiteboard</h1>
+		<p class="legend text-mute">{t.editor.guard.coachesOnly}</p>
+		<h1 class="mt-3 display text-[3.5rem]">{t.editor.guard.title}</h1>
 		<p class="mt-3 max-w-md text-lg leading-snug text-dim">
-			Only the coaches of {data.activeWorkspace?.name ?? 'this box'} can program WoDs. You can still read
-			every one of them.
+			{t.editor.guard.cannotProgram(data.activeWorkspace?.name ?? t.editor.guard.thisBox)}
 		</p>
-		<a href={resolve('/dashboard')} class="btn btn-ink mt-6">Back to today</a>
+		<a href={resolve('/dashboard')} class="btn btn-ink mt-6">{t.editor.guard.backToToday}</a>
 	</div>
 {/if}
