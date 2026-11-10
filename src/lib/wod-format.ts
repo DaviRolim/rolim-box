@@ -4,6 +4,7 @@
  */
 import type { Section, WoD } from '$lib/types/wod';
 import { parseTimerConfig, type TimerConfig } from '$lib/types/timer';
+import { t } from '$lib/i18n';
 
 // ---------------------------------------------------------------------------
 // Timers
@@ -29,11 +30,13 @@ export function timerLabel(config: TimerConfig): string {
 		case 'amrap':
 			return `AMRAP ${duration(config.duration ?? 0)}`;
 		case 'fortime':
-			return `For time · ${duration(config.duration ?? 0)} cap`;
+			return t.format.forTimeLabel(duration(config.duration ?? 0));
 		case 'emom': {
 			const rounds = config.rounds ?? 0;
 			const interval = config.intervalWork ?? 60;
-			return interval === 60 ? `EMOM ${rounds} min` : `Every ${duration(interval)} × ${rounds}`;
+			return interval === 60
+				? `EMOM ${rounds} min`
+				: t.format.everyLabel(duration(interval), rounds);
 		}
 		case 'tabata':
 			return `Tabata ${config.rounds ?? 0} × ${config.intervalWork ?? 0}s/${config.intervalRest ?? 0}s`;
@@ -47,7 +50,7 @@ export function timerChip(config: TimerConfig): string {
 		case 'amrap':
 			return `AMRAP ${minutes(config.duration ?? 0)}`;
 		case 'fortime':
-			return `For time ${minutes(config.duration ?? 0)}`;
+			return t.format.forTimeChip(minutes(config.duration ?? 0));
 		case 'emom':
 			return `EMOM ${minutes((config.rounds ?? 0) * (config.intervalWork ?? 60))}`;
 		case 'tabata':
@@ -87,7 +90,7 @@ export function mainSection(wod: Pick<WoD, 'sections'>): Section | null {
 /** Headline for a WoD. The data model has no title, so derive one. */
 export function wodTitle(wod: Pick<WoD, 'sections' | 'description'>): string {
 	const main = mainSection(wod);
-	if (!main) return firstSentence(wod.description) || 'Untitled WoD';
+	if (!main) return firstSentence(wod.description) || t.format.untitledWod;
 
 	const name = main.name.trim();
 	if (name && !GENERIC_NAMES.has(name.toLowerCase())) {
@@ -97,7 +100,7 @@ export function wodTitle(wod: Pick<WoD, 'sections' | 'description'>): string {
 
 	const timer = sectionTimer(main);
 	if (timer) return timerChip(timer);
-	return name || 'Workout';
+	return name || t.format.workout;
 }
 
 /** One line under the headline: the coach's note, or the first movements. */
@@ -201,7 +204,7 @@ export function formatStrip(config: TimerConfig): [string, string] {
 		case 'amrap':
 			return ['AMRAP', clock(config.duration ?? 0)];
 		case 'fortime':
-			return ['For time', `Cap ${clock(config.duration ?? 0)}`];
+			return [t.format.forTime, t.format.cap(clock(config.duration ?? 0))];
 		case 'emom': {
 			const interval = config.intervalWork ?? 60;
 			const rounds = config.rounds ?? 0;

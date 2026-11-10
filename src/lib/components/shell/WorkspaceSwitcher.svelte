@@ -3,6 +3,7 @@
 	import Sheet from '$lib/components/ui/Sheet.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 
 	type Workspace = { id: string; name: string; role: string };
 
@@ -19,7 +20,6 @@
 	let switching = $state<string | null>(null);
 
 	const active = $derived(workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0]);
-	const roleName: Record<string, string> = { owner: 'Owner', coach: 'Coach', member: 'Athlete' };
 
 	async function choose(workspaceId: string) {
 		if (workspaceId === activeWorkspaceId) {
@@ -37,7 +37,7 @@
 			await invalidateAll();
 			open = false;
 		} catch {
-			toastStore.error('Could not switch box. Check your connection and try again.');
+			toastStore.error(t.shell.box.switchFailed);
 		} finally {
 			switching = null;
 		}
@@ -50,10 +50,10 @@
 			type="button"
 			class="trigger {variant}"
 			onclick={() => (open = true)}
-			aria-label="Box: {active.name}. Switch box."
+			aria-label={t.shell.box.switchAria(active.name)}
 		>
 			<span class="min-w-0">
-				{#if variant === 'rail'}<span class="block legend text-mute">Box</span>{/if}
+				{#if variant === 'rail'}<span class="block legend text-mute">{t.shell.box.label}</span>{/if}
 				<span class="name">{active.name}</span>
 			</span>
 			<Icon name="chevron-down" size={18} stroke={3} />
@@ -61,13 +61,17 @@
 	{:else if variant === 'rail'}
 		<div class="trigger rail">
 			<span class="min-w-0">
-				<span class="block legend text-mute">Box</span>
+				<span class="block legend text-mute">{t.shell.box.label}</span>
 				<span class="name">{active.name}</span>
 			</span>
 		</div>
 	{/if}
 
-	<Sheet bind:open title="Switch box" legend="You train in {workspaces.length} boxes">
+	<Sheet
+		bind:open
+		title={t.shell.box.switchTitle}
+		legend={t.shell.box.youTrainIn(workspaces.length)}
+	>
 		<ul class="flex flex-col gap-2">
 			{#each workspaces as workspace (workspace.id)}
 				{@const current = workspace.id === activeWorkspaceId}
@@ -83,8 +87,8 @@
 						<span class="min-w-0 truncate display text-[1.75rem]">{workspace.name}</span>
 						<span class="flex-none legend">
 							{switching === workspace.id
-								? 'Switching'
-								: (roleName[workspace.role] ?? workspace.role)}
+								? t.shell.box.switching
+								: (t.common.roles[workspace.role] ?? workspace.role)}
 						</span>
 					</button>
 				</li>

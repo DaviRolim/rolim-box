@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	/** A number you change with two big keys. Made for chalky thumbs. */
 	interface Props {
@@ -32,7 +33,7 @@
 			class="key"
 			onclick={() => set(value - step)}
 			disabled={value <= min}
-			aria-label="Less {label.toLowerCase()}"
+			aria-label={t.common.less(label.toLowerCase())}
 		>
 			<Icon name="minus" size={28} stroke={3.5} />
 		</button>
@@ -58,7 +59,7 @@
 			class="key"
 			onclick={() => set(value + step)}
 			disabled={value >= max}
-			aria-label="More {label.toLowerCase()}"
+			aria-label={t.common.more(label.toLowerCase())}
 		>
 			<Icon name="plus" size={28} stroke={3.5} />
 		</button>
