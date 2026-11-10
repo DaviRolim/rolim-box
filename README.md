@@ -5,6 +5,9 @@
 ## 🚀 Key Features
 
 - **WoD Management**: Create, edit, duplicate, and organize daily workouts with ease.
+- **WoD bank**: coaches keep WoDs with no date (a name and a rough idea are enough), find them
+  by name, format or movement, and put one on a day when its time comes. The bank keeps its copy,
+  and any dated WoD can be saved into it. Athletes don't see it.
 - **AI-Powered Assistance**: Use the "Magic Wand" to automatically generate workout sections and descriptions, streamlining the programming process.
 - **Local-First Architecture**: Built with offline support in mind. Your data is cached locally for instant access and synced when you're back online.
 - **Integrated Timer**: Built-in timers to run workouts directly within the app.
@@ -73,6 +76,12 @@ bun run db:studio    # Open Drizzle Studio
 bun run db:seed      # Wipe and reseed the LOCAL database
 ```
 
+### Schema changes in production
+
+Production is migrated by hand. The WoD bank added two tables (`bank_wod`, `bank_section`) and
+changed nothing else; apply them before deploying with `bun run db:push` (with the production
+`DATABASE_URL` and `DATABASE_AUTH_TOKEN`), and check it lists only `CREATE TABLE` / `CREATE INDEX`.
+
 ## 🧪 Testing
 
 ```bash
@@ -89,6 +98,9 @@ offline (including a WoD written offline and synced later).
 
 Language screenshots (login, Today, editor, timer in EN and PT) are in `screenshots/i18n`; retake
 them with `node scripts/screenshots-i18n.mjs --base http://localhost:4173`.
+
+Bank screenshots (list, editor in bank mode, the schedule step, save to bank) are in
+`screenshots/bank`; retake them with `node scripts/screenshots-bank.mjs --base http://localhost:4173`.
 
 To retake the screenshots: `bun --bun run build && bun run preview`, then `bun run screenshots`
 with `--base http://localhost:4173`.
