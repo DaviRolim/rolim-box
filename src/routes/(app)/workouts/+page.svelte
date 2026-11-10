@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { listWoDs, deleteWoD, duplicateWoD } from '$lib/services/wod';
+	import { wodStore } from '$lib/stores/wods.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import { authFetch } from '$lib/services/auth-fetch';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
@@ -26,7 +26,8 @@
 	onMount(async () => {
 		if (data.workspaceId) {
 			try {
-				wods = await listWoDs(data.workspaceId);
+				await wodStore.open(data.workspaceId);
+				wods = wodStore.wods;
 				// Determine if there are more pages based on cached count
 				// The background fetch in listWoDs will paginate through all data,
 				// but for the "Load More" UI, check the API for the initial cursor
@@ -104,11 +105,8 @@
 		if (!selectedWodId) return;
 
 		try {
-			await deleteWoD(selectedWodId);
-			// Reload from service
-			if (data.workspaceId) {
-				wods = await listWoDs(data.workspaceId);
-			}
+			await wodStore.remove(selectedWodId);
+			wods = wodStore.wods;
 			toastStore.success('Workout deleted successfully');
 		} catch (error) {
 			console.error('Failed to delete workout:', error);
@@ -135,11 +133,8 @@
 		if (!selectedWodId) return;
 
 		try {
-			await duplicateWoD(selectedWodId, duplicateDate);
-			// Reload from service instead of navigation
-			if (data.workspaceId) {
-				wods = await listWoDs(data.workspaceId);
-			}
+			await wodStore.duplicate(selectedWodId, duplicateDate);
+			wods = wodStore.wods;
 			toastStore.success('Workout duplicated successfully');
 		} catch (error) {
 			console.error('Failed to duplicate workout:', error);

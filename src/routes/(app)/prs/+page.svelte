@@ -158,7 +158,7 @@
 		bind:open={modalOpen}
 		exercise={selectedExercise}
 		unitPreference={unitPreference}
-		workspaceId={activeWorkspaceId}
+		workspaceId={activeWorkspaceId ?? undefined}
 		onClose={handleModalClose}
 		onSaved={handlePRSaved}
 		onDeleted={handlePRDeleted}

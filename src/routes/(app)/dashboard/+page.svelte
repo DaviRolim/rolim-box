@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { listWoDs } from '$lib/services/wod';
+	import { wodStore } from '$lib/stores/wods.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -22,7 +22,8 @@
 		}
 
 		try {
-			wods = await listWoDs(data.workspaceId);
+			await wodStore.open(data.workspaceId);
+			wods = wodStore.wods;
 
 			// Find today's workout
 			todaysWoD = wods.find((wod) => wod.date === today) || null;

@@ -9,7 +9,7 @@
 	import Card from '$lib/components/Card.svelte';
 	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
-	import { createWoD } from '$lib/services/wod';
+	import { wodStore } from '$lib/stores/wods.svelte';
 	import type { Section, SectionType } from '$lib/types/wod';
 	import type { TimerConfig } from '$lib/types/timer';
 	import type { PageData } from './$types';
@@ -229,7 +229,7 @@
 			}));
 
 			// Create WoD
-			await createWoD({
+			await wodStore.create({
 				workspaceId: data.workspaceId,
 				date,
 				description: description.trim() || null,

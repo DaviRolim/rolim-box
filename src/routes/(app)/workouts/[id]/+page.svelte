@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { getWoD } from '$lib/services/wod';
+	import { wodStore } from '$lib/stores/wods.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -19,7 +19,8 @@
 
 	onMount(async () => {
 		try {
-			const loadedWod = await getWoD(data.wodId);
+			const found = await wodStore.find(data.wodId);
+			const loadedWod = found === 'unavailable' ? null : found;
 			if (loadedWod) {
 				wod = loadedWod;
 			} else {

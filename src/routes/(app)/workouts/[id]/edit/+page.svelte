@@ -10,7 +10,7 @@
 	import Card from '$lib/components/Card.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
-	import { getWoD, updateWoD } from '$lib/services/wod';
+	import { wodStore } from '$lib/stores/wods.svelte';
 	import type { Section, SectionType, WoD } from '$lib/types/wod';
 
 	interface Props {
@@ -46,7 +46,8 @@
 	// Load existing WoD data
 	onMount(async () => {
 		try {
-			const wod = await getWoD(data.wodId);
+			const found = await wodStore.find(data.wodId);
+			const wod = found === 'unavailable' ? null : found;
 
 			if (!wod) {
 				notFound = true;
@@ -282,7 +283,7 @@
 			}));
 
 			// Update WoD
-			await updateWoD(data.wodId, {
+			await wodStore.update(data.wodId, {
 				date,
 				description: description.trim() || null,
 				sections: sectionsData

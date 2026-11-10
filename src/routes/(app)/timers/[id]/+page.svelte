@@ -4,7 +4,7 @@
 	import { onMount, tick } from 'svelte';
 	import { timerStore } from '$lib/stores/timer.svelte';
 	import { TimerDisplay } from '$lib/components/timer';
-	import { getWoD } from '$lib/services/wod';
+	import { wodStore } from '$lib/stores/wods.svelte';
 	import { parseTimerConfig } from '$lib/types/timer';
 	import type { PageData } from './$types';
 
@@ -42,7 +42,8 @@
 				return;
 			}
 
-			const wod = await getWoD(wodId);
+			const found = await wodStore.find(wodId);
+			const wod = found === 'unavailable' ? null : found;
 			if (!wod) {
 				error = 'Workout not found';
 				loading = false;

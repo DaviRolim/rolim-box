@@ -45,7 +45,7 @@
 			</a>
 			<div class="flex items-center gap-4">
 				<div class="hidden sm:block">
-					<WorkspaceSwitcher workspaces={data.workspaces} activeWorkspaceId={data.activeWorkspaceId} />
+					<WorkspaceSwitcher workspaces={data.workspaces} activeWorkspaceId={data.activeWorkspaceId ?? undefined} />
 				</div>
 				<a
 					href="/settings"
