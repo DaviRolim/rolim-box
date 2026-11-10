@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isIsoDate } from '$lib/date';
 
 // ============================================================================
 // Type Definitions
@@ -24,7 +25,7 @@ export interface Section {
 	name: string;
 	content: string;
 	order: number;
-	timerConfig: string | null; // Reserved for Phase 3 - JSON string of timer configuration
+	timerConfig: string | null; // JSON string of a TimerConfig, or null when the section has no timer
 }
 
 /**
@@ -45,11 +46,23 @@ export interface WoD {
 // ============================================================================
 
 /**
+ * IDs are generated on the device (32 hex chars) so a WoD created offline keeps the same id,
+ * and the same timer links, once it reaches the server.
+ */
+export const entityIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'Invalid id');
+
+const wodDateSchema = z
+	.string()
+	.regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
+	.refine(isIsoDate, 'Invalid date');
+
+/**
  * Section validation schema
  * Used for validating individual sections during create/update operations
  */
 export const sectionSchema = z.object({
-	type: z.enum(['warmup', 'skill', 'wod', 'cooldown', 'stretches', 'custom']),
+	id: entityIdSchema.optional(),
+	type: z.enum(SECTION_TYPES),
 	name: z.string().min(1, 'Section name is required').max(100, 'Section name too long'),
 	content: z.string().max(2000, 'Section content too long'),
 	order: z.number().int().min(0, 'Order must be a non-negative integer'),
@@ -61,14 +74,9 @@ export const sectionSchema = z.object({
  * Used when creating a new WoD
  */
 export const createWoDSchema = z.object({
+	id: entityIdSchema.optional(),
 	workspaceId: z.string().min(1, 'Workspace ID is required'),
-	date: z
-		.string()
-		.regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-		.refine((date) => {
-			const parsed = new Date(date);
-			return !isNaN(parsed.getTime());
-		}, 'Invalid date'),
+	date: wodDateSchema,
 	description: z.string().max(500, 'Description too long').nullable(),
 	sections: z.array(sectionSchema).default([])
 });
@@ -79,14 +87,7 @@ export const createWoDSchema = z.object({
  * All fields are optional to allow partial updates
  */
 export const updateWoDSchema = z.object({
-	date: z
-		.string()
-		.regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-		.refine((date) => {
-			const parsed = new Date(date);
-			return !isNaN(parsed.getTime());
-		}, 'Invalid date')
-		.optional(),
+	date: wodDateSchema.optional(),
 	description: z.string().max(500, 'Description too long').nullable().optional(),
 	sections: z.array(sectionSchema).optional()
 });

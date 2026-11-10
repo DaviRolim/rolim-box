@@ -10,7 +10,7 @@ import * as auth from '$lib/server/auth';
  * Accepts an invite and adds user to workspace
  * Requires authentication
  */
-export const POST: RequestHandler = async ({ params, locals }) => {
+export const POST: RequestHandler = async ({ params, locals, cookies }) => {
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
@@ -50,7 +50,20 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 	}
 
 	// Add user to workspace
-	await auth.addUserToWorkspace(locals.user.id, invite.workspaceId, invite.role as 'coach' | 'member');
+	await auth.addUserToWorkspace(
+		locals.user.id,
+		invite.workspaceId,
+		invite.role as 'coach' | 'member'
+	);
+
+	// Land the person in the box they just joined.
+	cookies.set('activeWorkspaceId', invite.workspaceId, {
+		path: '/',
+		maxAge: 60 * 60 * 24 * 30,
+		httpOnly: true,
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: 'lax'
+	});
 
 	return json({
 		success: true,

@@ -1,48 +1,40 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
-import { wod, section, workspaceMember } from '$lib/server/db/schema';
+import { wod, section } from '$lib/server/db/schema';
 import { createWoDSchema } from '$lib/types/wod';
 import { generateId } from '$lib/server/auth';
+import {
+	buildSectionRows,
+	canEditWods,
+	getMembership,
+	getSections,
+	serializeWod
+} from '$lib/server/wods';
 import { eq, and, desc, inArray, asc, lt } from 'drizzle-orm';
 
 /**
- * GET /api/wods?workspaceId={id}
- * Returns WoD[] ordered by date DESC
- * Validates workspace membership
+ * GET /api/wods?workspaceId={id}&cursor={date}&limit={n}
+ * Returns { wods, nextCursor } ordered by date DESC.
  */
 export const GET: RequestHandler = async ({ locals, url }) => {
-	// Check authentication
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	// Get workspaceId from query params
 	const workspaceId = url.searchParams.get('workspaceId');
 	if (!workspaceId) {
 		return json({ error: 'workspaceId query parameter is required' }, { status: 400 });
 	}
 
-	// Validate workspace membership
-	const [membership] = await db
-		.select()
-		.from(workspaceMember)
-		.where(
-			and(
-				eq(workspaceMember.userId, locals.user.id),
-				eq(workspaceMember.workspaceId, workspaceId)
-			)
-		);
-
+	const membership = await getMembership(locals.user.id, workspaceId);
 	if (!membership) {
 		return json({ error: 'Access denied: not a member of this workspace' }, { status: 403 });
 	}
 
-	// Pagination params
 	const limit = Math.min(Number(url.searchParams.get('limit')) || 20, 100);
 	const cursor = url.searchParams.get('cursor'); // ISO date string
 
-	// Build query conditions
 	const conditions = [eq(wod.workspaceId, workspaceId)];
 	if (cursor) {
 		conditions.push(lt(wod.date, cursor));
@@ -53,61 +45,60 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		.select()
 		.from(wod)
 		.where(and(...conditions))
-		.orderBy(desc(wod.date))
+		.orderBy(desc(wod.date), desc(wod.createdAt))
 		.limit(limit + 1);
 
-	// Determine next cursor
 	let nextCursor: string | null = null;
 	if (wods.length > limit) {
-		const extra = wods.pop()!;
-		nextCursor = extra.date;
-	}
-
-	// Fetch ALL sections for ALL wods in ONE query (fixes N+1 issue)
-	const wodIds = wods.map((w) => w.id);
-	const allSections = wodIds.length > 0
-		? await db
+		wods.pop();
+		// Keyset pagination on the date: never split a day across two pages, or the
+		// second WoD of that day would be skipped by the `date < cursor` filter.
+		const lastDate = wods[wods.length - 1].date;
+		const sameDay = await db
 			.select()
-			.from(section)
-			.where(inArray(section.wodId, wodIds))
-			.orderBy(asc(section.order))
-		: [];
-
-	// Group sections by wodId in memory (fast)
-	const sectionsMap = new Map<string, typeof allSections[number][]>();
-	for (const sect of allSections) {
-		if (!sectionsMap.has(sect.wodId)) {
-			sectionsMap.set(sect.wodId, []);
-		}
-		sectionsMap.get(sect.wodId)!.push(sect);
+			.from(wod)
+			.where(and(eq(wod.workspaceId, workspaceId), eq(wod.date, lastDate)));
+		const seen = new Set(wods.map((w) => w.id));
+		for (const extra of sameDay) if (!seen.has(extra.id)) wods.push(extra);
+		nextCursor = lastDate;
 	}
 
-	// Combine wods with their sections
-	const wodsWithSections = wods.map((w) => ({
-		id: w.id,
-		workspaceId: w.workspaceId,
-		date: w.date,
-		description: w.description,
-		sections: sectionsMap.get(w.id) || [],
-		createdAt: w.createdAt,
-		updatedAt: w.updatedAt
-	}));
+	// All sections for the page in one query
+	const wodIds = wods.map((w) => w.id);
+	const allSections =
+		wodIds.length > 0
+			? await db
+					.select()
+					.from(section)
+					.where(inArray(section.wodId, wodIds))
+					.orderBy(asc(section.order))
+			: [];
 
-	return json({ wods: wodsWithSections, nextCursor });
+	const sectionsByWod = new Map<string, (typeof allSections)[number][]>();
+	for (const sect of allSections) {
+		const list = sectionsByWod.get(sect.wodId);
+		if (list) list.push(sect);
+		else sectionsByWod.set(sect.wodId, [sect]);
+	}
+
+	return json({
+		wods: wods.map((w) => serializeWod(w, sectionsByWod.get(w.id) ?? [])),
+		nextCursor
+	});
 };
 
 /**
  * POST /api/wods
- * Creates a new WoD with sections
- * Validates with createWoDSchema
+ * Creates a WoD with its sections. Coaches and owners only.
+ *
+ * The device may send its own ids (see entityIdSchema). Creating the same id twice is treated
+ * as a replay of a request whose response was lost, and returns the existing WoD.
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
-	// Check authentication
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	// Parse and validate request body
 	let body;
 	try {
 		body = await request.json();
@@ -118,39 +109,33 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const validation = createWoDSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
-			{
-				error: 'Validation failed',
-				details: validation.error.flatten()
-			},
+			{ error: 'Validation failed', details: validation.error.flatten() },
 			{ status: 400 }
 		);
 	}
 
 	const data = validation.data;
 
-	// Validate workspace membership
-	const [membership] = await db
-		.select()
-		.from(workspaceMember)
-		.where(
-			and(
-				eq(workspaceMember.userId, locals.user.id),
-				eq(workspaceMember.workspaceId, data.workspaceId)
-			)
-		);
-
+	const membership = await getMembership(locals.user.id, data.workspaceId);
 	if (!membership) {
 		return json({ error: 'Access denied: not a member of this workspace' }, { status: 403 });
 	}
-
-	// Check if user has edit permissions (owner or coach only)
-	if (membership.role === 'member') {
+	if (!canEditWods(membership.role)) {
 		return json({ error: 'Members cannot create workouts' }, { status: 403 });
 	}
 
-	// Create WoD with sections in a transaction
+	if (data.id) {
+		const [existing] = await db.select().from(wod).where(eq(wod.id, data.id));
+		if (existing) {
+			if (existing.workspaceId !== data.workspaceId) {
+				return json({ error: 'A workout with this id already exists' }, { status: 409 });
+			}
+			return json(serializeWod(existing, await getSections(existing.id)));
+		}
+	}
+
 	const result = await db.transaction(async (tx) => {
-		const wodId = generateId();
+		const wodId = data.id ?? generateId();
 		const now = new Date();
 
 		const [newWod] = await tx
@@ -165,34 +150,11 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			})
 			.returning();
 
-		// Create sections
-		const createdSections = [];
-		for (const sectionData of data.sections) {
-			const [newSection] = await tx
-				.insert(section)
-				.values({
-					id: generateId(),
-					wodId: wodId,
-					type: sectionData.type,
-					name: sectionData.name,
-					content: sectionData.content,
-					order: sectionData.order,
-					timerConfig: sectionData.timerConfig ?? null
-				})
-				.returning();
-			createdSections.push(newSection);
-		}
+		const rows = await buildSectionRows(tx, wodId, data.sections);
+		const createdSections = rows.length > 0 ? await tx.insert(section).values(rows).returning() : [];
+		createdSections.sort((a, b) => a.order - b.order);
 
-		// Return created WoD with sections
-		return {
-			id: newWod.id,
-			workspaceId: newWod.workspaceId,
-			date: newWod.date,
-			description: newWod.description,
-			sections: createdSections,
-			createdAt: newWod.createdAt,
-			updatedAt: newWod.updatedAt
-		};
+		return serializeWod(newWod, createdSections);
 	});
 
 	return json(result, { status: 201 });

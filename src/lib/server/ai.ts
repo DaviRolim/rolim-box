@@ -2,30 +2,99 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateText, Output } from 'ai';
 import { z } from 'zod';
 import { env } from '$env/dynamic/private';
+import { timerConfigSchema as appTimerConfigSchema, type TimerConfig } from '$lib/types/timer';
 
-// Configure OpenRouter as OpenAI-compatible provider
-const openrouter = createOpenAI({
-	baseURL: 'https://openrouter.ai/api/v1',
-	apiKey: env.OPENROUTER_API_KEY
-});
+/** True when the server has an OpenRouter key, i.e. the Magic Wand can actually run. */
+export function isAiConfigured(): boolean {
+	return Boolean(env.OPENROUTER_API_KEY?.trim());
+}
 
-// Timer config schema for AI response
-const timerConfigSchema = z
+/** Thrown when an AI feature is used on a server without OPENROUTER_API_KEY. */
+export class AiNotConfiguredError extends Error {
+	constructor() {
+		super('OPENROUTER_API_KEY is not set');
+		this.name = 'AiNotConfiguredError';
+	}
+}
+
+// OpenRouter through the OpenAI-compatible provider. Created on first use so a server
+// without a key still boots and every other feature keeps working.
+function openrouter() {
+	if (!isAiConfigured()) throw new AiNotConfiguredError();
+	return createOpenAI({
+		baseURL: 'https://openrouter.ai/api/v1',
+		apiKey: env.OPENROUTER_API_KEY
+	});
+}
+
+// What the model may send back for a timer. It is deliberately loose: the prompt examples
+// use several spellings (interval, cap, workTime...), and normalizeTimerConfig() below turns
+// whatever arrives into the app's own TimerConfig, or drops it.
+const aiTimerSchema = z
 	.object({
 		type: z.enum(['amrap', 'fortime', 'emom', 'tabata']),
-		duration: z.number().optional(), // seconds
-		rounds: z.number().optional(),
-		workTime: z.number().optional(), // for tabata
-		restTime: z.number().optional() // for tabata
+		duration: z.number().nullable().optional(), // seconds: AMRAP length, EMOM total, For Time cap
+		cap: z.number().nullable().optional(), // seconds: For Time cap
+		rounds: z.number().nullable().optional(),
+		interval: z.number().nullable().optional(), // seconds: EMOM interval
+		workTime: z.number().nullable().optional(), // seconds: Tabata work
+		restTime: z.number().nullable().optional() // seconds: Tabata rest
 	})
 	.nullable();
+
+export type AiTimer = z.infer<typeof aiTimerSchema>;
+
+const clamp = (value: number, min: number, max: number) =>
+	Math.min(max, Math.max(min, Math.round(value)));
+const positive = (value: number | null | undefined): number | undefined =>
+	typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+
+/**
+ * Convert the model's timer into a TimerConfig the timers can run. Missing values get the
+ * usual box defaults and everything is clamped to what the timer screen accepts.
+ */
+export function normalizeTimerConfig(raw: AiTimer | undefined): TimerConfig | null {
+	if (!raw) return null;
+
+	let config: TimerConfig;
+	switch (raw.type) {
+		case 'amrap':
+			config = { type: 'amrap', duration: clamp(positive(raw.duration) ?? 20 * 60, 60, 3600) };
+			break;
+		case 'fortime':
+			config = {
+				type: 'fortime',
+				duration: clamp(positive(raw.cap) ?? positive(raw.duration) ?? 15 * 60, 60, 3600)
+			};
+			break;
+		case 'emom': {
+			const intervalWork = clamp(positive(raw.interval) ?? 60, 10, 300);
+			const total = positive(raw.duration);
+			const rounds = positive(raw.rounds) ?? (total ? total / intervalWork : 10);
+			config = { type: 'emom', rounds: clamp(rounds, 1, 50), intervalWork };
+			break;
+		}
+		case 'tabata':
+			config = {
+				type: 'tabata',
+				rounds: clamp(positive(raw.rounds) ?? 8, 1, 20),
+				intervalWork: clamp(positive(raw.workTime) ?? 20, 5, 60),
+				intervalRest: clamp(positive(raw.restTime) ?? 10, 5, 60)
+			};
+			break;
+		default:
+			return null;
+	}
+
+	return appTimerConfigSchema.safeParse(config).success ? config : null;
+}
 
 // Section schema for AI response
 const generatedSectionSchema = z.object({
 	type: z.enum(['warmup', 'skill', 'wod', 'cooldown', 'stretches', 'custom']),
 	name: z.string(),
 	content: z.string(),
-	timerConfig: timerConfigSchema
+	timerConfig: aiTimerSchema
 });
 
 // Full response schema
@@ -64,21 +133,22 @@ Parse these patterns precisely:
 
 **For Time**:
 - Patterns: "For Time", "X rounds for time", "RFT", "for time:"
-- Config: { type: "fortime", rounds: <number or null> }
+- Config: { type: "fortime", rounds: <number or null>, cap: <time cap in seconds, when one is given or sensible> }
 - Example: "3 rounds for time" → { type: "fortime", rounds: 3 }
-- Example: "21-15-9 For Time" → { type: "fortime", rounds: null }
+- Example: "21-15-9 For Time, 10 min cap" → { type: "fortime", rounds: null, cap: 600 }
 
 **EMOM** (Every Minute On the Minute):
 - Patterns: "EMOM", "EMOM X", "X min EMOM", "E2MOM" (every 2 min)
-- Config: { type: "emom", duration: <seconds> }
+- Config: { type: "emom", duration: <total seconds> } or { type: "emom", interval: <seconds per round>, rounds: <number> }
 - Example: "10 min EMOM" → { type: "emom", duration: 600 }
+- Example: "E2MOM x 5" → { type: "emom", interval: 120, rounds: 5 }
 
 **Tabata**:
 - Patterns: "Tabata", "Tabata-style", "20 on/10 off"
 - Config: { type: "tabata", workTime: 20, restTime: 10, rounds: 8 }
 - Adjust workTime/restTime if specified differently
 
-**No timer detected** → timerConfig: null
+**Anything else** (work/rest intervals longer than a minute, untimed work, no timing given) → timerConfig: null
 
 # CONTENT FORMATTING
 Use standard CrossFit notation:
@@ -165,7 +235,7 @@ If description mentions known benchmarks, use their standard format:
 **Output:**
 - Section 1: { type: "warmup", name: "Warmup", content: "2 Rounds:\n10 Lunges\n10 Burpees\n10 PVC Snatches", timerConfig: null }
 - Section 2: { type: "skill", name: "Snatch Cycling", content: "E2MOM:\n3 Snatches (moderate)\nFocus on consistency", timerConfig: { type: "emom", interval: 120, rounds: 5 } }
-- Section 3: { type: "wod", name: "Intervals", content: "4 Rounds:\n3 min On / 1 min Off\n15 Burpees\n10 Lunges\nMax Snatches in remaining time", timerConfig: { type: "intervals", rounds: 4, work: 180, rest: 60 } }
+- Section 3: { type: "wod", name: "Intervals", content: "4 Rounds:\n3 min On / 1 min Off\n15 Burpees\n10 Lunges\nMax Snatches in remaining time", timerConfig: null }
 
 **Input:** "20 minute AMRAP with running, clean and jerks, bar muscle ups and rope climbs"
 **Output:**
@@ -176,7 +246,7 @@ If description mentions known benchmarks, use their standard format:
 **Input:** "Short AMRAP with double unders and heavy cleans"
 **Output:**
 - Section 1: { type: "warmup", name: "Warmup", content: "2 Rounds:\n20 Jumping Jacks\n10 Air Squats\n10 Empty Bar Cleans", timerConfig: null }
-- Section 2: { type: "strength", name: "Heavy Clean Prep", content: "E2MOM:\n2 Heavy Cleans\nBuild each round", timerConfig: { type: "emom", interval: 120, rounds: 5 } }
+- Section 2: { type: "skill", name: "Heavy Clean Prep", content: "E2MOM:\n2 Heavy Cleans\nBuild each round", timerConfig: { type: "emom", interval: 120, rounds: 5 } }
 - Section 3: { type: "wod", name: "AMRAP Heavy", content: "10 min AMRAP:\n30 Double Unders\n4 Heavy Cleans", timerConfig: { type: "amrap", duration: 600 } }
 
 **Input:** "High rep AMRAP with running, snatches, chest to bar and dumbbell clean and jerks"
@@ -192,9 +262,13 @@ If description mentions known benchmarks, use their standard format:
 - Always match the intent and specificity level of the input
 - When unsure about loading/scaling, omit specific weights`;
 
-export async function generateWodSections(description: string): Promise<GeneratedSection[]> {
+export type GeneratedWodSection = Omit<GeneratedSection, 'timerConfig'> & {
+	timerConfig: TimerConfig | null;
+};
+
+export async function generateWodSections(description: string): Promise<GeneratedWodSection[]> {
 	const { output } = await generateText({
-		model: openrouter('google/gemini-3-flash-preview'),
+		model: openrouter()('google/gemini-3-flash-preview'),
 		output: Output.object({
 			schema: generateSectionsResponseSchema
 		}),
@@ -202,5 +276,10 @@ export async function generateWodSections(description: string): Promise<Generate
 		prompt: `Generate workout sections for this description:\n\n${description}`
 	});
 
-	return output!.sections;
+	return (output?.sections ?? []).map((section) => ({
+		...section,
+		name: section.name.trim().slice(0, 100) || 'Section',
+		content: section.content.trim().slice(0, 2000),
+		timerConfig: normalizeTimerConfig(section.timerConfig)
+	}));
 }

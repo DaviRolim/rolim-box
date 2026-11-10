@@ -239,6 +239,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
+	// No key, no call: never send a request to the AI provider without credentials.
+	if (!env.OPENROUTER_API_KEY?.trim()) {
+		return json(
+			{
+				error: 'Photo import is not set up on this server yet. You can still log PRs by hand.',
+				code: 'ai_not_configured'
+			},
+			{ status: 503 }
+		);
+	}
+
 	// Parse multipart form data
 	let formData: FormData;
 	try {

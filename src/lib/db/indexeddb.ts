@@ -51,6 +51,8 @@ interface RolimBoxDB extends DBSchema {
 			retries: number;
 			status: 'pending' | 'failed';
 			failedAt?: number;
+			/** Why the server refused the operation (only set when status is 'failed'). */
+			error?: string;
 		};
 		indexes: {
 			'by-entity': string;
