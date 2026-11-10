@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	/**
 	 * One line of a timing tower: position block, athlete, figure. First place gets the pink
 	 * block; the signed-in athlete's own line is marked so they find themselves at a glance.
@@ -26,7 +28,7 @@
 	<span class="who">
 		<span class="flex items-center gap-2">
 			<span class="name display">{name}</span>
-			{#if you}<span class="tag tag-ink flex-none">You</span>{/if}
+			{#if you}<span class="tag tag-ink flex-none">{t.prs.rankRow.you}</span>{/if}
 		</span>
 		{#if bar !== undefined}
 			<span class="bar" aria-hidden="true"

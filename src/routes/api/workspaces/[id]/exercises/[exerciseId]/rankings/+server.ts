@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { workspaceMember, user, personalRecord, exercise } from '$lib/server/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
@@ -17,7 +18,7 @@ import type {
 export const GET: RequestHandler = async ({ params, locals }) => {
 	try {
 		if (!locals.user) {
-			return json({ error: 'Unauthorized' }, { status: 401 });
+			return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 		}
 
 		const { id: workspaceId, exerciseId } = params;
@@ -34,14 +35,14 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			);
 
 		if (!membership) {
-			return json({ error: 'Not a member of this workspace' }, { status: 403 });
+			return json({ error: dictFor(locals.locale).api.notMember }, { status: 403 });
 		}
 
 		// Get the exercise
 		const [ex] = await db.select().from(exercise).where(eq(exercise.id, exerciseId));
 
 		if (!ex) {
-			return json({ error: 'Exercise not found' }, { status: 404 });
+			return json({ error: dictFor(locals.locale).prs.api.exerciseNotFound }, { status: 404 });
 		}
 
 		// Get all workspace members
@@ -131,6 +132,6 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		return json(response);
 	} catch (error) {
 		console.error('Exercise rankings API error:', error);
-		return json({ error: 'Failed to load exercise rankings' }, { status: 500 });
+		return json({ error: dictFor(locals.locale).prs.api.rankingsFailed }, { status: 500 });
 	}
 };

@@ -8,6 +8,7 @@
 	import ExerciseRankingModal from './ExerciseRankingModal.svelte';
 	import RankRow from './RankRow.svelte';
 	import { athleteName, prParts } from './pr-format';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * The box leaderboard: a timing tower of athletes by points, then who holds the top mark on
@@ -41,10 +42,10 @@
 			if (res.ok) {
 				leaderboard = await res.json();
 			} else {
-				error = 'The leaderboard could not be loaded.';
+				error = t.prs.leaderboard.loadFailed;
 			}
 		} catch (e) {
-			error = 'The leaderboard needs a connection, and the server cannot be reached right now.';
+			error = t.prs.leaderboard.offline;
 			console.error(e);
 		}
 		isLoading = false;
@@ -59,10 +60,10 @@
 				selectedExerciseRankings = await res.json();
 				rankingModalOpen = true;
 			} else {
-				rankingError = 'That ranking could not be loaded. Try again.';
+				rankingError = t.prs.leaderboard.rankingFailed;
 			}
 		} catch (e) {
-			rankingError = 'That ranking could not be loaded. Check the connection and try again.';
+			rankingError = t.prs.leaderboard.rankingOffline;
 			console.error(e);
 		}
 		loadingExerciseId = null;
@@ -91,7 +92,7 @@
 />
 
 {#if isLoading}
-	<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading the leaderboard">
+	<div class="flex flex-col gap-2" aria-busy="true" aria-label={t.prs.leaderboard.loading}>
 		{#each [0, 1, 2, 3, 4, 5] as row (row)}
 			<div class="led h-[4.25rem]"></div>
 		{/each}
@@ -105,7 +106,7 @@
 			<p>{error}</p>
 			<button type="button" class="btn btn-sm btn-quiet mt-3" onclick={loadLeaderboard}>
 				<Icon name="refresh" size={16} stroke={2.8} />
-				Try again
+				{t.common.retry}
 			</button>
 		</div>
 	</div>
@@ -114,12 +115,12 @@
 	<div class="cols">
 		<section class="min-w-0">
 			<div class="module-head border-t-2 border-ink">
-				<h2>Box ranking</h2>
-				<span>{board.rankings.length} {board.rankings.length === 1 ? 'athlete' : 'athletes'}</span>
+				<h2>{t.prs.leaderboard.boxRanking}</h2>
+				<span>{t.prs.leaderboard.athletes(board.rankings.length)}</span>
 			</div>
 
 			{#if board.rankings.length === 0}
-				<p class="border-t border-line py-6 text-lg text-dim">Nobody is in this box yet.</p>
+				<p class="border-t border-line py-6 text-lg text-dim">{t.prs.leaderboard.nobody}</p>
 			{:else}
 				<ol>
 					{#each board.rankings as user (user.userId)}
@@ -129,22 +130,22 @@
 								name={athleteName(user.email)}
 								you={user.userId === board.currentUserId}
 								figure={String(user.points)}
-								unit={user.points === 1 ? 'pt' : 'pts'}
+								unit={t.prs.leaderboard.points(user.points)}
 								bar={user.points / maxPoints}
 							/>
 						</li>
 					{/each}
 				</ol>
 				<p class="mt-3 legend leading-relaxed text-mute normal-case" style="letter-spacing: 0.02em">
-					One point for every exercise where you hold the box's best mark.
+					{t.prs.leaderboard.pointsNote}
 				</p>
 			{/if}
 		</section>
 
 		<section class="min-w-0">
 			<div class="module-head border-t-2 border-ink">
-				<h2>Who holds what</h2>
-				<span>{board.activeExercises} of {board.totalExercises} taken</span>
+				<h2>{t.prs.leaderboard.whoHoldsWhat}</h2>
+				<span>{t.prs.leaderboard.taken(board.activeExercises, board.totalExercises)}</span>
 			</div>
 
 			{#if rankingError}
@@ -172,11 +173,11 @@
 									<span class="lead-mark" class:mine aria-hidden="true">01</span>
 									<span class="truncate">
 										{busy
-											? 'Loading the ranking'
+											? t.prs.modal.loadingRanking
 											: leader.userId === board.currentUserId
-												? 'You'
+												? t.prs.leaderboard.you
 												: athleteName(leader.email)}{!busy && exercise.leaders.length > 1
-											? ` +${exercise.leaders.length - 1} tied`
+											? t.prs.leaderboard.tied(exercise.leaders.length - 1)
 											: ''}
 									</span>
 								</span>
@@ -197,7 +198,7 @@
 			{#if open.length > 0}
 				<details class="open-list">
 					<summary class="legend">
-						<span>{open.length} still open</span>
+						<span>{t.prs.leaderboard.stillOpen(open.length)}</span>
 						<Icon name="chevron-down" size={16} stroke={3} />
 					</summary>
 					<ul>
@@ -212,7 +213,9 @@
 									onclick={() => openExerciseRankings(exercise.exerciseId)}
 								>
 									<span class="ex min-w-0 flex-1 display">{exercise.exerciseName}</span>
-									<span class="flex-none legend text-mute">{busy ? 'Loading' : 'No PRs yet'}</span>
+									<span class="flex-none legend text-mute"
+										>{busy ? t.prs.leaderboard.loadingShort : t.prs.leaderboard.noPrsYet}</span
+									>
 								</button>
 							</li>
 						{/each}

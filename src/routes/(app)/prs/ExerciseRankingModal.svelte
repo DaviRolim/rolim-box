@@ -3,7 +3,8 @@
 	import { type ExerciseRankingsResponse, type UnitPreference } from '$lib/types/pr';
 	import Sheet from '$lib/components/ui/Sheet.svelte';
 	import RankRow from './RankRow.svelte';
-	import { CATEGORY_LABELS, MEASUREMENT_LABELS, athleteName, prParts } from './pr-format';
+	import { athleteName, categoryLabel, measurementLabel, prParts } from './pr-format';
+	import { t } from '$lib/i18n';
 
 	/** The whole box ranked on one exercise. */
 	interface Props {
@@ -20,24 +21,27 @@
 
 <Sheet
 	bind:open
-	title={data?.exercise.name ?? 'Ranking'}
+	title={data?.exercise.name ?? t.prs.ranking.title}
 	legend={data
-		? `Ranking · ${CATEGORY_LABELS[data.exercise.category]} · ${MEASUREMENT_LABELS[data.exercise.measurementType]}`
+		? t.prs.ranking.legend(
+				categoryLabel(data.exercise.category),
+				measurementLabel(data.exercise.measurementType)
+			)
 		: undefined}
 	onclose={onClose}
 >
 	{#if data}
 		{#if data.rankings.length === 0}
 			<div class="border-2 border-line-strong px-4 py-6">
-				<h3 class="display text-[2rem]">Open podium</h3>
+				<h3 class="display text-[2rem]">{t.prs.ranking.openPodium}</h3>
 				<p class="mt-2 text-lg leading-snug text-dim">
-					Nobody in the box has logged this one yet. First to log it takes first place.
+					{t.prs.ranking.openPodiumBody}
 				</p>
 			</div>
 		{:else}
 			<div class="module-head border-t-2 border-ink">
-				<span>{data.membersWithPR} of {data.totalMembers} logged</span>
-				<span>{MEASUREMENT_LABELS[data.exercise.measurementType]}</span>
+				<span>{t.prs.ranking.logged(data.membersWithPR, data.totalMembers)}</span>
+				<span>{measurementLabel(data.exercise.measurementType)}</span>
 			</div>
 			<ol>
 				{#each data.rankings as entry (entry.userId)}
@@ -57,8 +61,7 @@
 
 			{#if missing > 0}
 				<p class="mt-4 border-t border-line pt-3 legend text-mute">
-					{missing}
-					{missing === 1 ? 'athlete has' : 'athletes have'} not logged this one yet
+					{t.prs.ranking.missing(missing)}
 				</p>
 			{/if}
 		{/if}

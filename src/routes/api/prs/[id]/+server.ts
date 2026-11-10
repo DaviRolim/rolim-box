@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { personalRecord } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -10,7 +11,7 @@ import { eq, and } from 'drizzle-orm';
  */
 export const DELETE: RequestHandler = async ({ locals, params }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const { id } = params;
@@ -22,7 +23,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 		.where(and(eq(personalRecord.id, id), eq(personalRecord.userId, locals.user.id)));
 
 	if (!pr) {
-		return json({ error: 'PR not found' }, { status: 404 });
+		return json({ error: dictFor(locals.locale).prs.api.notFound }, { status: 404 });
 	}
 
 	await db.delete(personalRecord).where(eq(personalRecord.id, id));

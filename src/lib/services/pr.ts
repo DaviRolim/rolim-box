@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { authFetch } from '$lib/services/auth-fetch';
+import { t } from '$lib/i18n';
 import {
 	cacheExercises,
 	getCachedExercises,
@@ -196,7 +197,7 @@ export async function createPR(data: CreatePRData): Promise<boolean> {
 		payload: data,
 		status: 'pending'
 	});
-	toastStore.info('PR saved offline -- will sync when back online');
+	toastStore.info(t.prs.savedOffline);
 	await invalidatePRCache();
 	return true;
 }
@@ -227,7 +228,7 @@ export async function deletePR(prId: string): Promise<boolean> {
 		payload: null,
 		status: 'pending'
 	});
-	toastStore.info('PR deleted offline -- will sync when back online');
+	toastStore.info(t.prs.deletedOffline);
 	await invalidatePRCache();
 	return true;
 }

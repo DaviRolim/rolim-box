@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { dictFor } from '$lib/i18n';
+import { currentLocale, intlLocale } from '$lib/i18n/locale';
 
 // ============================================================================
 // Type Definitions
@@ -235,6 +237,14 @@ export function parseTime(timeStr: string): number {
 	return parts[0];
 }
 
+/** A figure in the active language's style: "102.5" in English, "102,5" in Portuguese. */
+function figure(value: number): string {
+	return new Intl.NumberFormat(intlLocale(), {
+		maximumFractionDigits: 3,
+		useGrouping: false
+	}).format(value);
+}
+
 export function formatPRValue(
 	value: number,
 	measurementType: MeasurementType,
@@ -242,13 +252,13 @@ export function formatPRValue(
 ): string {
 	switch (measurementType) {
 		case 'weight':
-			return `${convertWeightForDisplay(value, unit)}${unit === 'metric' ? 'kg' : 'lbs'}`;
+			return `${figure(convertWeightForDisplay(value, unit))}${unit === 'metric' ? 'kg' : 'lbs'}`;
 		case 'time':
 			return formatTime(value);
 		case 'reps':
-			return `${value} reps`;
+			return `${value} ${dictFor(currentLocale()).prs.repsUnit}`;
 		case 'distance':
-			return `${convertDistanceForDisplay(value, unit)}${unit === 'metric' ? 'm' : 'mi'}`;
+			return `${figure(convertDistanceForDisplay(value, unit))}${unit === 'metric' ? 'm' : 'mi'}`;
 		default:
 			return String(value);
 	}

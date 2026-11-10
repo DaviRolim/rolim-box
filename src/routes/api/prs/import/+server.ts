@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { exercise, personalRecord } from '$lib/server/db/schema';
 import { eq, asc } from 'drizzle-orm';
@@ -236,14 +237,14 @@ Remember: Return ONLY the JSON object. No other text before or after.`;
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	// No key, no call: never send a request to the AI provider without credentials.
 	if (!env.OPENROUTER_API_KEY?.trim()) {
 		return json(
 			{
-				error: 'Photo import is not set up on this server yet. You can still log PRs by hand.',
+				error: dictFor(locals.locale).prs.api.importNotSetUp,
 				code: 'ai_not_configured'
 			},
 			{ status: 503 }
@@ -255,24 +256,24 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	try {
 		formData = await request.formData();
 	} catch {
-		return json({ error: 'Invalid form data' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).prs.api.invalidForm }, { status: 400 });
 	}
 
 	const imageFile = formData.get('image') as File | null;
 	if (!imageFile) {
-		return json({ error: 'No image provided' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).prs.api.noImage }, { status: 400 });
 	}
 
 	// Validate file type
 	const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
 	if (!validTypes.includes(imageFile.type)) {
-		return json({ error: 'Invalid file type. Please upload PNG, JPG, or WEBP.' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).prs.api.wrongType }, { status: 400 });
 	}
 
 	// Validate file size (5MB max)
 	const maxSize = 5 * 1024 * 1024;
 	if (imageFile.size > maxSize) {
-		return json({ error: 'Image must be smaller than 5MB' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).prs.api.tooBig }, { status: 400 });
 	}
 
 	// Get all exercises for matching
@@ -361,14 +362,14 @@ Return JSON with this exact structure:
 		if (!response.ok) {
 			const errorData = await response.json();
 			console.error('OpenRouter error:', errorData);
-			return json({ error: 'Failed to analyze image' }, { status: 500 });
+			return json({ error: dictFor(locals.locale).prs.api.analyzeFailed }, { status: 500 });
 		}
 
 		const data = await response.json();
 		const content = data.choices?.[0]?.message?.content;
 
 		if (!content) {
-			return json({ error: 'Failed to analyze image' }, { status: 500 });
+			return json({ error: dictFor(locals.locale).prs.api.analyzeFailed }, { status: 500 });
 		}
 
 		// Parse JSON from response (handle potential markdown code blocks)
@@ -388,7 +389,7 @@ Return JSON with this exact structure:
 
 		if (!validation.success) {
 			console.error('Validation error:', validation.error);
-			return json({ error: 'Invalid response from AI' }, { status: 500 });
+			return json({ error: dictFor(locals.locale).prs.api.analyzeFailed }, { status: 500 });
 		}
 
 		const output = validation.data;
@@ -415,6 +416,6 @@ Return JSON with this exact structure:
 		});
 	} catch (error) {
 		console.error('Import analysis error:', error);
-		return json({ error: 'Failed to analyze image. Please try again.' }, { status: 500 });
+		return json({ error: dictFor(locals.locale).prs.api.analyzeFailed }, { status: 500 });
 	}
 };

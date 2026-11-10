@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { personalRecord, exercise } from '$lib/server/db/schema';
 import { bulkImportSchema } from '$lib/types/pr';
@@ -8,21 +9,21 @@ import { inArray } from 'drizzle-orm';
 
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	let body;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).api.invalidJson }, { status: 400 });
 	}
 
 	const validation = bulkImportSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
 			{
-				error: 'Validation failed',
+				error: dictFor(locals.locale).api.validationFailed,
 				details: validation.error.flatten()
 			},
 			{ status: 400 }
@@ -44,7 +45,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	if (invalidIds.length > 0) {
 		return json(
 			{
-				error: 'Some exercises not found',
+				error: dictFor(locals.locale).prs.api.someExercisesNotFound,
 				invalidIds
 			},
 			{ status: 400 }
@@ -60,7 +61,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		userId: locals.user!.id,
 		exerciseId: pr.exerciseId,
 		value: pr.value,
-		note: 'Imported from image',
+		note: dictFor(locals.locale).prs.api.importedNote,
 		date: today,
 		createdAt: now,
 		updatedAt: now
@@ -75,6 +76,6 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		});
 	} catch (error) {
 		console.error('Bulk import error:', error);
-		return json({ error: 'Failed to import PRs' }, { status: 500 });
+		return json({ error: dictFor(locals.locale).prs.api.importFailed }, { status: 500 });
 	}
 };
