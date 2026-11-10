@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * A modal panel: slides up from the bottom edge on a phone (where thumbs are), sits in the
@@ -68,7 +69,7 @@
 					{#if legend}<p class="legend text-mute">{legend}</p>{/if}
 					<h2 class="mt-1 display text-[2rem] break-words">{title}</h2>
 				</div>
-				<button type="button" class="icon-btn -mr-1" onclick={close} aria-label="Close">
+				<button type="button" class="icon-btn -mr-1" onclick={close} aria-label={t.common.close}>
 					<Icon name="x" size={22} stroke={2.5} />
 				</button>
 			</header>

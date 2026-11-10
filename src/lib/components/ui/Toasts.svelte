@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import Icon from './Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	const ICON = { success: 'check', error: 'alert', info: 'info' } as const;
 </script>
@@ -15,7 +16,7 @@
 				type="button"
 				class="dismiss"
 				onclick={() => toastStore.dismiss(toast.id)}
-				aria-label="Dismiss"
+				aria-label={t.common.dismiss}
 			>
 				<Icon name="x" size={18} stroke={2.5} />
 			</button>

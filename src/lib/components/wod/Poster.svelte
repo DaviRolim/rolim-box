@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { fitText } from '$lib/actions/fit';
-	import { formatShort, relativeDay } from '$lib/date';
+	import { formatShort, relativeDay, todayIso } from '$lib/date';
 	import { formatStrip, mainSection, sectionTimer, vaiDoer, wodTitle } from '$lib/wod-format';
 	import type { WoD } from '$lib/types/wod';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * The reveal: the WoD's name across the full width, its format in a scoreboard strip, and the
@@ -28,7 +29,7 @@
 	<p class="stamp flex items-center justify-between gap-3 legend">
 		<span>{formatShort(wod.date)}</span>
 		{#if when}
-			<span class="tag {when === 'Today' ? 'tag-pink' : 'tag-ink'}">{when}</span>
+			<span class="tag {wod.date === todayIso() ? 'tag-pink' : 'tag-ink'}">{when}</span>
 		{/if}
 	</p>
 
@@ -37,7 +38,7 @@
 	</h1>
 
 	{#if strip}
-		<div class="strip" aria-label="Format: {strip[0]}, {strip[1]}">
+		<div class="strip" aria-label={t.today.poster.format(strip[0], strip[1])}>
 			<span class="cell fill">{strip[0]}</span>
 			<span class="cell">{strip[1]}</span>
 		</div>
@@ -56,7 +57,7 @@
 
 	{#if wod.description?.trim()}
 		<div class="brief">
-			<p class="legend text-mute">From the coach</p>
+			<p class="legend text-mute">{t.today.poster.fromCoach}</p>
 			<p class="mt-2 text-lg leading-snug text-ink">{wod.description.trim()}</p>
 		</div>
 	{/if}

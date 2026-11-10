@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { personalRecord, exercise } from '$lib/server/db/schema';
 import { createPRSchema } from '$lib/types/pr';
@@ -8,7 +9,7 @@ import { eq } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const prs = await db
@@ -31,21 +32,21 @@ export const GET: RequestHandler = async ({ locals }) => {
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	let body;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).api.invalidJson }, { status: 400 });
 	}
 
 	const validation = createPRSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
 			{
-				error: 'Validation failed',
+				error: dictFor(locals.locale).api.validationFailed,
 				details: validation.error.flatten()
 			},
 			{ status: 400 }
@@ -58,7 +59,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const [ex] = await db.select().from(exercise).where(eq(exercise.id, data.exerciseId));
 
 	if (!ex) {
-		return json({ error: 'Exercise not found' }, { status: 404 });
+		return json({ error: dictFor(locals.locale).prs.api.exerciseNotFound }, { status: 404 });
 	}
 
 	const now = new Date();

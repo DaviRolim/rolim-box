@@ -4,6 +4,7 @@
 	import type { SectionDraft } from './types';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import TimerFields from './TimerFields.svelte';
+	import { dictionaries, t } from '$lib/i18n';
 
 	interface Props {
 		draft: SectionDraft;
@@ -17,18 +18,20 @@
 
 	let { draft = $bindable(), index, count, showErrors = false, onmove, onremove }: Props = $props();
 
-	const EXAMPLE = '21-15-9 for time:\nThrusters (43/30 kg)\nPull-ups\n\nTime cap: 10 min';
-	const LABELS = new Set(Object.values(sectionTypes).map((t) => t.label));
+	// Default names in every language: a name the coach never touched follows the type,
+	// even if they switched language in between.
+	const LABELS = new Set(
+		Object.values(dictionaries).flatMap((dict) => Object.values(dict.format.sectionTypes))
+	);
 	const nameError = $derived(
 		!draft.name.trim()
-			? 'Give this section a name.'
+			? t.editor.errors.nameRequired
 			: draft.name.length > 100
-				? 'Name is too long (100 max).'
+				? t.editor.errors.nameTooLong
 				: ''
 	);
-	const contentError = $derived(
-		draft.content.length > 2000 ? 'Too long (2000 characters max).' : ''
-	);
+	const contentError = $derived(draft.content.length > 2000 ? t.editor.errors.contentTooLong : '');
+	const label = $derived(draft.name || t.editor.section.section);
 	const rows = $derived(Math.min(18, Math.max(4, draft.content.split('\n').length + 1)));
 
 	function changeType(type: SectionType) {
@@ -51,12 +54,16 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <fieldset class="section" class:main={draft.type === 'wod'} onkeydown={onKeydown}>
-	<legend class="sr-only">Section {index + 1}: {draft.name || 'unnamed'}</legend>
+	<legend class="sr-only">
+		{t.editor.section.legend(index + 1, draft.name || t.editor.section.unnamed)}
+	</legend>
 
 	<div class="flex items-center gap-2">
 		<span class="index display" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
 		<div class="min-w-0 flex-1">
-			<label for="section-type-{draft.key}" class="sr-only">Type of section {index + 1}</label>
+			<label for="section-type-{draft.key}" class="sr-only"
+				>{t.editor.section.typeLabel(index + 1)}</label
+			>
 			<select
 				id="section-type-{draft.key}"
 				class="input type"
@@ -73,8 +80,8 @@
 			class="icon-btn"
 			onclick={() => onmove(-1)}
 			disabled={index === 0}
-			aria-label="Move {draft.name || 'section'} up"
-			title="Move up (Alt+↑)"
+			aria-label={t.editor.section.moveUpAria(label)}
+			title={t.editor.section.moveUpTitle}
 		>
 			<Icon name="arrow-up" size={20} stroke={2.6} />
 		</button>
@@ -83,8 +90,8 @@
 			class="icon-btn"
 			onclick={() => onmove(1)}
 			disabled={index === count - 1}
-			aria-label="Move {draft.name || 'section'} down"
-			title="Move down (Alt+↓)"
+			aria-label={t.editor.section.moveDownAria(label)}
+			title={t.editor.section.moveDownTitle}
 		>
 			<Icon name="arrow-down" size={20} stroke={2.6} />
 		</button>
@@ -92,22 +99,22 @@
 			type="button"
 			class="icon-btn"
 			onclick={onremove}
-			aria-label="Remove {draft.name || 'section'}"
-			title="Remove section"
+			aria-label={t.editor.section.removeAria(label)}
+			title={t.editor.section.removeTitle}
 		>
 			<Icon name="trash" size={20} stroke={2.4} />
 		</button>
 	</div>
 
 	<div class="mt-3">
-		<label for="section-name-{draft.key}" class="field-label">Name</label>
+		<label for="section-name-{draft.key}" class="field-label">{t.editor.section.name}</label>
 		<input
 			id="section-name-{draft.key}"
 			type="text"
 			class="input name"
 			maxlength="100"
 			autocomplete="off"
-			placeholder="Fran, Strength, Warm-up"
+			placeholder={t.editor.section.namePlaceholder}
 			bind:value={draft.name}
 			aria-invalid={showErrors && !!nameError}
 			aria-describedby={showErrors && nameError ? `section-name-error-${draft.key}` : undefined}
@@ -121,13 +128,14 @@
 
 	<div class="mt-3">
 		<label for="section-content-{draft.key}" class="field-label">
-			What's on the board <span class="text-mute normal-case">· one movement per line</span>
+			{t.editor.section.content}
+			<span class="text-mute normal-case">{t.editor.section.contentHint}</span>
 		</label>
 		<textarea
 			id="section-content-{draft.key}"
 			class="input"
 			{rows}
-			placeholder={EXAMPLE}
+			placeholder={t.editor.section.example}
 			bind:value={draft.content}
 			aria-invalid={showErrors && !!contentError}
 		></textarea>
@@ -176,6 +184,19 @@
 		font-size: 1rem;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
+	}
+	/* On a phone the type sits between the index and three buttons: give the longer
+	   Portuguese names ("Aquecimento", "Alongamento") the room the chevron was taking. */
+	@media (max-width: 639px) {
+		.type {
+			padding-left: 0.625rem;
+			padding-right: 1.75rem;
+			font-size: 0.875rem;
+			letter-spacing: 0.02em;
+			background-position:
+				calc(100% - 1rem) 50%,
+				calc(100% - 0.625rem) 50%;
+		}
 	}
 	.name {
 		font-stretch: 68%;

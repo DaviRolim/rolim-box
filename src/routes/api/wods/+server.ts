@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { wod, section } from '$lib/server/db/schema';
 import { createWoDSchema } from '$lib/types/wod';
@@ -18,18 +19,19 @@ import { eq, and, desc, inArray, asc, lt } from 'drizzle-orm';
  * Returns { wods, nextCursor } ordered by date DESC.
  */
 export const GET: RequestHandler = async ({ locals, url }) => {
+	const d = dictFor(locals.locale);
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: d.api.unauthorized }, { status: 401 });
 	}
 
 	const workspaceId = url.searchParams.get('workspaceId');
 	if (!workspaceId) {
-		return json({ error: 'workspaceId query parameter is required' }, { status: 400 });
+		return json({ error: d.editor.api.workspaceRequired }, { status: 400 });
 	}
 
 	const membership = await getMembership(locals.user.id, workspaceId);
 	if (!membership) {
-		return json({ error: 'Access denied: not a member of this workspace' }, { status: 403 });
+		return json({ error: d.api.notMember }, { status: 403 });
 	}
 
 	const limit = Math.min(Number(url.searchParams.get('limit')) || 20, 100);
@@ -95,21 +97,22 @@ export const GET: RequestHandler = async ({ locals, url }) => {
  * as a replay of a request whose response was lost, and returns the existing WoD.
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
+	const d = dictFor(locals.locale);
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: d.api.unauthorized }, { status: 401 });
 	}
 
 	let body;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, { status: 400 });
+		return json({ error: d.api.invalidJson }, { status: 400 });
 	}
 
 	const validation = createWoDSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
-			{ error: 'Validation failed', details: validation.error.flatten() },
+			{ error: d.api.validationFailed, details: validation.error.flatten() },
 			{ status: 400 }
 		);
 	}
@@ -118,17 +121,17 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	const membership = await getMembership(locals.user.id, data.workspaceId);
 	if (!membership) {
-		return json({ error: 'Access denied: not a member of this workspace' }, { status: 403 });
+		return json({ error: d.api.notMember }, { status: 403 });
 	}
 	if (!canEditWods(membership.role)) {
-		return json({ error: 'Members cannot create workouts' }, { status: 403 });
+		return json({ error: d.editor.api.membersCannotCreate }, { status: 403 });
 	}
 
 	if (data.id) {
 		const [existing] = await db.select().from(wod).where(eq(wod.id, data.id));
 		if (existing) {
 			if (existing.workspaceId !== data.workspaceId) {
-				return json({ error: 'A workout with this id already exists' }, { status: 409 });
+				return json({ error: d.editor.api.alreadyExists }, { status: 409 });
 			}
 			return json(serializeWod(existing, await getSections(existing.id)));
 		}

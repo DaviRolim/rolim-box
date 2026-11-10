@@ -1,4 +1,10 @@
-import { formatPRValue, type MeasurementType, type UnitPreference } from '$lib/types/pr';
+import {
+	formatPRValue,
+	type ExerciseCategory,
+	type MeasurementType,
+	type UnitPreference
+} from '$lib/types/pr';
+import { t } from '$lib/i18n';
 
 /**
  * A PR value split into the figure and its unit ("102.5" + "kg", "3:42" + "", "21" + "reps"),
@@ -19,16 +25,11 @@ export function athleteName(email: string): string {
 	return email.split('@')[0];
 }
 
-export const CATEGORY_LABELS: Record<string, string> = {
-	weightlifting: 'Weightlifting',
-	benchmark: 'Benchmark',
-	gymnastics: 'Gymnastics',
-	cardio: 'Cardio'
-};
+/** Category and measurement names in the active language (read at render time). */
+export function categoryLabel(category: ExerciseCategory): string {
+	return t.prs.categories[category] ?? category;
+}
 
-export const MEASUREMENT_LABELS: Record<string, string> = {
-	weight: 'Weight',
-	time: 'Time',
-	reps: 'Reps',
-	distance: 'Distance'
-};
+export function measurementLabel(measurementType: MeasurementType): string {
+	return t.prs.measurements[measurementType] ?? measurementType;
+}

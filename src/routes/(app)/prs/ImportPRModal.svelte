@@ -11,6 +11,7 @@
 	} from '$lib/types/pr';
 	import Sheet from '$lib/components/ui/Sheet.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * Import PRs from a screenshot of another app: upload the picture, let the server read it,
@@ -84,11 +85,11 @@
 	function selectFile(file: File) {
 		const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
 		if (!validTypes.includes(file.type)) {
-			error = 'Please upload a PNG, JPG, or WEBP image';
+			error = t.prs.import.wrongType;
 			return;
 		}
 		if (file.size > 5 * 1024 * 1024) {
-			error = 'Image must be smaller than 5MB';
+			error = t.prs.import.tooBig;
 			return;
 		}
 
@@ -119,7 +120,7 @@
 			const data = await res.json();
 
 			if (!res.ok) {
-				throw new Error(data.error || 'Failed to analyze image');
+				throw new Error(data.error || t.prs.import.analyzeFailed);
 			}
 
 			matchedPRs = data.matched;
@@ -137,15 +138,18 @@
 			}
 
 			if (matchedPRs.length === 0) {
-				error =
-					'No personal records found in this image. Make sure the image clearly shows exercise names and values.';
+				error = t.prs.import.nothingFound;
 				modalState = 'upload';
 				return;
 			}
 
 			modalState = 'review';
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to analyze image';
+			// A network failure has no message worth showing; the server's own message is localised.
+			error =
+				err instanceof Error && !(err instanceof TypeError)
+					? err.message
+					: t.prs.import.analyzeFailed;
 			modalState = 'upload';
 		}
 	}
@@ -190,13 +194,16 @@
 			const data = await res.json();
 
 			if (!res.ok) {
-				throw new Error(data.error || 'Failed to import PRs');
+				throw new Error(data.error || t.prs.import.importFailed);
 			}
 
 			onImported();
 			handleClose();
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to import PRs';
+			error =
+				err instanceof Error && !(err instanceof TypeError)
+					? err.message
+					: t.prs.import.importFailed;
 			modalState = 'review';
 		}
 	}
@@ -225,16 +232,16 @@
 
 	const legend = $derived(
 		modalState === 'upload'
-			? 'Step 1 of 2 · upload'
+			? t.prs.import.stepUpload
 			: modalState === 'processing'
 				? processingWhat === 'reading'
-					? 'Reading the image'
-					: 'Saving'
-				: 'Step 2 of 2 · review'
+					? t.prs.import.readingImage
+					: t.prs.import.saving
+				: t.prs.import.stepReview
 	);
 </script>
 
-<Sheet bind:open title="Import PRs" {legend} wide onclose={onClose}>
+<Sheet bind:open title={t.prs.import.title} {legend} wide onclose={onClose}>
 	{#if error}
 		<div class="notice notice-danger mb-4" role="alert">
 			<span class="mt-0.5 flex-none text-danger-ink"
@@ -257,11 +264,11 @@
 				ondragleave={() => (dragging = false)}
 			>
 				<Icon name="upload" size={36} stroke={2.2} />
-				<span class="mt-3 display text-[2rem]">Pick a screenshot</span>
+				<span class="mt-3 display text-[2rem]">{t.prs.import.pick}</span>
 				<span class="mt-2 max-w-xs text-base leading-snug text-dim">
-					A picture of the PR list from another app or a notes page. Drop it here or tap to choose.
+					{t.prs.import.pickBody}
 				</span>
-				<span class="mt-3 legend text-mute">PNG, JPG or WEBP · 5 MB max</span>
+				<span class="mt-3 legend text-mute">{t.prs.import.fileRules}</span>
 				<input
 					type="file"
 					accept="image/png,image/jpeg,image/webp"
@@ -271,12 +278,12 @@
 			</label>
 		{:else}
 			<div class="border-2 border-line-strong">
-				<img src={previewUrl} alt="The screenshot you picked" class="preview" />
+				<img src={previewUrl} alt={t.prs.import.previewAlt} class="preview" />
 				<div class="flex items-center gap-3 border-t-2 border-line-strong p-2 pl-3">
 					<p class="min-w-0 flex-1 truncate legend text-dim normal-case">{selectedFile.name}</p>
 					<button type="button" class="btn btn-sm btn-quiet flex-none" onclick={clearFile}>
 						<Icon name="x" size={16} stroke={3} />
-						Remove
+						{t.prs.import.remove}
 					</button>
 				</div>
 			</div>
@@ -284,30 +291,26 @@
 	{:else if modalState === 'processing'}
 		<div class="py-10" role="status" aria-live="polite">
 			<p class="display text-[2.5rem]">
-				{processingWhat === 'reading' ? 'Reading your PRs' : 'Saving your PRs'}
+				{processingWhat === 'reading' ? t.prs.import.readingTitle : t.prs.import.savingTitle}
 			</p>
 			<p class="mt-2 text-lg text-dim">
-				{processingWhat === 'reading'
-					? 'Matching every line to an exercise. This takes a few seconds.'
-					: 'Almost there.'}
+				{processingWhat === 'reading' ? t.prs.import.readingBody : t.prs.import.almostThere}
 			</p>
 			<div class="led mt-5 h-3"></div>
 		</div>
 	{:else}
 		<div class="module-head border-t-2 border-ink">
-			<span>Found {matchedPRs.length} {matchedPRs.length === 1 ? 'PR' : 'PRs'}</span>
+			<span>{t.prs.import.found(matchedPRs.length)}</span>
 			<span>
-				{selectedCount} selected{unmatchedExercises.length > 0
-					? ` · ${unmatchedExercises.length} skipped`
+				{t.prs.import.selected(selectedCount)}{unmatchedExercises.length > 0
+					? ` · ${t.prs.import.skipped(unmatchedExercises.length)}`
 					: ''}
 			</span>
 		</div>
 
 		{#if conflictCount > 0}
 			<p class="notice notice-warn mb-3" role="status">
-				{conflictCount === 1
-					? '1 selected line replaces a PR you already have.'
-					: `${conflictCount} selected lines replace PRs you already have.`}
+				{t.prs.import.conflicts(conflictCount)}
 			</p>
 		{/if}
 
@@ -332,7 +335,7 @@
 								<span class="display text-[1.5rem] leading-[0.95]">{pr.exerciseName}</span>
 								{#if pr.confidence !== 'high'}
 									<span class="tag {pr.confidence === 'medium' ? 'tag-warn' : 'tag-ink'}">
-										{pr.confidence === 'medium' ? 'Check this' : 'Unsure'}
+										{pr.confidence === 'medium' ? t.prs.import.checkThis : t.prs.import.unsure}
 									</span>
 								{/if}
 							</span>
@@ -340,7 +343,7 @@
 								class="mt-1.5 block truncate legend text-mute normal-case"
 								style="letter-spacing: 0.02em"
 							>
-								Read as: {pr.originalText}
+								{t.prs.import.readAs(pr.originalText)}
 							</span>
 							{#if pr.hasConflict && pr.existingValue}
 								{@const existing = convertValueForDisplay(
@@ -350,7 +353,8 @@
 								)}
 								<span class="mt-1.5 flex items-center gap-1.5 legend text-warn-ink">
 									<Icon name="alert" size={14} stroke={2.8} />
-									Replaces {show(existing, pr.measurementType)} → {show(
+									{t.prs.import.replaces}
+									{show(existing, pr.measurementType)} → {show(
 										currentValue,
 										pr.measurementType
 									)}{pr.measurementType === 'time' ? '' : ` ${unit}`}
@@ -361,7 +365,7 @@
 
 					<div class="amount">
 						<label for="import-{pr.exerciseId}" class="sr-only">
-							Value for {pr.exerciseName}{unit ? ` (${unit})` : ''}
+							{t.prs.import.valueFor(pr.exerciseName)}{unit ? ` (${unit})` : ''}
 						</label>
 						{#if pr.measurementType === 'time'}
 							<input
@@ -396,8 +400,7 @@
 			<details class="skipped">
 				<summary class="legend">
 					<span>
-						{unmatchedExercises.length}
-						{unmatchedExercises.length === 1 ? 'line' : 'lines'} could not be matched
+						{t.prs.import.unmatched(unmatchedExercises.length)}
 					</span>
 					<Icon name="chevron-down" size={16} stroke={3} />
 				</summary>
@@ -413,19 +416,18 @@
 	{#snippet actions()}
 		{#if modalState === 'upload'}
 			<button type="button" class="btn btn-pink" onclick={analyzeImage} disabled={!selectedFile}>
-				Read the image
+				{t.prs.import.readImage}
 			</button>
-			<button type="button" class="btn btn-quiet" onclick={handleClose}>Cancel</button>
+			<button type="button" class="btn btn-quiet" onclick={handleClose}>{t.common.cancel}</button>
 		{:else if modalState === 'review'}
 			<button type="button" class="btn btn-pink" onclick={importPRs} disabled={selectedCount === 0}>
-				Import {selectedCount}
-				{selectedCount === 1 ? 'PR' : 'PRs'}
+				{t.prs.import.importN(selectedCount)}
 			</button>
 			<button type="button" class="btn btn-quiet" onclick={() => (modalState = 'upload')}>
-				Back
+				{t.common.back}
 			</button>
 		{:else}
-			<button type="button" class="btn btn-quiet" disabled>Working</button>
+			<button type="button" class="btn btn-quiet" disabled>{t.prs.import.working}</button>
 		{/if}
 	{/snippet}
 </Sheet>

@@ -13,7 +13,8 @@
 	import PRModal from './PRModal.svelte';
 	import ImportPRModal from './ImportPRModal.svelte';
 	import LeaderboardTab from './LeaderboardTab.svelte';
-	import { prParts } from './pr-format';
+	import { categoryLabel, prParts } from './pr-format';
+	import { t } from '$lib/i18n';
 
 	let { data } = $props();
 
@@ -42,10 +43,10 @@
 	// Tabs
 	type TabId = 'my-prs' | 'leaderboard';
 	let activeTab = $state<TabId>('my-prs');
-	const tabs: { id: TabId; label: string }[] = [
-		{ id: 'my-prs', label: 'My PRs' },
-		{ id: 'leaderboard', label: 'Leaderboard' }
-	];
+	const tabs = $derived<{ id: TabId; label: string }[]>([
+		{ id: 'my-prs', label: t.prs.page.tabMine },
+		{ id: 'leaderboard', label: t.prs.page.tabLeaderboard }
+	]);
 
 	function onTabKeydown(event: KeyboardEvent) {
 		if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
@@ -88,29 +89,22 @@
 		return exercises.filter((ex) => ex.category === effectiveCategory);
 	});
 
-	const categoryLabels: Record<ExerciseCategory, string> = {
-		weightlifting: 'Weightlifting',
-		benchmark: 'Benchmarks',
-		gymnastics: 'Gymnastics',
-		cardio: 'Cardio'
-	};
-
 	// One group per category when showing everything recorded, a single group otherwise.
 	const groups = $derived.by(() => {
 		if (isSearching)
-			return [{ key: 'search', label: 'Search results', exercises: filteredExercises }];
+			return [{ key: 'search', label: t.prs.page.searchResults, exercises: filteredExercises }];
 		if (effectiveCategory !== 'recorded') {
 			return [
 				{
 					key: effectiveCategory,
-					label: categoryLabels[effectiveCategory],
+					label: categoryLabel(effectiveCategory),
 					exercises: filteredExercises
 				}
 			];
 		}
 		return EXERCISE_CATEGORIES.map((category) => ({
 			key: category as string,
-			label: categoryLabels[category],
+			label: categoryLabel(category),
 			exercises: filteredExercises.filter((ex) => ex.category === category)
 		})).filter((group) => group.exercises.length > 0);
 	});
@@ -137,22 +131,22 @@
 
 	async function handlePRSaved() {
 		await reload();
-		toastStore.success('PR saved!');
+		toastStore.success(t.prs.page.saved);
 	}
 
 	async function handlePRDeleted() {
 		await reload();
-		toastStore.success('PR deleted');
+		toastStore.success(t.prs.page.deleted);
 	}
 
 	async function handleImportSuccess() {
 		await reload();
-		toastStore.success('PRs imported successfully!');
+		toastStore.success(t.prs.page.imported);
 	}
 </script>
 
 <svelte:head>
-	<title>PRs - RolimBox</title>
+	<title>{t.common.pageTitle(t.prs.title)}</title>
 </svelte:head>
 
 {#if selectedExercise}
@@ -179,14 +173,14 @@
 		<div class="min-w-0">
 			<p class="legend text-mute">
 				{#if loading}
-					Reading the board
+					{t.prs.page.reading}
 				{:else}
-					{recorded.length} of {exercises.length} logged · {unitPreference === 'metric'
+					{t.prs.page.logged(recorded.length, exercises.length)} · {unitPreference === 'metric'
 						? 'kg'
 						: 'lbs'}
 				{/if}
 			</p>
-			<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">PRs</h1>
+			<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">{t.prs.title}</h1>
 		</div>
 		{#if activeTab === 'my-prs'}
 			<button
@@ -195,13 +189,13 @@
 				onclick={() => (importModalOpen = true)}
 			>
 				<Icon name="upload" size={20} stroke={2.6} />
-				Import
+				{t.prs.page.import}
 			</button>
 		{/if}
 	</header>
 
 	<!-- svelte-ignore a11y_interactive_supports_focus -->
-	<div class="tabs" role="tablist" aria-label="Personal records" onkeydown={onTabKeydown}>
+	<div class="tabs" role="tablist" aria-label={t.prs.page.tabsLabel} onkeydown={onTabKeydown}>
 		{#each tabs as tab (tab.id)}
 			<button
 				type="button"
@@ -221,7 +215,7 @@
 	{#if activeTab === 'my-prs'}
 		<div id="panel-my-prs" role="tabpanel" aria-labelledby="tab-my-prs" class="mt-5">
 			{#if loading}
-				<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading PRs">
+				<div class="flex flex-col gap-2" aria-busy="true" aria-label={t.prs.page.loadingPrs}>
 					<div class="led h-14"></div>
 					{#each [0, 1, 2, 3, 4, 5] as row (row)}
 						<div class="led h-[4.5rem]"></div>
@@ -234,8 +228,7 @@
 					>
 					<div class="min-w-0 flex-1">
 						<p>
-							The exercise list could not be loaded. It is not saved on this phone yet and the
-							server did not answer.
+							{t.prs.page.loadFailed}
 						</p>
 						<button
 							type="button"
@@ -246,14 +239,14 @@
 							}}
 						>
 							<Icon name="refresh" size={16} stroke={2.8} />
-							Try again
+							{t.common.retry}
 						</button>
 					</div>
 				</div>
 			{:else}
 				<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
 					<div class="relative lg:w-96">
-						<label for="pr-search" class="sr-only">Search exercises</label>
+						<label for="pr-search" class="sr-only">{t.prs.page.searchLabel}</label>
 						<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-mute">
 							<Icon name="search" size={20} stroke={2.6} />
 						</span>
@@ -261,7 +254,7 @@
 							id="pr-search"
 							type="search"
 							class="input pl-11"
-							placeholder="Search: snatch, fran, pull-ups"
+							placeholder={t.prs.page.searchPlaceholder}
 							autocomplete="off"
 							bind:value={searchQuery}
 						/>
@@ -272,7 +265,7 @@
 						<div
 							class="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0"
 							role="group"
-							aria-label="Category"
+							aria-label={t.prs.page.categoryGroup}
 						>
 							<button
 								type="button"
@@ -282,7 +275,7 @@
 								aria-pressed={effectiveCategory === 'recorded'}
 								onclick={() => (activeCategory = 'recorded')}
 							>
-								Recorded
+								{t.prs.page.recorded}
 							</button>
 							{#each EXERCISE_CATEGORIES as category (category)}
 								<button
@@ -293,7 +286,7 @@
 									aria-pressed={effectiveCategory === category}
 									onclick={() => (activeCategory = category)}
 								>
-									{categoryLabels[category]}
+									{categoryLabel(category)}
 								</button>
 							{/each}
 						</div>
@@ -304,10 +297,10 @@
 					{#if filteredExercises.length === 0}
 						{#if isSearching}
 							<div class="border-2 border-line-strong px-5 py-8">
-								<h2 class="display text-[2.5rem]">No match</h2>
-								<p class="mt-2 text-lg text-dim">No exercise is called that.</p>
+								<h2 class="display text-[2.5rem]">{t.prs.page.noMatch}</h2>
+								<p class="mt-2 text-lg text-dim">{t.prs.page.noMatchBody}</p>
 								<button type="button" class="btn btn-quiet mt-5" onclick={() => (searchQuery = '')}>
-									Clear search
+									{t.prs.page.clearSearch}
 								</button>
 							</div>
 						{:else if effectiveCategory === 'recorded'}
@@ -315,10 +308,9 @@
 								<p class="inline-block -rotate-3 sign text-[3rem] text-pink-ink" lang="pt-BR">
 									Bora marcar?
 								</p>
-								<h2 class="mt-4 display text-[3rem] lg:text-[4rem]">No PRs yet</h2>
+								<h2 class="mt-4 display text-[3rem] lg:text-[4rem]">{t.prs.page.noPrsYet}</h2>
 								<p class="mt-3 max-w-md text-lg leading-snug text-dim">
-									Pick a category, tap a lift and log your best. It goes straight on the box
-									leaderboard.
+									{t.prs.page.noPrsBody}
 								</p>
 								<button
 									type="button"
@@ -326,13 +318,13 @@
 									onclick={() => (activeCategory = 'weightlifting')}
 								>
 									<Icon name="plus" size={20} stroke={3.4} />
-									Log the first one
+									{t.prs.page.logFirst}
 								</button>
 							</div>
 						{:else}
 							<div class="border-2 border-line-strong px-5 py-8">
-								<h2 class="display text-[2.5rem]">Nothing here</h2>
-								<p class="mt-2 text-lg text-dim">There are no exercises in this category.</p>
+								<h2 class="display text-[2.5rem]">{t.prs.page.nothingHere}</h2>
+								<p class="mt-2 text-lg text-dim">{t.prs.page.emptyCategory}</p>
 							</div>
 						{/if}
 					{:else}
@@ -352,7 +344,7 @@
 														{#if exercise.bestPR}
 															{formatDayMonth(exercise.bestPR.date)}
 														{:else}
-															No PR yet
+															{t.prs.page.noPrYet}
 														{/if}
 													</span>
 												</span>
@@ -369,7 +361,7 @@
 												{:else}
 													<span class="tag flex-none text-dim">
 														<Icon name="plus" size={12} stroke={3.6} />
-														Log
+														{t.prs.page.log}
 													</span>
 												{/if}
 											</button>
@@ -390,9 +382,9 @@
 				{/key}
 			{:else}
 				<div class="border-2 border-line-strong px-5 py-8">
-					<h2 class="display text-[2.5rem]">No box</h2>
+					<h2 class="display text-[2.5rem]">{t.prs.page.noBox}</h2>
 					<p class="mt-2 text-lg text-dim">
-						The leaderboard belongs to a box. Join one to see where you stand.
+						{t.prs.page.noBoxBody}
 					</p>
 				</div>
 			{/if}

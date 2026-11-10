@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { workspaceMember } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { dictFor } from '$lib/i18n';
 
 /**
  * POST /api/workspaces/active
@@ -10,14 +11,14 @@ import { eq, and } from 'drizzle-orm';
  */
 export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const body = await request.json();
 	const { workspaceId } = body;
 
 	if (!workspaceId) {
-		return json({ error: 'workspaceId is required' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).api.workspaceRequired }, { status: 400 });
 	}
 
 	// Validate user is a member of this workspace
@@ -29,7 +30,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 		);
 
 	if (!membership) {
-		return json({ error: 'Not a member of this workspace' }, { status: 403 });
+		return json({ error: dictFor(locals.locale).api.notMember }, { status: 403 });
 	}
 
 	// Set cookie (30 days) with security attributes

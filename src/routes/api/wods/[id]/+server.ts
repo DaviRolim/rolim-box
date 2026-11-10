@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { dictFor } from '$lib/i18n';
 import { db } from '$lib/server/db';
 import { wod, section } from '$lib/server/db/schema';
 import { updateWoDSchema } from '$lib/types/wod';
@@ -17,11 +18,12 @@ import { eq, asc } from 'drizzle-orm';
  * Returns the WoD with all its sections. Any member of the workspace.
  */
 export const GET: RequestHandler = async ({ locals, params }) => {
+	const d = dictFor(locals.locale);
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: d.api.unauthorized }, { status: 401 });
 	}
 
-	const access = await getWodAccess(locals.user.id, params.id);
+	const access = await getWodAccess(locals.user.id, params.id, locals.locale);
 	if (!access.ok) {
 		return json({ error: access.error }, { status: access.status });
 	}
@@ -34,31 +36,32 @@ export const GET: RequestHandler = async ({ locals, params }) => {
  * Updates a WoD; when `sections` is sent it replaces them all. Coaches and owners only.
  */
 export const PUT: RequestHandler = async ({ locals, params, request }) => {
+	const d = dictFor(locals.locale);
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: d.api.unauthorized }, { status: 401 });
 	}
 
 	const wodId = params.id;
 
-	const access = await getWodAccess(locals.user.id, wodId);
+	const access = await getWodAccess(locals.user.id, wodId, locals.locale);
 	if (!access.ok) {
 		return json({ error: access.error }, { status: access.status });
 	}
 	if (!canEditWods(access.membership.role)) {
-		return json({ error: 'Members cannot edit workouts' }, { status: 403 });
+		return json({ error: d.editor.api.membersCannotEdit }, { status: 403 });
 	}
 
 	let body;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, { status: 400 });
+		return json({ error: d.api.invalidJson }, { status: 400 });
 	}
 
 	const validation = updateWoDSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
-			{ error: 'Validation failed', details: validation.error.flatten() },
+			{ error: d.api.validationFailed, details: validation.error.flatten() },
 			{ status: 400 }
 		);
 	}
@@ -97,16 +100,17 @@ export const PUT: RequestHandler = async ({ locals, params, request }) => {
  * Deletes a WoD (sections cascade). Coaches and owners only. Returns 204.
  */
 export const DELETE: RequestHandler = async ({ locals, params }) => {
+	const d = dictFor(locals.locale);
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: d.api.unauthorized }, { status: 401 });
 	}
 
-	const access = await getWodAccess(locals.user.id, params.id);
+	const access = await getWodAccess(locals.user.id, params.id, locals.locale);
 	if (!access.ok) {
 		return json({ error: access.error }, { status: access.status });
 	}
 	if (!canEditWods(access.membership.role)) {
-		return json({ error: 'Members cannot delete workouts' }, { status: 403 });
+		return json({ error: d.editor.api.membersCannotDelete }, { status: 403 });
 	}
 
 	// SQLite only cascades when foreign keys are enforced on the connection, so delete

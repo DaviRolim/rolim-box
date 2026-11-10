@@ -1,5 +1,6 @@
 // src/lib/types/timer.ts
 import { z } from 'zod';
+import { t } from '$lib/i18n';
 
 // ============================================================================
 // Type Definitions
@@ -47,12 +48,21 @@ export const TIMER_LABELS: Record<TimerType, string> = {
 	tabata: 'TABATA'
 };
 
-export const TIMER_DESCRIPTIONS: Record<TimerType, string> = {
-	amrap: 'As Many Rounds As Possible',
-	emom: 'Every Minute On the Minute',
-	fortime: 'Complete workout for time',
-	tabata: 'Work/Rest intervals'
-};
+/** One line on what each format means, read in the active language every time. */
+export const TIMER_DESCRIPTIONS = {
+	get amrap() {
+		return t.timer.descriptions.amrap;
+	},
+	get emom() {
+		return t.timer.descriptions.emom;
+	},
+	get fortime() {
+		return t.timer.descriptions.fortime;
+	},
+	get tabata() {
+		return t.timer.descriptions.tabata;
+	}
+} as Readonly<Record<TimerType, string>>;
 
 // ============================================================================
 // Zod Validation Schemas

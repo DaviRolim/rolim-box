@@ -11,6 +11,7 @@
 	import WodView from '$lib/components/wod/WodView.svelte';
 	import DuplicateSheet from '$lib/components/wod/DuplicateSheet.svelte';
 	import type { WoD } from '$lib/types/wod';
+	import { t } from '$lib/i18n';
 
 	let { data } = $props();
 
@@ -48,12 +49,12 @@
 		try {
 			const title = wodTitle(wod);
 			await wodStore.remove(wod.id);
-			toastStore.success(`"${title}" deleted.`);
+			toastStore.success(t.today.remove.deleted(title));
 			deleteOpen = false;
 			await goto(resolve('/workouts'));
 		} catch (error) {
 			console.error('Failed to delete WoD:', error);
-			toastStore.error('Could not delete this WoD.');
+			toastStore.error(t.today.remove.failed);
 		} finally {
 			deleting = false;
 		}
@@ -61,7 +62,7 @@
 </script>
 
 <svelte:head>
-	<title>{wod ? `${wodTitle(wod)} · ${formatShort(wod.date)}` : 'WoD'} - RolimBox</title>
+	<title>{t.common.pageTitle(wod ? `${wodTitle(wod)} · ${formatShort(wod.date)}` : 'WoD')}</title>
 </svelte:head>
 
 <div class="page">
@@ -70,7 +71,7 @@
 		class="inline-flex min-h-11 items-center gap-2 legend text-dim no-underline"
 	>
 		<Icon name="arrow-left" size={16} stroke={3} />
-		All WoDs
+		{t.today.detail.allWods}
 	</a>
 
 	<div class="mt-3">
@@ -80,20 +81,20 @@
 					{#if data.canEdit}
 						<a href={resolve('/(app)/workouts/[id]/edit', { id: wod.id })} class="btn btn-quiet">
 							<Icon name="edit" size={18} stroke={2.6} />
-							Edit
+							{t.today.detail.edit}
 						</a>
 						<button type="button" class="btn btn-quiet" onclick={() => (duplicateOpen = true)}>
 							<Icon name="copy" size={18} stroke={2.6} />
-							Duplicate
+							{t.today.detail.duplicate}
 						</button>
 						<button
 							type="button"
 							class="btn btn-quiet"
 							onclick={() => (deleteOpen = true)}
-							aria-label="Delete this WoD"
+							aria-label={t.today.detail.deleteAria}
 						>
 							<Icon name="trash" size={18} stroke={2.6} />
-							Delete
+							{t.today.detail.delete}
 						</button>
 					{/if}
 				{/snippet}
@@ -102,7 +103,7 @@
 			<div
 				class="grid gap-8 lg:grid-cols-[5fr_7fr] lg:gap-12"
 				aria-busy="true"
-				aria-label="Loading the WoD"
+				aria-label={t.today.detail.loadingAria}
 			>
 				<div>
 					<div class="led h-28 w-full lg:h-40"></div>
@@ -116,24 +117,23 @@
 			</div>
 		{:else if unavailable}
 			<div class="border-2 border-warn px-5 py-8 lg:p-12">
-				<p class="legend text-warn-ink">Offline</p>
-				<h1 class="mt-3 display text-[3.5rem] lg:text-[5rem]">Not on this phone</h1>
+				<p class="legend text-warn-ink">{t.today.detail.offline}</p>
+				<h1 class="mt-3 display text-[3.5rem] lg:text-[5rem]">{t.today.detail.notHereTitle}</h1>
 				<p class="mt-3 max-w-md text-lg leading-snug text-dim">
-					This WoD is not saved here and the server cannot be reached right now. It will open as
-					soon as there is a connection.
+					{t.today.detail.notHereBody}
 				</p>
-				<a href={resolve('/dashboard')} class="btn btn-ink mt-6">Back to today</a>
+				<a href={resolve('/dashboard')} class="btn btn-ink mt-6">{t.today.detail.backToToday}</a>
 			</div>
 		{:else}
 			<div class="border-2 border-line-strong gridlines px-5 py-8 lg:p-12">
 				<p class="inline-block -rotate-3 sign text-[3.25rem] text-pink-ink" lang="pt-BR">Sumiu.</p>
-				<h1 class="mt-4 display text-[3.5rem] lg:text-[5rem]">WoD not found</h1>
+				<h1 class="mt-4 display text-[3.5rem] lg:text-[5rem]">{t.today.detail.notFoundTitle}</h1>
 				<p class="mt-3 max-w-md text-lg leading-snug text-dim">
-					It may have been deleted, or it belongs to a box you are not in.
+					{t.today.detail.notFoundBody}
 				</p>
 				<div class="mt-6 flex flex-wrap gap-2">
-					<a href={resolve('/workouts')} class="btn btn-ink">All WoDs</a>
-					<a href={resolve('/dashboard')} class="btn btn-quiet">Today</a>
+					<a href={resolve('/workouts')} class="btn btn-ink">{t.today.detail.allWods}</a>
+					<a href={resolve('/dashboard')} class="btn btn-quiet">{t.today.detail.today}</a>
 				</div>
 			</div>
 		{/if}
@@ -148,11 +148,11 @@
 
 <ConfirmDialog
 	bind:open={deleteOpen}
-	title="Delete this WoD?"
+	title={t.today.remove.title}
 	legend={wod ? `${wodTitle(wod)} · ${formatLong(wod.date)}` : undefined}
-	message="It disappears from everyone's board. This cannot be undone."
-	confirmLabel={deleting ? 'Deleting' : 'Delete WoD'}
-	cancelLabel="Keep it"
+	message={t.today.remove.message}
+	confirmLabel={deleting ? t.today.remove.deleting : t.today.remove.confirm}
+	cancelLabel={t.today.remove.keep}
 	danger
 	busy={deleting}
 	onconfirm={confirmDelete}

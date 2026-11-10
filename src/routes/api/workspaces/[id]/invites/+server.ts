@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import * as auth from '$lib/server/auth';
+import { dictFor } from '$lib/i18n';
 
 /**
  * GET /api/workspaces/[id]/invites
@@ -8,7 +9,7 @@ import * as auth from '$lib/server/auth';
  */
 export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const { id: workspaceId } = params;
@@ -16,7 +17,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	// Check if user is owner
 	const isOwner = await auth.isWorkspaceOwner(locals.user.id, workspaceId);
 	if (!isOwner) {
-		return json({ error: 'Only workspace owners can view invites' }, { status: 403 });
+		return json({ error: dictFor(locals.locale).api.ownersOnly }, { status: 403 });
 	}
 
 	const invites = await auth.getWorkspaceInvites(workspaceId);
@@ -30,7 +31,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
  */
 export const POST: RequestHandler = async ({ params, locals, request }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const { id: workspaceId } = params;
@@ -38,14 +39,14 @@ export const POST: RequestHandler = async ({ params, locals, request }) => {
 	// Check if user is owner
 	const isOwner = await auth.isWorkspaceOwner(locals.user.id, workspaceId);
 	if (!isOwner) {
-		return json({ error: 'Only workspace owners can create invites' }, { status: 403 });
+		return json({ error: dictFor(locals.locale).api.ownersOnly }, { status: 403 });
 	}
 
 	const body = await request.json();
 	const role = body.role as 'coach' | 'member';
 
 	if (!role || !['coach', 'member'].includes(role)) {
-		return json({ error: 'Invalid role. Must be "coach" or "member"' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).api.invalidRole }, { status: 400 });
 	}
 
 	const invite = await auth.createWorkspaceInvite(workspaceId, locals.user.id, role);

@@ -11,6 +11,7 @@
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import Board from '$lib/components/wod/Board.svelte';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * The tower clock. It owns the whole screen: minutes stacked over seconds as tall as the
@@ -190,41 +191,41 @@
 		const elapsed = formatTimeMs(timerStore.elapsedMs);
 		const total = formatTimeMs(timerStore.totalMs);
 		const rounds = timerStore.completedRounds;
-		const roundWord = rounds === 1 ? 'round' : 'rounds';
+		const words = t.timer.result;
 
 		if (type === 'fortime') {
 			return timerStore.endedEarly
 				? {
 						big: elapsed,
-						label: 'Time',
-						extra: rounds > 0 ? `${rounds} ${roundWord} logged` : `Cap ${total}`
+						label: words.time,
+						extra: rounds > 0 ? words.roundsLogged(rounds) : words.cap(total)
 					}
 				: {
 						big: total,
-						label: 'Time cap',
-						extra: rounds > 0 ? `${rounds} ${roundWord} logged` : 'Capped'
+						label: words.timeCap,
+						extra: rounds > 0 ? words.roundsLogged(rounds) : words.capped
 					};
 		}
 		if (type === 'amrap') {
 			if (rounds > 0)
 				return {
 					big: String(rounds),
-					label: roundWord,
-					extra: timerStore.endedEarly ? `Stopped at ${elapsed}` : `In ${total}`
+					label: words.roundWord(rounds),
+					extra: timerStore.endedEarly ? words.stoppedAtTime(elapsed) : words.inTime(total)
 				};
 			return {
 				big: timerStore.endedEarly ? elapsed : total,
-				label: timerStore.endedEarly ? 'Stopped at' : 'AMRAP done',
+				label: timerStore.endedEarly ? words.stoppedAt : words.amrapDone,
 				extra: strip[1]
 			};
 		}
 		return timerStore.endedEarly
 			? {
 					big: elapsed,
-					label: 'Stopped at',
-					extra: `Round ${timerStore.currentRound} of ${timerStore.totalRounds}`
+					label: words.stoppedAt,
+					extra: words.roundOf(timerStore.currentRound, timerStore.totalRounds)
 				}
-			: { big: total, label: `${timerStore.totalRounds} rounds done`, extra: strip[1] };
+			: { big: total, label: words.roundsDone(timerStore.totalRounds), extra: strip[1] };
 	});
 
 	const dateLabel = $derived(formatShort(context?.date ?? todayIso()));
@@ -237,10 +238,10 @@
 				return;
 			}
 			await navigator.clipboard.writeText(text);
-			toastStore.success('Result copied. Paste it in the group.');
+			toastStore.success(t.timer.result.copied);
 		} catch (error) {
 			if ((error as Error)?.name !== 'AbortError') {
-				toastStore.error('Could not share the result on this device.');
+				toastStore.error(t.timer.result.shareFailed);
 			}
 		}
 	}
@@ -284,7 +285,11 @@
 					<span use:fitText={{ max: 120, min: 40, key: name }}>{name}</span>
 				</h1>
 
-				<div class="result" role="status" aria-label="Result: {result.big} {result.label}">
+				<div
+					class="result"
+					role="status"
+					aria-label={t.timer.result.aria(result.big, result.label)}
+				>
 					<p class="result-big display">
 						<span use:fitText={{ max: 360, min: 96, key: result.big }}>{result.big}</span>
 					</p>
@@ -301,7 +306,7 @@
 						type="button"
 						class="btn btn-pink btn-slab"
 						onclick={share}
-						aria-label="Share result (manda no grupo)"
+						aria-label={t.timer.result.shareAria}
 					>
 						<Icon name="share" size={24} stroke={2.8} />
 						<span lang="pt-BR">Manda no grupo</span>
@@ -309,10 +314,10 @@
 					<div class="grid grid-cols-2 gap-2">
 						<button type="button" class="btn" onclick={() => timerStore.reset()}>
 							<Icon name="rotate" size={18} stroke={2.8} />
-							Go again
+							{t.timer.result.goAgain}
 						</button>
 						<button type="button" class="btn" onclick={leave}>
-							{context?.wodId ? 'Back to WoD' : 'Done'}
+							{context?.wodId ? t.timer.result.backToWod : t.timer.result.done}
 						</button>
 					</div>
 				</div>
@@ -322,7 +327,7 @@
 			{#if phase === 'paused'}<div class="tape hazard" aria-hidden="true"></div>{/if}
 
 			<header class="top">
-				<button type="button" class="icon-btn" onclick={exit} aria-label="Leave the clock">
+				<button type="button" class="icon-btn" onclick={exit} aria-label={t.timer.run.leaveAria}>
 					<Icon name="x" size={24} stroke={2.8} />
 				</button>
 				<div class="min-w-0 flex-1">
@@ -336,7 +341,7 @@
 						class:on={boardPref}
 						onclick={toggleBoard}
 						aria-pressed={boardPref}
-						aria-label="Show the workout next to the clock"
+						aria-label={t.timer.run.boardAria}
 					>
 						<Icon name="board" size={22} stroke={2.4} />
 					</button>
@@ -345,7 +350,7 @@
 					type="button"
 					class="icon-btn max-lg:hidden"
 					onclick={toggleFullscreen}
-					aria-label={isFullscreen ? 'Leave full screen' : 'Full screen'}
+					aria-label={isFullscreen ? t.timer.run.leaveFullscreen : t.timer.run.fullscreen}
 				>
 					<Icon name="expand" size={22} stroke={2.4} />
 				</button>
@@ -354,9 +359,7 @@
 					class="icon-btn"
 					onclick={() => audioService.toggleMute()}
 					aria-pressed={audioService.isMuted}
-					aria-label={audioService.isMuted
-						? 'Sound is off. Turn sound on'
-						: 'Sound is on. Turn sound off'}
+					aria-label={audioService.isMuted ? t.timer.run.soundOff : t.timer.run.soundOn}
 				>
 					<Icon name={audioService.isMuted ? 'volume-off' : 'volume'} size={22} stroke={2.4} />
 				</button>
@@ -366,7 +369,7 @@
 			<div class="status">
 				{#if intervals}
 					<p class="flex items-baseline gap-2.5">
-						<span class="legend opacity-80">Round</span>
+						<span class="legend opacity-80">{t.timer.run.round}</span>
 						<span class="display text-[2.75rem] lg:text-[4rem]">
 							{String(timerStore.currentRound).padStart(2, '0')}<span class="opacity-50"
 								>/{String(timerStore.totalRounds).padStart(2, '0')}</span
@@ -375,14 +378,18 @@
 					</p>
 					{#if type === 'tabata'}
 						<p class="phase-word display" aria-live="assertive">
-							{phase === 'idle' || phase === 'countdown' ? 'Ready' : working ? 'Work' : 'Rest'}
+							{phase === 'idle' || phase === 'countdown'
+								? t.timer.run.ready
+								: working
+									? t.timer.run.work
+									: t.timer.run.rest}
 						</p>
 					{:else if phase === 'paused'}
-						<p class="tag tag-warn">Paused</p>
+						<p class="tag tag-warn">{t.timer.run.paused}</p>
 					{/if}
 				{:else}
 					<div class="flex items-center gap-2.5">
-						<span class="legend opacity-80">Rounds</span>
+						<span class="legend opacity-80">{t.timer.run.rounds}</span>
 						<span class="min-w-[1.2ch] display text-[2.75rem] lg:text-[4rem]" aria-live="polite"
 							>{timerStore.completedRounds}</span
 						>
@@ -392,7 +399,7 @@
 								class="icon-btn"
 								onclick={() => timerStore.decrementRounds()}
 								disabled={timerStore.completedRounds === 0}
-								aria-label="Take one round back"
+								aria-label={t.timer.run.takeBack}
 							>
 								<Icon name="minus" size={20} stroke={3.2} />
 							</button>
@@ -401,7 +408,7 @@
 									type="button"
 									class="icon-btn"
 									onclick={() => timerStore.incrementRounds()}
-									aria-label="Count one round"
+									aria-label={t.timer.run.countRound}
 								>
 									<Icon name="plus" size={20} stroke={3.2} />
 								</button>
@@ -409,9 +416,11 @@
 						{/if}
 					</div>
 					{#if phase === 'paused'}
-						<p class="tag tag-warn">Paused</p>
+						<p class="tag tag-warn">{t.timer.run.paused}</p>
 					{:else}
-						<p class="legend opacity-80">{type === 'fortime' ? strip[1] : `Of ${strip[1]}`}</p>
+						<p class="legend opacity-80">
+							{type === 'fortime' ? strip[1] : t.timer.run.of(strip[1])}
+						</p>
 					{/if}
 				{/if}
 			</div>
@@ -425,7 +434,7 @@
 							class:beat={urgent}
 							class:blink={phase === 'paused'}
 							role="timer"
-							aria-label="{time[0]} minutes {time[1]} seconds"
+							aria-label={t.timer.run.timeAria(time[0], time[1])}
 						>
 							<span>{time[0]}</span><span class="colon" aria-hidden="true">:</span><span
 								>{time[1]}</span
@@ -443,10 +452,10 @@
 
 			{#if !boardVisible && slot && (phase === 'running' || phase === 'paused')}
 				<div class="now">
-					<p class="legend opacity-80">Now</p>
+					<p class="legend opacity-80">{t.timer.run.now}</p>
 					<p class="display-wide text-[2rem] leading-none lg:text-[3rem]">{slot.now}</p>
 					{#if slot.next}
-						<p class="mt-2 truncate legend opacity-80">Next · {slot.next}</p>
+						<p class="mt-2 truncate legend opacity-80">{t.timer.run.next(slot.next)}</p>
 					{/if}
 				</div>
 			{/if}
@@ -476,11 +485,11 @@
 				{#if phase === 'idle'}
 					<button type="button" class="btn btn-pink btn-slab go" onclick={start}>
 						<Icon name="play" solid size={28} />
-						Start
+						{t.timer.run.start}
 					</button>
 				{:else if phase === 'countdown'}
 					<button type="button" class="btn btn-slab" onclick={() => timerStore.reset()}
-						>Cancel</button
+						>{t.timer.run.cancel}</button
 					>
 				{:else if phase === 'running'}
 					<div class="row">
@@ -489,10 +498,10 @@
 								type="button"
 								class="btn btn-pink btn-slab go"
 								onclick={() => timerStore.incrementRounds()}
-								aria-label="Count one round"
+								aria-label={t.timer.run.countRound}
 							>
 								<Icon name="plus" size={28} stroke={3.6} />
-								Round
+								{t.timer.run.roundButton}
 							</button>
 						{:else if type === 'fortime'}
 							<button
@@ -501,7 +510,7 @@
 								onclick={() => timerStore.stop()}
 							>
 								<Icon name="flag" size={26} stroke={2.8} />
-								Finish
+								{t.timer.run.finish}
 							</button>
 						{/if}
 						<button
@@ -510,7 +519,7 @@
 							onclick={() => timerStore.pause()}
 						>
 							<Icon name="pause" solid size={24} />
-							Pause
+							{t.timer.run.pause}
 						</button>
 					</div>
 				{:else if phase === 'paused'}
@@ -520,16 +529,16 @@
 						onclick={() => timerStore.resume()}
 					>
 						<Icon name="play" solid size={28} />
-						Resume
+						{t.timer.run.resume}
 					</button>
 					<div class="row mt-2">
 						<button type="button" class="btn flex-1" onclick={() => timerStore.reset()}>
 							<Icon name="rotate" size={18} stroke={2.8} />
-							Reset
+							{t.timer.run.reset}
 						</button>
 						<button type="button" class="btn flex-1" onclick={() => timerStore.stop()}>
 							<Icon name="flag" size={18} stroke={2.8} />
-							{type === 'fortime' ? 'Finish' : 'End here'}
+							{type === 'fortime' ? t.timer.run.finish : t.timer.run.endHere}
 						</button>
 					</div>
 				{/if}
@@ -543,7 +552,7 @@
 					{#key timerStore.countdownValue}
 						{#if timerStore.countdownValue === 'GO'}
 							<p class="bora sign" lang="pt-BR">Bora!</p>
-							<span class="sr-only">Go</span>
+							<span class="sr-only">{t.timer.run.go}</span>
 						{:else}
 							<p class="count display">{timerStore.countdownValue}</p>
 						{/if}
@@ -556,10 +565,10 @@
 
 <ConfirmDialog
 	bind:open={exitOpen}
-	title="Leave the clock?"
-	message="The clock is paused. If you leave now, this time is lost."
-	confirmLabel="Leave"
-	cancelLabel="Back to the clock"
+	title={t.timer.leave.title}
+	message={t.timer.leave.message}
+	confirmLabel={t.timer.leave.confirm}
+	cancelLabel={t.timer.leave.cancel}
 	danger
 	onconfirm={leave}
 />

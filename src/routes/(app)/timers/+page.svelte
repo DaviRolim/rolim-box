@@ -17,6 +17,7 @@
 	import { clock, formatStrip, sectionTimer, timerChip } from '$lib/wod-format';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Stepper from '$lib/components/ui/Stepper.svelte';
+	import { t } from '$lib/i18n';
 
 	const STANDALONE = 'rolimbox:standalone-timer';
 	const AUTOSTART = 'rolimbox:standalone-autostart';
@@ -95,13 +96,13 @@
 </script>
 
 <svelte:head>
-	<title>Clock - RolimBox</title>
+	<title>{t.common.pageTitle(t.timer.setup.title)}</title>
 </svelte:head>
 
 <div class="page">
 	<header>
-		<p class="legend text-mute">Any format, no WoD needed</p>
-		<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">Clock</h1>
+		<p class="legend text-mute">{t.timer.setup.kicker}</p>
+		<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">{t.timer.setup.title}</h1>
 	</header>
 
 	<div class="cols">
@@ -113,7 +114,7 @@
 			}}
 		>
 			<!-- svelte-ignore a11y_interactive_supports_focus -->
-			<div class="keys" role="radiogroup" aria-label="Format" onkeydown={onKeys}>
+			<div class="keys" role="radiogroup" aria-label={t.timer.setup.format} onkeydown={onKeys}>
 				{#each TIMER_TYPES as option (option)}
 					<button
 						type="button"
@@ -137,7 +138,7 @@
 				{#if type === 'amrap'}
 					<Stepper
 						id="duration"
-						label="Minutes"
+						label={t.timer.setup.minutes}
 						unit="min"
 						min={1}
 						max={60}
@@ -146,17 +147,23 @@
 				{:else if type === 'fortime'}
 					<Stepper
 						id="duration"
-						label="Time cap"
+						label={t.timer.setup.timeCap}
 						unit="min"
 						min={1}
 						max={60}
 						bind:value={minutes.fortime}
 					/>
 				{:else if type === 'emom'}
-					<Stepper id="rounds" label="Rounds" min={1} max={50} bind:value={emom.rounds} />
+					<Stepper
+						id="rounds"
+						label={t.timer.setup.rounds}
+						min={1}
+						max={50}
+						bind:value={emom.rounds}
+					/>
 					<Stepper
 						id="interval"
-						label="Every"
+						label={t.timer.setup.every}
 						unit="s"
 						min={10}
 						max={300}
@@ -164,10 +171,16 @@
 						bind:value={emom.every}
 					/>
 				{:else}
-					<Stepper id="tabata-rounds" label="Rounds" min={1} max={20} bind:value={tabata.rounds} />
+					<Stepper
+						id="tabata-rounds"
+						label={t.timer.setup.rounds}
+						min={1}
+						max={20}
+						bind:value={tabata.rounds}
+					/>
 					<Stepper
 						id="work"
-						label="Work"
+						label={t.timer.setup.work}
 						unit="s"
 						min={5}
 						max={60}
@@ -176,7 +189,7 @@
 					/>
 					<Stepper
 						id="rest"
-						label="Rest"
+						label={t.timer.setup.rest}
 						unit="s"
 						min={5}
 						max={60}
@@ -190,7 +203,7 @@
 				<span class="cell fill">{strip[0]}</span>
 				<span class="cell">{strip[1]}</span>
 				<span class="cell total">
-					<span class="block legend opacity-70">Total</span>
+					<span class="block legend opacity-70">{t.timer.setup.total}</span>
 					{clock(getTotalDuration(config))}
 				</span>
 			</div>
@@ -201,13 +214,13 @@
 				style="min-height: 5.5rem; font-size: 2.25rem"
 			>
 				<Icon name="play" solid size={26} />
-				Start timer
+				{t.timer.setup.start}
 			</button>
 		</form>
 
 		<aside class="min-w-0">
 			<div class="module-head border-t-2 border-ink">
-				<span>From today's WoD</span>
+				<span>{t.timer.setup.fromToday}</span>
 				<span>{todays.length}</span>
 			</div>
 			{#if todays.length > 0}
@@ -231,9 +244,7 @@
 				</ul>
 			{:else}
 				<p class="border-t border-line py-4 text-base leading-snug text-mute">
-					{wodStore.loading
-						? 'Reading the board.'
-						: "Today's WoD has no clocks. Set one up by hand."}
+					{wodStore.loading ? t.timer.setup.reading : t.timer.setup.noClocksToday}
 				</p>
 			{/if}
 		</aside>

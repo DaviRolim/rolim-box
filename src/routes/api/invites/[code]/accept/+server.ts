@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { workspaceMember } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import * as auth from '$lib/server/auth';
+import { dictFor } from '$lib/i18n';
 
 /**
  * POST /api/invites/[code]/accept
@@ -12,23 +13,23 @@ import * as auth from '$lib/server/auth';
  */
 export const POST: RequestHandler = async ({ params, locals, cookies }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const { code } = params;
 
 	if (!code) {
-		return json({ error: 'Invite code is required' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).api.inviteCodeRequired }, { status: 400 });
 	}
 
 	const invite = await auth.getInviteByCode(code);
 
 	if (!invite) {
-		return json({ error: 'Invalid invite code' }, { status: 404 });
+		return json({ error: dictFor(locals.locale).api.inviteInvalid }, { status: 404 });
 	}
 
 	if (new Date() > invite.expiresAt) {
-		return json({ error: 'This invite has expired. Ask for a new one.' }, { status: 410 });
+		return json({ error: dictFor(locals.locale).api.inviteExpired }, { status: 410 });
 	}
 
 	// Check if user is already a member
@@ -45,7 +46,7 @@ export const POST: RequestHandler = async ({ params, locals, cookies }) => {
 	if (existingMembership) {
 		return json(
 			{
-				error: 'You are already a member of this workspace',
+				error: dictFor(locals.locale).api.alreadyMember,
 				workspaceId: invite.workspaceId
 			},
 			{ status: 409 }

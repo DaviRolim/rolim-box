@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Sheet from './Sheet.svelte';
+	import { t } from '$lib/i18n';
 
 	interface Props {
 		open: boolean;
@@ -19,8 +20,8 @@
 		title,
 		message,
 		legend,
-		confirmLabel = 'Confirm',
-		cancelLabel = 'Cancel',
+		confirmLabel,
+		cancelLabel,
 		danger = false,
 		busy = false,
 		onconfirm,
@@ -42,8 +43,10 @@
 			disabled={busy}
 			onclick={onconfirm}
 		>
-			{confirmLabel}
+			{confirmLabel ?? t.common.confirm}
 		</button>
-		<button type="button" class="btn btn-quiet" onclick={cancel}>{cancelLabel}</button>
+		<button type="button" class="btn btn-quiet" onclick={cancel}
+			>{cancelLabel ?? t.common.cancel}</button
+		>
 	{/snippet}
 </Sheet>

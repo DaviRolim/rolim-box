@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { addDays, dayOfMonth, formatLong, formatWeekday, weekDays } from '$lib/date';
 	import Icon from '$lib/components/ui/Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	/** Seven keys, Monday to Sunday. The lit one is the day on the board. */
 	interface Props {
@@ -15,12 +16,12 @@
 	const days = $derived(weekDays(selected));
 </script>
 
-<div class="strip" role="group" aria-label="Pick a day">
+<div class="strip" role="group" aria-label={t.today.week.pickDay}>
 	<button
 		type="button"
 		class="arrow"
 		onclick={() => (selected = addDays(selected, -7))}
-		aria-label="Previous week"
+		aria-label={t.today.week.previousWeek}
 	>
 		<Icon name="chevron-left" size={20} stroke={3} />
 	</button>
@@ -31,9 +32,9 @@
 			class:selected={day === selected}
 			class:today={day === today}
 			aria-pressed={day === selected}
-			aria-label="{formatLong(day)}{day === today ? ', today' : ''}{marked.has(day)
-				? ', has a WoD'
-				: ', nothing programmed'}"
+			aria-label="{formatLong(day)}{day === today ? t.today.week.todaySuffix : ''}{marked.has(day)
+				? t.today.week.hasWod
+				: t.today.week.nothing}"
 			onclick={() => (selected = day)}
 		>
 			<span class="wd legend">{formatWeekday(day, 'short').slice(0, 3)}</span>
@@ -45,7 +46,7 @@
 		type="button"
 		class="arrow"
 		onclick={() => (selected = addDays(selected, 7))}
-		aria-label="Next week"
+		aria-label={t.today.week.nextWeek}
 	>
 		<Icon name="chevron-right" size={20} stroke={3} />
 	</button>

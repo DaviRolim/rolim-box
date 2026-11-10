@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import LangToggle from './LangToggle.svelte';
 
 	/**
 	 * The front door: a painted pink wall with the box's name on it, and the form beside it
@@ -10,14 +11,17 @@
 
 <div class="door">
 	<div class="wall">
-		<svg class="mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-			<path d="M3 19 24 3l21 16v26H3z" fill="#0c0c0d" />
-			<path
-				fill="#ff2e93"
-				fill-rule="evenodd"
-				d="M14.5 40V19h11.2a6.6 6.6 0 0 1 2.6 12.7L33 40h-6.1l-4-7h-2.8v7zm5.6-16.2v4.6h5a2.3 2.3 0 0 0 0-4.6z"
-			/>
-		</svg>
+		<div class="top">
+			<svg class="mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+				<path d="M3 19 24 3l21 16v26H3z" fill="#0c0c0d" />
+				<path
+					fill="#ff2e93"
+					fill-rule="evenodd"
+					d="M14.5 40V19h11.2a6.6 6.6 0 0 1 2.6 12.7L33 40h-6.1l-4-7h-2.8v7zm5.6-16.2v4.6h5a2.3 2.3 0 0 0 0-4.6z"
+				/>
+			</svg>
+			<LangToggle tone="fill" />
+		</div>
 		<div>
 			<p class="name display">Rolim<br />Box</p>
 			<p class="mt-3 legend" lang="pt-BR">CrossFit na casa da vó · João Pessoa, PB</p>
@@ -51,7 +55,13 @@
 		border-bottom: 4px solid #0c0c0d;
 		overflow: hidden;
 	}
+	.top {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+	}
 	.mark {
+		flex: none;
 		width: 3.25rem;
 		height: 3.25rem;
 	}

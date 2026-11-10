@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { forgetDevice } from '$lib/services/session';
 	import Icon from '$lib/components/ui/Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	let { class: className = 'btn btn-quiet' }: { class?: string } = $props();
 </script>
@@ -20,6 +21,6 @@
 >
 	<button type="submit" class={className}>
 		<Icon name="logout" size={20} stroke={2.5} />
-		Log out
+		{t.shell.logOut}
 	</button>
 </form>

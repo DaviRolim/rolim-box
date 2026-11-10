@@ -6,6 +6,7 @@
 	import { clock } from '$lib/wod-format';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Board from './Board.svelte';
+	import { t } from '$lib/i18n';
 	import type { Section } from '$lib/types/wod';
 
 	interface Props {
@@ -51,7 +52,7 @@
 		>
 			<span class="flex items-center gap-2.5">
 				<Icon name="play" solid size={main ? 24 : 18} />
-				Start clock
+				{t.today.section.startClock}
 			</span>
 			<span class="num">{clock(getTotalDuration(timer))}</span>
 		</a>

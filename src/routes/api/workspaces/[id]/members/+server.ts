@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { workspaceMember, user } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { dictFor } from '$lib/i18n';
 
 /**
  * GET /api/workspaces/[id]/members
@@ -10,7 +11,7 @@ import { eq, and } from 'drizzle-orm';
  */
 export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const { id: workspaceId } = params;
@@ -24,7 +25,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		);
 
 	if (!membership) {
-		return json({ error: 'Not a member of this workspace' }, { status: 403 });
+		return json({ error: dictFor(locals.locale).api.notMember }, { status: 403 });
 	}
 
 	// Get all members with user info

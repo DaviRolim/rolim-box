@@ -29,6 +29,7 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DuplicateSheet from '$lib/components/wod/DuplicateSheet.svelte';
 	import type { WoD } from '$lib/types/wod';
+	import { t } from '$lib/i18n';
 
 	let { data } = $props();
 
@@ -114,12 +115,12 @@
 		try {
 			const title = wodTitle(selected);
 			await wodStore.remove(selected.id);
-			toastStore.success(`"${title}" deleted.`);
+			toastStore.success(t.today.remove.deleted(title));
 			deleteOpen = false;
 			selected = null;
 		} catch (error) {
 			console.error('Failed to delete WoD:', error);
-			toastStore.error('Could not delete this WoD.');
+			toastStore.error(t.today.remove.failed);
 		} finally {
 			deleting = false;
 		}
@@ -133,7 +134,7 @@
 </script>
 
 <svelte:head>
-	<title>WoDs - RolimBox</title>
+	<title>{t.common.pageTitle(t.today.list.title)}</title>
 </svelte:head>
 
 <div class="page">
@@ -141,10 +142,10 @@
 		<div class="min-w-0">
 			<p class="legend text-mute">
 				{#if wodStore.loading}
-					Reading the board
+					{t.today.list.readingBoard}
 				{:else}
-					{wodStore.wods.length} on the board{wodStore.stale && !syncStore.isOffline
-						? ' · could not refresh'
+					{t.today.list.onBoard(wodStore.wods.length)}{wodStore.stale && !syncStore.isOffline
+						? t.today.list.couldNotRefresh
 						: ''}
 				{/if}
 			</p>
@@ -153,14 +154,14 @@
 		{#if data.canEdit}
 			<a href={resolve('/workouts/new')} class="btn btn-pink mb-1 flex-none lg:hidden">
 				<Icon name="plus" size={20} stroke={3.4} />
-				New WoD
+				{t.today.list.newWod}
 			</a>
 		{/if}
 	</header>
 
 	<div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
 		<div class="relative lg:w-96">
-			<label for="wod-search" class="sr-only">Search WoDs</label>
+			<label for="wod-search" class="sr-only">{t.today.list.search}</label>
 			<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-mute">
 				<Icon name="search" size={20} stroke={2.6} />
 			</span>
@@ -168,7 +169,7 @@
 				id="wod-search"
 				type="search"
 				class="input pl-11"
-				placeholder="Search: fran, thrusters, emom"
+				placeholder={t.today.list.searchPlaceholder}
 				autocomplete="off"
 				bind:value={query}
 			/>
@@ -176,7 +177,7 @@
 		<div
 			class="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0"
 			role="group"
-			aria-label="Format"
+			aria-label={t.today.list.format}
 		>
 			<button
 				type="button"
@@ -184,7 +185,7 @@
 				aria-pressed={format === null}
 				onclick={() => (format = null)}
 			>
-				All
+				{t.today.list.all}
 			</button>
 			{#each TIMER_TYPES as type (type)}
 				<button
@@ -201,7 +202,7 @@
 
 	<div class="mt-6">
 		{#if wodStore.loading}
-			<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading WoDs">
+			<div class="flex flex-col gap-2" aria-busy="true" aria-label={t.today.list.loadingAria}>
 				{#each [0, 1, 2, 3, 4, 5] as row (row)}
 					<div class="led h-[4.5rem]"></div>
 				{/each}
@@ -209,32 +210,32 @@
 		{:else if wodStore.wods.length === 0}
 			<div class="border-2 border-line-strong gridlines px-5 py-8 lg:p-12">
 				<p class="inline-block -rotate-3 sign text-[3rem] text-pink-ink" lang="pt-BR">Tá vazio.</p>
-				<h2 class="mt-4 display text-[3rem] lg:text-[4rem]">No WoDs yet</h2>
+				<h2 class="mt-4 display text-[3rem] lg:text-[4rem]">{t.today.list.emptyTitle}</h2>
 				<p class="mt-3 max-w-md text-lg leading-snug text-dim">
 					{#if wodStore.stale}
-						The server cannot be reached and nothing is saved on this phone yet.
+						{t.today.list.emptyStale}
 					{:else if data.canEdit}
-						This box has an empty board. Program the first one and it shows up on everyone's phone.
+						{t.today.list.emptyCoach}
 					{:else}
-						The coaches have not programmed anything in this box yet.
+						{t.today.list.emptyAthlete}
 					{/if}
 				</p>
 				{#if wodStore.stale}
 					<button type="button" class="btn btn-ink mt-6" onclick={() => wodStore.refresh()}>
 						<Icon name="refresh" size={18} stroke={2.6} />
-						Try again
+						{t.today.list.tryAgain}
 					</button>
 				{:else if data.canEdit}
 					<a href={resolve('/workouts/new')} class="btn btn-pink mt-6">
 						<Icon name="plus" size={20} stroke={3.4} />
-						Program the first WoD
+						{t.today.list.programFirst}
 					</a>
 				{/if}
 			</div>
 		{:else if matches.length === 0}
 			<div class="border-2 border-line-strong px-5 py-8">
-				<h2 class="display text-[2.5rem]">No match</h2>
-				<p class="mt-2 text-lg text-dim">Nothing on the board matches that search.</p>
+				<h2 class="display text-[2.5rem]">{t.today.list.noMatchTitle}</h2>
+				<p class="mt-2 text-lg text-dim">{t.today.list.noMatch}</p>
 				<button
 					type="button"
 					class="btn btn-quiet mt-5"
@@ -243,7 +244,7 @@
 						format = null;
 					}}
 				>
-					Clear search
+					{t.today.list.clearSearch}
 				</button>
 			</div>
 		{:else}
@@ -291,16 +292,16 @@
 												type="button"
 												class="icon-btn"
 												onclick={() => askDuplicate(wod)}
-												aria-label="Duplicate {wodTitle(wod)}, {formatLong(wod.date)}"
-												title="Duplicate"
+												aria-label={t.today.list.duplicateAria(wodTitle(wod), formatLong(wod.date))}
+												title={t.today.list.duplicate}
 											>
 												<Icon name="copy" size={20} stroke={2.4} />
 											</button>
 											<a
 												href={resolve('/(app)/workouts/[id]/edit', { id: wod.id })}
 												class="icon-btn"
-												aria-label="Edit {wodTitle(wod)}, {formatLong(wod.date)}"
-												title="Edit"
+												aria-label={t.today.list.editAria(wodTitle(wod), formatLong(wod.date))}
+												title={t.today.list.edit}
 											>
 												<Icon name="edit" size={20} stroke={2.4} />
 											</a>
@@ -308,8 +309,8 @@
 												type="button"
 												class="icon-btn"
 												onclick={() => askDelete(wod)}
-												aria-label="Delete {wodTitle(wod)}, {formatLong(wod.date)}"
-												title="Delete"
+												aria-label={t.today.list.deleteAria(wodTitle(wod), formatLong(wod.date))}
+												title={t.today.list.delete}
 											>
 												<Icon name="trash" size={20} stroke={2.4} />
 											</button>
@@ -318,7 +319,7 @@
 											type="button"
 											class="more"
 											onclick={() => openActions(wod)}
-											aria-label="Actions for {wodTitle(wod)}, {formatLong(wod.date)}"
+											aria-label={t.today.list.actionsAria(wodTitle(wod), formatLong(wod.date))}
 										>
 											<Icon name="more" size={24} stroke={3} />
 										</button>
@@ -328,11 +329,11 @@
 										<span class="flex items-center gap-2 legend text-dim">
 											<Icon name="plus" size={14} stroke={3.4} />
 											<span class="text-ink"
-												>Program {row.date === today
-													? 'today'
-													: formatWeekday(row.date, 'long')}</span
+												>{row.date === today
+													? t.today.list.programToday
+													: t.today.list.programDay(formatWeekday(row.date, 'long'))}</span
 											>
-											<span class="text-mute max-sm:hidden">· nothing on the board yet</span>
+											<span class="text-mute max-sm:hidden">{t.today.list.nothingYet}</span>
 										</span>
 									</a>
 								{/if}
@@ -344,7 +345,7 @@
 
 			{#if matches.length > limit}
 				<button type="button" class="btn btn-quiet mt-6 w-full" onclick={() => (limit += PAGE)}>
-					Show older WoDs ({matches.length - limit} more)
+					{t.today.list.showOlder(matches.length - limit)}
 				</button>
 			{/if}
 		{/if}
@@ -361,7 +362,7 @@
 		<div class="flex flex-col gap-2">
 			<button type="button" class="btn justify-start" onclick={() => askDuplicate(wod)}>
 				<Icon name="copy" size={20} stroke={2.6} />
-				Duplicate
+				{t.today.list.duplicate}
 			</button>
 			<button
 				type="button"
@@ -372,11 +373,11 @@
 				}}
 			>
 				<Icon name="edit" size={20} stroke={2.6} />
-				Edit
+				{t.today.list.edit}
 			</button>
 			<button type="button" class="btn btn-danger justify-start" onclick={() => askDelete(wod)}>
 				<Icon name="trash" size={20} stroke={2.6} />
-				Delete
+				{t.today.list.delete}
 			</button>
 		</div>
 	{/if}
@@ -386,11 +387,11 @@
 
 <ConfirmDialog
 	bind:open={deleteOpen}
-	title="Delete this WoD?"
+	title={t.today.remove.title}
 	legend={selected ? `${wodTitle(selected)} · ${formatLong(selected.date)}` : undefined}
-	message="It disappears from everyone's board. This cannot be undone."
-	confirmLabel={deleting ? 'Deleting' : 'Delete WoD'}
-	cancelLabel="Keep it"
+	message={t.today.remove.message}
+	confirmLabel={deleting ? t.today.remove.deleting : t.today.remove.confirm}
+	cancelLabel={t.today.remove.keep}
 	danger
 	busy={deleting}
 	onconfirm={confirmDelete}

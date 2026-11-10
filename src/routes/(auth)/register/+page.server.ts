@@ -15,16 +15,16 @@ export const actions: Actions = {
 		const password = formData.get('password');
 
 		if (typeof email !== 'string' || !email.includes('@')) {
-			return fail(400, { error: 'Invalid email address' });
+			return fail(400, { error: 'invalid_email' });
 		}
 
 		if (typeof password !== 'string' || password.length < 8) {
-			return fail(400, { error: 'Password must be at least 8 characters' });
+			return fail(400, { error: 'password_short' });
 		}
 
 		const existingUser = await auth.findUserByEmail(email);
 		if (existingUser) {
-			return fail(400, { error: 'Email already registered' });
+			return fail(400, { error: 'email_taken' });
 		}
 
 		const user = await auth.createUser(email, password);

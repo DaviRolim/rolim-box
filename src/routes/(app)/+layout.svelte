@@ -12,19 +12,21 @@
 	import SyncChip from '$lib/components/shell/SyncChip.svelte';
 	import WorkspaceSwitcher from '$lib/components/shell/WorkspaceSwitcher.svelte';
 	import LogoutButton from '$lib/components/shell/LogoutButton.svelte';
+	import LangToggle from '$lib/components/shell/LangToggle.svelte';
+	import { t } from '$lib/i18n';
 	import type { IconName } from '$lib/components/ui/icons';
 
 	let { data, children } = $props();
 
 	const NAV: {
 		href: '/dashboard' | '/workouts' | '/timers' | '/prs';
-		label: string;
+		key: keyof typeof t.shell.nav;
 		icon: IconName;
 	}[] = [
-		{ href: '/dashboard', label: 'Today', icon: 'today' },
-		{ href: '/workouts', label: 'WoDs', icon: 'list' },
-		{ href: '/timers', label: 'Clock', icon: 'timer' },
-		{ href: '/prs', label: 'PRs', icon: 'trophy' }
+		{ href: '/dashboard', key: 'today', icon: 'today' },
+		{ href: '/workouts', key: 'wods', icon: 'list' },
+		{ href: '/timers', key: 'clock', icon: 'timer' },
+		{ href: '/prs', key: 'prs', icon: 'trophy' }
 	];
 
 	const path = $derived(page.url.pathname);
@@ -80,13 +82,12 @@
 	<div class="shell">
 		<!-- Desktop: the rail -->
 		<aside class="rail" aria-label="RolimBox">
-			<a
-				href={resolve('/dashboard')}
-				class="block px-4 pt-5 pb-4 no-underline"
-				aria-label="RolimBox, today"
-			>
-				<Logo size={34} />
-			</a>
+			<div class="flex items-center justify-between gap-2 pt-4 pr-3 pb-3 pl-4">
+				<a href={resolve('/dashboard')} class="block no-underline" aria-label={t.shell.homeLink}>
+					<Logo size={28} />
+				</a>
+				<LangToggle />
+			</div>
 
 			{#if data.workspaces.length > 0}
 				<WorkspaceSwitcher
@@ -97,7 +98,7 @@
 			{/if}
 
 			{#if !data.hasNoWorkspace}
-				<nav class="mt-2 flex flex-col" aria-label="Main">
+				<nav class="mt-2 flex flex-col" aria-label={t.shell.mainNav}>
 					{#each NAV as item, index (item.href)}
 						<a
 							href={resolve(item.href)}
@@ -106,7 +107,7 @@
 							aria-current={isActive(item.href) ? 'page' : undefined}
 						>
 							<span class="w-6 legend opacity-70">0{index + 1}</span>
-							<span class="display text-[1.75rem]">{item.label}</span>
+							<span class="display text-[1.75rem]">{t.shell.nav[item.key]}</span>
 						</a>
 					{/each}
 				</nav>
@@ -116,7 +117,7 @@
 						<a href={resolve('/workouts/new')} class="btn btn-pink w-full justify-between">
 							<span class="flex items-center gap-2">
 								<Icon name="plus" size={20} stroke={3.5} />
-								New WoD
+								{t.shell.newWod}
 							</span>
 							<kbd class="border border-current px-1.5 py-0.5 legend">N</kbd>
 						</a>
@@ -133,7 +134,7 @@
 						: 'text-dim'}"
 				>
 					<Icon name="settings" size={16} stroke={2.5} />
-					Settings
+					{t.shell.settings}
 				</a>
 				<p class="truncate px-1 pb-2 text-sm text-mute" title={data.user.email}>
 					{data.user.email}
@@ -145,7 +146,11 @@
 		<!-- Phone: the top bar -->
 		<header class="topbar">
 			<div class="flex min-w-0 items-center gap-2">
-				<a href={resolve('/dashboard')} class="flex-none no-underline" aria-label="RolimBox, today">
+				<a
+					href={resolve('/dashboard')}
+					class="flex-none no-underline"
+					aria-label={t.shell.homeLink}
+				>
 					<Logo size={28} wordmark={data.workspaces.length <= 1} />
 				</a>
 				{#if data.workspaces.length > 1}
@@ -157,13 +162,14 @@
 				{/if}
 			</div>
 			<div class="flex flex-none items-center gap-1">
-				<SyncChip />
+				<SyncChip compact />
+				<LangToggle />
 				<a
 					href={resolve('/settings')}
 					class="-mr-2 flex h-12 w-11 flex-none items-center justify-center {isActive('/settings')
 						? 'text-pink-ink'
 						: 'text-ink'}"
-					aria-label="Settings"
+					aria-label={t.shell.settings}
 				>
 					<Icon name="settings" size={22} stroke={2.2} />
 				</a>
@@ -174,16 +180,15 @@
 			{#if syncStore.isOffline}
 				<div class="status-strip bg-warn text-on-fill" role="status">
 					<Icon name="wifi-off" size={16} stroke={2.8} />
-					<span>Offline. Showing what is saved on this phone.</span>
+					<span>{t.shell.offlineStrip}</span>
 				</div>
 			{:else if syncStore.failed.length > 0}
 				<div role="status">
 					<a href={resolve('/settings')} class="status-strip bg-danger text-on-fill no-underline">
 						<Icon name="alert" size={16} stroke={2.8} />
 						<span>
-							{syncStore.failed.length === 1
-								? '1 change was refused by the server.'
-								: `${syncStore.failed.length} changes were refused by the server.`} Review
+							{t.shell.refused(syncStore.failed.length)}
+							{t.shell.review}
 						</span>
 					</a>
 				</div>
@@ -196,7 +201,7 @@
 
 		<!-- Phone: the bottom navigation -->
 		{#if !data.hasNoWorkspace}
-			<nav class="tabs" aria-label="Main">
+			<nav class="tabs" aria-label={t.shell.mainNav}>
 				{#each NAV as item (item.href)}
 					<a
 						href={resolve(item.href)}
@@ -205,7 +210,7 @@
 						aria-current={isActive(item.href) ? 'page' : undefined}
 					>
 						<Icon name={item.icon} size={24} stroke={isActive(item.href) ? 2.6 : 2} />
-						<span class="legend">{item.label}</span>
+						<span class="legend">{t.shell.nav[item.key]}</span>
 					</a>
 				{/each}
 			</nav>

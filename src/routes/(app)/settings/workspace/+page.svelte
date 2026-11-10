@@ -4,10 +4,10 @@
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import { intlLocale, t } from '$lib/i18n';
 
 	let { data } = $props();
 
-	const ROLE: Record<string, string> = { owner: 'Owner', coach: 'Coach', member: 'Athlete' };
 	const RANK: Record<string, number> = { owner: 0, coach: 1, member: 2 };
 
 	let inviteRole = $state<'coach' | 'member'>('member');
@@ -28,8 +28,12 @@
 		)
 	);
 
-	const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-	const formatDate = (value: Date | string) => day.format(new Date(value));
+	const day = $derived(
+		new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
+	);
+	// "10 nov 2026" in Portuguese too: no abbreviation dots, no "de".
+	const formatDate = (value: Date | string) =>
+		day.format(new Date(value)).replace(/\./g, '').replace(/ de /g, ' ');
 	const linkFor = (code: string) => `${window.location.origin}/join/${code}`;
 
 	async function createInvite() {
@@ -41,11 +45,13 @@
 				body: JSON.stringify({ role: inviteRole })
 			});
 			const result = await response.json().catch(() => ({}));
-			if (!response.ok) throw new Error(result.error ?? 'Could not create the invite.');
+			if (!response.ok) throw new Error(result.error ?? t.settings.members.invite.createFailed);
 			fresh = result.code;
 			await invalidateAll();
 		} catch (error) {
-			toastStore.error(error instanceof Error ? error.message : 'Could not create the invite.');
+			toastStore.error(
+				error instanceof Error ? error.message : t.settings.members.invite.createFailed
+			);
 		} finally {
 			creating = false;
 		}
@@ -59,7 +65,7 @@
 				if (copied === code) copied = null;
 			}, 2000);
 		} catch {
-			toastStore.error('Could not copy. Select the link and copy it by hand.');
+			toastStore.error(t.settings.members.invite.copyFailed);
 		}
 	}
 
@@ -67,7 +73,10 @@
 		const url = linkFor(code);
 		if (navigator.share) {
 			try {
-				await navigator.share({ title: `Join ${data.workspace.name} on RolimBox`, url });
+				await navigator.share({
+					title: t.settings.members.invite.shareTitle(data.workspace.name),
+					url
+				});
 			} catch {
 				// closed the share sheet
 			}
@@ -86,9 +95,9 @@
 			if (!response.ok) throw new Error();
 			if (fresh === revoking) fresh = null;
 			await invalidateAll();
-			toastStore.success('Invite cancelled.');
+			toastStore.success(t.settings.members.revoke.done);
 		} catch {
-			toastStore.error('Could not cancel the invite.');
+			toastStore.error(t.settings.members.revoke.failed);
 		} finally {
 			busy = false;
 			revokeOpen = false;
@@ -106,9 +115,9 @@
 			);
 			if (!response.ok) throw new Error();
 			await invalidateAll();
-			toastStore.success(`${removing.email} removed from the box.`);
+			toastStore.success(t.settings.members.removal.done(removing.email));
 		} catch {
-			toastStore.error('Could not remove this member.');
+			toastStore.error(t.settings.members.removal.failed);
 		} finally {
 			busy = false;
 			removeOpen = false;
@@ -118,7 +127,7 @@
 </script>
 
 <svelte:head>
-	<title>{data.workspace.name} · Members - RolimBox</title>
+	<title>{t.common.pageTitle(t.settings.members.pageTitle(data.workspace.name))}</title>
 </svelte:head>
 
 <div class="page">
@@ -127,11 +136,11 @@
 		class="inline-flex min-h-11 items-center gap-2 legend text-dim no-underline"
 	>
 		<Icon name="arrow-left" size={16} stroke={3} />
-		Settings
+		{t.settings.title}
 	</a>
 
 	<header class="mt-1">
-		<p class="legend text-mute">{data.members.length} on the board</p>
+		<p class="legend text-mute">{t.settings.members.onTheBoard(data.members.length)}</p>
 		<h1 class="mt-2 display text-[3.5rem] break-words lg:text-[5rem]">{data.workspace.name}</h1>
 	</header>
 
@@ -140,10 +149,10 @@
 			<div>
 				<section class="module pb-6">
 					<div class="module-head">
-						<h2>Invite someone</h2>
-						<span>Link lasts 7 days</span>
+						<h2>{t.settings.members.invite.heading}</h2>
+						<span>{t.settings.members.invite.lasts}</span>
 					</div>
-					<div class="choices" role="radiogroup" aria-label="Invite as">
+					<div class="choices" role="radiogroup" aria-label={t.settings.members.invite.inviteAs}>
 						<button
 							type="button"
 							role="radio"
@@ -152,9 +161,9 @@
 							class:on={inviteRole === 'member'}
 							onclick={() => (inviteRole = 'member')}
 						>
-							<span class="display text-[1.75rem]">Athlete</span>
+							<span class="display text-[1.75rem]">{t.common.roles.member}</span>
 							<span class="mt-1 block text-sm leading-tight opacity-80"
-								>Reads WoDs, runs timers, logs PRs</span
+								>{t.settings.members.invite.athleteHint}</span
 							>
 						</button>
 						<button
@@ -165,9 +174,9 @@
 							class:on={inviteRole === 'coach'}
 							onclick={() => (inviteRole = 'coach')}
 						>
-							<span class="display text-[1.75rem]">Coach</span>
+							<span class="display text-[1.75rem]">{t.common.roles.coach}</span>
 							<span class="mt-1 block text-sm leading-tight opacity-80"
-								>Also programs and edits WoDs</span
+								>{t.settings.members.invite.coachHint}</span
 							>
 						</button>
 					</div>
@@ -178,22 +187,24 @@
 						onclick={createInvite}
 					>
 						<Icon name="link" size={20} stroke={2.6} />
-						{creating ? 'Creating' : 'Create invite link'}
+						{creating ? t.settings.members.invite.creating : t.settings.members.invite.create}
 					</button>
 
 					{#if fresh}
 						<div class="fresh mt-4" role="status">
-							<p class="legend">New invite · send it to them</p>
+							<p class="legend">{t.settings.members.invite.fresh}</p>
 							<p class="mt-2 display text-[3rem]">{fresh}</p>
 							<p class="mt-2 text-sm leading-snug break-all">{linkFor(fresh)}</p>
 							<div class="mt-3 grid grid-cols-2 gap-2">
 								<button type="button" class="btn btn-sm" onclick={() => shareLink(fresh!)}>
 									<Icon name="share" size={16} stroke={2.8} />
-									Share
+									{t.settings.members.invite.share}
 								</button>
 								<button type="button" class="btn btn-sm" onclick={() => copyLink(fresh!)}>
 									<Icon name={copied === fresh ? 'check' : 'copy'} size={16} stroke={2.8} />
-									{copied === fresh ? 'Copied' : 'Copy link'}
+									{copied === fresh
+										? t.settings.members.invite.copied
+										: t.settings.members.invite.copyLink}
 								</button>
 							</div>
 						</div>
@@ -202,11 +213,11 @@
 
 				<section class="module pb-6">
 					<div class="module-head">
-						<h2>Open invites</h2>
+						<h2>{t.settings.members.open.heading}</h2>
 						<span>{data.invites.length}</span>
 					</div>
 					{#if data.invites.length === 0}
-						<p class="text-base text-mute">No invites waiting.</p>
+						<p class="text-base text-mute">{t.settings.members.open.none}</p>
 					{:else}
 						<ul>
 							{#each data.invites as invite (invite.code)}
@@ -214,15 +225,18 @@
 									<div class="min-w-0 flex-1">
 										<p class="display text-[1.5rem]">{invite.code}</p>
 										<p class="mt-1 legend text-dim">
-											{ROLE[invite.role] ?? invite.role} · until {formatDate(invite.expiresAt)}
+											{t.settings.members.open.until(
+												t.common.roles[invite.role] ?? invite.role,
+												formatDate(invite.expiresAt)
+											)}
 										</p>
 									</div>
 									<button
 										type="button"
 										class="icon-btn"
 										onclick={() => copyLink(invite.code)}
-										aria-label="Copy the link for invite {invite.code}"
-										title="Copy link"
+										aria-label={t.settings.members.open.copyAria(invite.code)}
+										title={t.settings.members.invite.copyLink}
 									>
 										<Icon name={copied === invite.code ? 'check' : 'copy'} size={20} stroke={2.4} />
 									</button>
@@ -233,8 +247,8 @@
 											revoking = invite.code;
 											revokeOpen = true;
 										}}
-										aria-label="Cancel invite {invite.code}"
-										title="Cancel invite"
+										aria-label={t.settings.members.open.cancelAria(invite.code)}
+										title={t.settings.members.open.cancel}
 									>
 										<Icon name="x" size={20} stroke={2.6} />
 									</button>
@@ -248,7 +262,7 @@
 
 		<section class="module pb-6 {data.isOwner ? '' : 'lg:col-span-2 lg:max-w-3xl'}">
 			<div class="module-head">
-				<h2>Members</h2>
+				<h2>{t.settings.members.list.heading}</h2>
 				<span>{data.members.length}</span>
 			</div>
 			<ul>
@@ -260,8 +274,9 @@
 								{member.email}
 							</p>
 							<p class="mt-1 legend text-dim">
-								Since {formatDate(member.joinedAt)}{member.userId === data.currentUserId
-									? ' · you'
+								{t.settings.members.list.since(formatDate(member.joinedAt))}{member.userId ===
+								data.currentUserId
+									? t.settings.members.list.you
 									: ''}
 							</p>
 						</div>
@@ -272,7 +287,7 @@
 									? 'tag-ink'
 									: ''}"
 						>
-							{ROLE[member.role] ?? member.role}
+							{t.common.roles[member.role] ?? member.role}
 						</span>
 						{#if data.isOwner && member.userId !== data.currentUserId}
 							<button
@@ -282,8 +297,8 @@
 									removing = { userId: member.userId, email: member.email };
 									removeOpen = true;
 								}}
-								aria-label="Remove {member.email} from the box"
-								title="Remove"
+								aria-label={t.settings.members.list.removeAria(member.email)}
+								title={t.settings.members.list.remove}
 							>
 								<Icon name="trash" size={20} stroke={2.4} />
 							</button>
@@ -297,11 +312,11 @@
 
 <ConfirmDialog
 	bind:open={removeOpen}
-	title="Remove from the box?"
+	title={t.settings.members.removal.title}
 	legend={removing?.email}
-	message="They lose access to this box's WoDs and leaderboard. Their own PRs are kept on their account."
-	confirmLabel={busy ? 'Removing' : 'Remove'}
-	cancelLabel="Keep them"
+	message={t.settings.members.removal.message}
+	confirmLabel={busy ? t.settings.members.removal.removing : t.settings.members.list.remove}
+	cancelLabel={t.settings.members.removal.keepThem}
 	danger
 	{busy}
 	onconfirm={confirmRemove}
@@ -309,11 +324,11 @@
 
 <ConfirmDialog
 	bind:open={revokeOpen}
-	title="Cancel this invite?"
+	title={t.settings.members.revoke.title}
 	legend={revoking ?? undefined}
-	message="The link stops working straight away. People who already joined with it stay in the box."
-	confirmLabel={busy ? 'Cancelling' : 'Cancel invite'}
-	cancelLabel="Keep it"
+	message={t.settings.members.revoke.message}
+	confirmLabel={busy ? t.settings.members.revoke.cancelling : t.settings.members.open.cancel}
+	cancelLabel={t.settings.members.revoke.keepIt}
 	danger
 	{busy}
 	onconfirm={confirmRevoke}

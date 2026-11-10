@@ -16,7 +16,8 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import RankRow from './RankRow.svelte';
-	import { CATEGORY_LABELS, MEASUREMENT_LABELS, athleteName, prParts } from './pr-format';
+	import { athleteName, categoryLabel, measurementLabel, prParts } from './pr-format';
+	import { t } from '$lib/i18n';
 
 	/** One exercise: log a new mark, see your history, see where you stand in the box. */
 	interface Props {
@@ -137,9 +138,7 @@
 
 		if (!Number.isFinite(storageValue) || storageValue <= 0) {
 			saveError =
-				exercise.measurementType === 'time'
-					? 'Write the time as minutes:seconds, for example 5:30.'
-					: 'Enter a number above zero.';
+				exercise.measurementType === 'time' ? t.prs.modal.timeFormatError : t.prs.modal.numberError;
 			return;
 		}
 
@@ -159,11 +158,11 @@
 				await loadRankings();
 				onSaved();
 			} else {
-				saveError = 'This PR could not be saved. Try again.';
+				saveError = t.prs.modal.saveFailed;
 			}
 		} catch (error) {
 			console.error('Failed to save PR:', error);
-			saveError = 'This PR could not be saved. Try again.';
+			saveError = t.prs.modal.saveFailed;
 		}
 		isSaving = false;
 	}
@@ -207,13 +206,13 @@
 	const inputLabel = $derived.by(() => {
 		switch (exercise.measurementType) {
 			case 'weight':
-				return `Weight (${getWeightUnit(unitPreference)})`;
+				return t.prs.modal.weightLabel(getWeightUnit(unitPreference));
 			case 'time':
-				return 'Time (mm:ss)';
+				return t.prs.modal.timeLabel;
 			case 'reps':
-				return 'Reps';
+				return t.prs.modal.repsLabel;
 			case 'distance':
-				return `Distance (${getDistanceUnit(unitPreference)})`;
+				return t.prs.modal.distanceLabel(getDistanceUnit(unitPreference));
 		}
 	});
 
@@ -236,16 +235,16 @@
 <Sheet
 	bind:open
 	title={exercise.name}
-	legend="{CATEGORY_LABELS[exercise.category]} · {MEASUREMENT_LABELS[exercise.measurementType]}"
+	legend="{categoryLabel(exercise.category)} · {measurementLabel(exercise.measurementType)}"
 	onclose={onClose}
 >
 	<!-- Log a new mark -->
 	<form onsubmit={handleSubmit} novalidate>
 		<div class="module-head border-t-2 border-ink">
-			<span>Log a new PR</span>
+			<span>{t.prs.modal.logNew}</span>
 			{#if bestPR}
 				{@const best = prParts(bestPR.value, exercise.measurementType, unitPreference)}
-				<span>Best {best.figure}{best.unit ? ` ${best.unit}` : ''}</span>
+				<span>{t.prs.modal.best(`${best.figure}${best.unit ? ` ${best.unit}` : ''}`)}</span>
 			{/if}
 		</div>
 
@@ -274,18 +273,18 @@
 				/>
 			</div>
 			<div>
-				<label for="pr-date" class="field-label">Date</label>
+				<label for="pr-date" class="field-label">{t.prs.modal.date}</label>
 				<input id="pr-date" type="date" bind:value={inputDate} required class="input" />
 			</div>
 		</div>
 
 		{#if showNoteField}
 			<div class="mt-3">
-				<label for="pr-note" class="field-label">Note</label>
+				<label for="pr-note" class="field-label">{t.prs.modal.note}</label>
 				<input
 					id="pr-note"
 					type="text"
-					placeholder="Felt strong, belt on, competition day"
+					placeholder={t.prs.modal.notePlaceholder}
 					bind:value={inputNote}
 					maxlength="500"
 					autocomplete="off"
@@ -299,7 +298,7 @@
 				onclick={() => (showNoteField = true)}
 			>
 				<Icon name="plus" size={14} stroke={3.4} />
-				Add a note
+				{t.prs.modal.addNote}
 			</button>
 		{/if}
 
@@ -312,26 +311,26 @@
 			class="btn btn-pink btn-slab mt-3"
 			disabled={isSaving || !String(inputValue).trim()}
 		>
-			{isSaving ? 'Saving' : 'Save PR'}
+			{isSaving ? t.common.saving : t.prs.modal.savePr}
 		</button>
 	</form>
 
 	<!-- History -->
 	<section class="mt-7">
 		<div class="module-head border-t-2 border-ink">
-			<h3>History</h3>
+			<h3>{t.prs.modal.history}</h3>
 			<span>{isLoading ? '' : history.length}</span>
 		</div>
 
 		{#if isLoading}
-			<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading history">
+			<div class="flex flex-col gap-2" aria-busy="true" aria-label={t.prs.modal.loadingHistory}>
 				{#each [0, 1, 2] as row (row)}
 					<div class="led h-14"></div>
 				{/each}
 			</div>
 		{:else if history.length === 0}
 			<p class="border-t border-line py-4 text-lg text-dim">
-				Nothing logged yet. The first one is always a PR.
+				{t.prs.modal.emptyHistory}
 			</p>
 		{:else}
 			<ul>
@@ -344,7 +343,7 @@
 							<span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
 								<span class="display text-[2rem] leading-[0.9]">{parts.figure}</span>
 								{#if parts.unit}<span class="legend text-dim">{parts.unit}</span>{/if}
-								{#if isBest}<span class="tag tag-pink">Best</span>{/if}
+								{#if isBest}<span class="tag tag-pink">{t.prs.modal.bestTag}</span>{/if}
 							</span>
 							<span class="mt-1.5 block legend text-mute">{formatDayMonth(pr.date)}</span>
 							{#if pr.note}
@@ -355,8 +354,8 @@
 							type="button"
 							class="icon-btn"
 							onclick={() => handleDeleteClick(pr.id)}
-							aria-label="Delete the PR of {formatDayMonth(pr.date)}"
-							title="Delete"
+							aria-label={t.prs.modal.deleteAria(formatDayMonth(pr.date))}
+							title={t.common.delete}
 						>
 							<Icon name="trash" size={20} stroke={2.4} />
 						</button>
@@ -370,25 +369,28 @@
 	{#if workspaceId}
 		<section class="mt-7">
 			<div class="module-head border-t-2 border-ink">
-				<h3>In the box</h3>
+				<h3>{t.prs.modal.inTheBox}</h3>
 				{#if rankings && rankings.rankings.length > 0}
-					<span>{rankings.membersWithPR} of {rankings.totalMembers} logged</span>
+					<span>{t.prs.ranking.logged(rankings.membersWithPR, rankings.totalMembers)}</span>
 				{/if}
 			</div>
 
 			{#if rankingsLoading && !rankings}
-				<div class="led h-24" aria-busy="true" aria-label="Loading the ranking"></div>
+				<div class="led h-24" aria-busy="true" aria-label={t.prs.modal.loadingRanking}></div>
 			{:else if rankings && rankings.rankings.length > 0}
 				{@const box = rankings}
 				<p class="border-t border-line py-3 text-lg leading-snug text-dim">
 					{#if currentUserRanking}
-						You are
+						{t.prs.modal.youAre}
 						<strong class="text-ink">
-							{String(currentUserRanking.rank).padStart(2, '0')} of {box.totalMembers}
+							{t.prs.modal.placeOf(
+								String(currentUserRanking.rank).padStart(2, '0'),
+								box.totalMembers
+							)}
 						</strong>
-						on this one.
+						{t.prs.modal.onThisOne}
 					{:else}
-						Log a PR to get on this board.
+						{t.prs.modal.logToRank}
 					{/if}
 				</p>
 				<ol>
@@ -427,16 +429,16 @@
 				</ol>
 				{#if box.rankings.length > 3}
 					<p class="mt-3 legend text-mute">
-						{box.rankings.length} ranked · the full list is on the leaderboard
+						{t.prs.modal.rankedMore(box.rankings.length)}
 					</p>
 				{/if}
 			{:else if rankings}
 				<p class="border-t border-line py-4 text-lg text-dim">
-					Nobody in the box has logged this one yet. Be the first.
+					{t.prs.modal.nobodyYet}
 				</p>
 			{:else if rankingsFailed}
 				<p class="notice notice-warn" role="status">
-					The box ranking needs a connection and could not be loaded.
+					{t.prs.modal.rankingOffline}
 				</p>
 			{/if}
 		</section>
@@ -445,11 +447,11 @@
 
 <ConfirmDialog
 	bind:open={deleteModalOpen}
-	title="Delete this PR?"
+	title={t.prs.modal.deleteTitle}
 	legend={deleteTarget ? `${exercise.name} · ${formatDayMonth(deleteTarget.date)}` : exercise.name}
-	message="This entry is removed from your history and from the box ranking. This cannot be undone."
-	confirmLabel={deleting ? 'Deleting' : 'Delete PR'}
-	cancelLabel="Keep it"
+	message={t.prs.modal.deleteMessage}
+	confirmLabel={deleting ? t.prs.modal.deleting : t.prs.modal.deletePr}
+	cancelLabel={t.prs.modal.keepIt}
 	danger
 	busy={deleting}
 	onconfirm={confirmDelete}

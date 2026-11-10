@@ -10,6 +10,8 @@
 - **Integrated Timer**: Built-in timers to run workouts directly within the app.
 - **Built for the box**: readable from two metres, big touch targets, light and dark grounds, and a full-screen placar mode.
 - **Installable PWA**: opens and runs the timers with no signal.
+- **English or Portuguese**: an EN | PT switch at the top of every screen. English is the default;
+  the choice is kept in a cookie so pages render in the right language, online or off.
 
 ## 🛠️ Technology Stack
 
@@ -84,6 +86,9 @@ bun run test         # unit + e2e
 The e2e suite builds the app, seeds `e2e.db` and covers login, today's WoD, placar mode, WoD
 create / edit / duplicate / delete, the Magic Wand without a key, the timers, PRs, and working
 offline (including a WoD written offline and synced later).
+
+Language screenshots (login, Today, editor, timer in EN and PT) are in `screenshots/i18n`; retake
+them with `node scripts/screenshots-i18n.mjs --base http://localhost:4173`.
 
 To retake the screenshots: `bun --bun run build && bun run preview`, then `bun run screenshots`
 with `--base http://localhost:4173`.

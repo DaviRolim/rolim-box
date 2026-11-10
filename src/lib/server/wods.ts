@@ -3,6 +3,7 @@ import { db } from '$lib/server/db';
 import { section, wod, workspaceMember } from '$lib/server/db/schema';
 import { generateId } from '$lib/server/auth';
 import type { SectionInput } from '$lib/types/wod';
+import { dictFor, type Locale } from '$lib/i18n';
 
 export type WorkspaceRole = 'owner' | 'coach' | 'member';
 
@@ -23,14 +24,19 @@ type WodAccess =
 	| { ok: true; wod: typeof wod.$inferSelect; membership: typeof workspaceMember.$inferSelect }
 	| { ok: false; status: 403 | 404; error: string };
 
-/** Load a WoD and check the user belongs to its workspace. */
-export async function getWodAccess(userId: string, wodId: string): Promise<WodAccess> {
+/** Load a WoD and check the user belongs to its workspace. Errors are in `locale`. */
+export async function getWodAccess(
+	userId: string,
+	wodId: string,
+	locale: Locale
+): Promise<WodAccess> {
+	const d = dictFor(locale);
 	const [wodRecord] = await db.select().from(wod).where(eq(wod.id, wodId));
-	if (!wodRecord) return { ok: false, status: 404, error: 'WoD not found' };
+	if (!wodRecord) return { ok: false, status: 404, error: d.editor.api.wodNotFound };
 
 	const membership = await getMembership(userId, wodRecord.workspaceId);
 	if (!membership) {
-		return { ok: false, status: 403, error: 'Access denied: not a member of this workspace' };
+		return { ok: false, status: 403, error: d.api.notMember };
 	}
 
 	return { ok: true, wod: wodRecord, membership };

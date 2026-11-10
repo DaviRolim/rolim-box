@@ -6,7 +6,15 @@
  * (UTC-3) flips to "tomorrow" at 9pm and would show the wrong WoD to the evening class.
  */
 
-const LOCALE = 'en-GB'; // day-first ("Tue 10 Nov"), the order people read dates in Brazil
+import { dictFor } from '$lib/i18n';
+import { currentLocale, intlLocale } from '$lib/i18n/locale';
+
+// Names of days and months come from Intl in the active language. English is en-GB: day-first
+// ("Tue 10 Nov"), the order people read dates in Brazil. Portuguese drops Intl's abbreviation
+// dots ("ter." -> "ter", "nov." -> "nov") so it reads like a scoreboard, not a form.
+const undot = (text: string) => (currentLocale() === 'pt' ? text.replace(/\./g, '') : text);
+const fmt = (iso: string, options: Intl.DateTimeFormatOptions) =>
+	parseIsoDate(iso).toLocaleDateString(intlLocale(), options);
 
 /** Local calendar date as YYYY-MM-DD. */
 export function toIsoDate(date: Date): string {
@@ -57,7 +65,7 @@ export function weekDays(iso: string): string[] {
 }
 
 export function formatWeekday(iso: string, style: 'long' | 'short' | 'narrow' = 'short'): string {
-	return parseIsoDate(iso).toLocaleDateString(LOCALE, { weekday: style });
+	return undot(fmt(iso, { weekday: style }));
 }
 
 export function dayOfMonth(iso: string): number {
@@ -65,41 +73,39 @@ export function dayOfMonth(iso: string): number {
 }
 
 export function formatMonth(iso: string, style: 'long' | 'short' = 'short'): string {
-	return parseIsoDate(iso).toLocaleDateString(LOCALE, { month: style });
+	return undot(fmt(iso, { month: style }));
 }
 
-/** "10 Nov" (adds the year when it is not the current one). */
+/** "10 Nov" / "10 nov" (adds the year when it is not the current one). */
 export function formatDayMonth(iso: string, today: string = todayIso()): string {
 	const sameYear = iso.slice(0, 4) === today.slice(0, 4);
-	return parseIsoDate(iso).toLocaleDateString(LOCALE, {
-		day: 'numeric',
-		month: 'short',
-		...(sameYear ? {} : { year: 'numeric' })
-	});
+	const parts = [String(dayOfMonth(iso)), formatMonth(iso, 'short')];
+	if (!sameYear) parts.push(iso.slice(0, 4));
+	return parts.join(' ');
 }
 
-/** "Tue 10 Nov" */
+/** "Tue 10 Nov" / "ter 10 nov" */
 export function formatShort(iso: string, today: string = todayIso()): string {
 	return `${formatWeekday(iso, 'short')} ${formatDayMonth(iso, today)}`;
 }
 
-/** "Tuesday 10 November" */
+/** "Tuesday 10 November" / "terça-feira, 10 de novembro" */
 export function formatLong(iso: string): string {
-	const date = parseIsoDate(iso);
-	const weekday = date.toLocaleDateString(LOCALE, { weekday: 'long' });
-	const rest = date.toLocaleDateString(LOCALE, { day: 'numeric', month: 'long' });
-	return `${weekday} ${rest}`;
+	if (currentLocale() === 'pt') return fmt(iso, { weekday: 'long', day: 'numeric', month: 'long' });
+	return `${fmt(iso, { weekday: 'long' })} ${fmt(iso, { day: 'numeric', month: 'long' })}`;
 }
+
+const words = () => dictFor(currentLocale()).date;
 
 /** "Today", "Tomorrow", "Yesterday", or null for any other day. */
 export function relativeDay(iso: string, today: string = todayIso()): string | null {
 	switch (diffDays(today, iso)) {
 		case 0:
-			return 'Today';
+			return words().today;
 		case 1:
-			return 'Tomorrow';
+			return words().tomorrow;
 		case -1:
-			return 'Yesterday';
+			return words().yesterday;
 		default:
 			return null;
 	}
@@ -108,19 +114,19 @@ export function relativeDay(iso: string, today: string = todayIso()): string | n
 /** Heading for a week in the history list: "This week", "Last week", or "27 Oct – 2 Nov". */
 export function weekLabel(weekStart: string, today: string = todayIso()): string {
 	const weeks = Math.round(diffDays(startOfWeek(today), weekStart) / 7);
-	if (weeks === 0) return 'This week';
-	if (weeks === -1) return 'Last week';
-	if (weeks === 1) return 'Next week';
+	if (weeks === 0) return words().thisWeek;
+	if (weeks === -1) return words().lastWeek;
+	if (weeks === 1) return words().nextWeek;
 	return `${formatDayMonth(weekStart, today)} – ${formatDayMonth(addDays(weekStart, 6), today)}`;
 }
 
 /** "just now", "5 min ago", "2 h ago", "3 d ago" */
 export function timeAgo(timestamp: number, now: number = Date.now()): string {
 	const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
-	if (seconds < 45) return 'just now';
+	if (seconds < 45) return words().justNow;
 	const minutes = Math.round(seconds / 60);
-	if (minutes < 60) return `${minutes} min ago`;
+	if (minutes < 60) return words().minutesAgo(minutes);
 	const hours = Math.round(minutes / 60);
-	if (hours < 24) return `${hours} h ago`;
-	return `${Math.round(hours / 24)} d ago`;
+	if (hours < 24) return words().hoursAgo(hours);
+	return words().daysAgo(Math.round(hours / 24));
 }

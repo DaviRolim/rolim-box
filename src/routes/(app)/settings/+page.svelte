@@ -13,20 +13,25 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import LogoutButton from '$lib/components/shell/LogoutButton.svelte';
 	import type { UnitPreference } from '$lib/types/pr';
+	import { LOCALES, HTML_LANG, t, type Locale } from '$lib/i18n';
+	import { localeStore } from '$lib/i18n/store.svelte';
 
 	let { data } = $props();
 
-	const GROUNDS: { value: ThemeChoice; label: string; hint: string }[] = [
-		{ value: 'auto', label: 'Auto', hint: 'Follows the phone' },
-		{ value: 'sol', label: 'Sol', hint: 'Light, for a bright box' },
-		{ value: 'noite', label: 'Noite', hint: 'Dark' }
-	];
-	const UNITS: { value: UnitPreference; label: string; hint: string }[] = [
-		{ value: 'metric', label: 'Metric', hint: 'kg, metres' },
-		{ value: 'imperial', label: 'Imperial', hint: 'lb, miles' }
-	];
-	const ROLE: Record<string, string> = { owner: 'Owner', coach: 'Coach', member: 'Athlete' };
-	const CHANGE = { create: 'New', update: 'Edit to', delete: 'Delete of' } as const;
+	// Sol and Noite are the grounds' own names, in both languages.
+	const GROUNDS: { value: ThemeChoice; label: string; hint: string }[] = $derived([
+		{ value: 'auto', label: t.settings.ground.auto, hint: t.settings.ground.autoHint },
+		{ value: 'sol', label: 'Sol', hint: t.settings.ground.solHint },
+		{ value: 'noite', label: 'Noite', hint: t.settings.ground.noiteHint }
+	]);
+	const UNITS: { value: UnitPreference; label: string; hint: string }[] = $derived([
+		{ value: 'metric', label: t.settings.units.metric, hint: t.settings.units.metricHint },
+		{ value: 'imperial', label: t.settings.units.imperial, hint: t.settings.units.imperialHint }
+	]);
+	const LANGUAGE_HINT: Record<Locale, () => string> = {
+		en: () => t.settings.language.englishHint,
+		pt: () => t.settings.language.portugueseHint
+	};
 
 	let savingUnits = $state(false);
 	let syncing = $state(false);
@@ -50,9 +55,9 @@
 			if (!response.ok) throw new Error(String(response.status));
 			await invalidatePRCache().catch(() => {});
 			await invalidateAll();
-			toastStore.success(next === 'metric' ? 'PRs now show in kg.' : 'PRs now show in lb.');
+			toastStore.success(next === 'metric' ? t.settings.units.nowKg : t.settings.units.nowLb);
 		} catch {
-			toastStore.error('Could not save. This setting needs a connection.');
+			toastStore.error(t.settings.units.saveFailed);
 		} finally {
 			savingUnits = false;
 		}
@@ -63,9 +68,9 @@
 		try {
 			await retrySync();
 			const ok = await wodStore.refresh();
-			if (ok) toastStore.success('Everything is up to date.');
-			else if (syncStore.isOffline) toastStore.info('Still offline. It will sync by itself later.');
-			else toastStore.error('The server did not answer. Try again in a moment.');
+			if (ok) toastStore.success(t.settings.phone.upToDate);
+			else if (syncStore.isOffline) toastStore.info(t.settings.phone.stillOffline);
+			else toastStore.error(t.settings.phone.noAnswer);
 		} finally {
 			syncing = false;
 		}
@@ -74,35 +79,36 @@
 	async function discardFailed() {
 		discardOpen = false;
 		await wodStore.discardFailedChanges();
-		toastStore.success('Refused changes discarded. The board matches the server again.');
+		toastStore.success(t.settings.phone.discarded);
 	}
 
 	const statusLine = $derived.by(() => {
+		const status = t.settings.phone.status;
 		switch (syncStore.status) {
 			case 'offline':
-				return 'Offline. Changes are kept on this phone and sent when the signal is back.';
+				return status.offline;
 			case 'error':
-				return 'The server refused some changes. They need a decision below.';
+				return status.error;
 			case 'unreachable':
-				return 'Online, but the server is not answering. It will keep trying.';
+				return status.unreachable;
 			case 'syncing':
-				return 'Sending changes to the server.';
+				return status.syncing;
 			case 'pending':
-				return `${syncStore.pending} ${syncStore.pending === 1 ? 'change is' : 'changes are'} waiting to be sent.`;
+				return status.pending(syncStore.pending);
 			default:
-				return 'Everything on this phone is on the server.';
+				return status.synced;
 		}
 	});
 </script>
 
 <svelte:head>
-	<title>Settings - RolimBox</title>
+	<title>{t.common.pageTitle(t.settings.title)}</title>
 </svelte:head>
 
 <div class="page">
 	<header>
 		<p class="truncate legend text-mute">{data.user.email}</p>
-		<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">Settings</h1>
+		<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">{t.settings.title}</h1>
 	</header>
 
 	<div class="mt-6 grid gap-x-12 lg:grid-cols-2">
@@ -110,10 +116,10 @@
 			<!-- Ground -->
 			<section class="module pb-6">
 				<div class="module-head">
-					<h2>Ground</h2>
+					<h2>{t.settings.ground.heading}</h2>
 					<span>{themeStore.ground === 'sol' ? 'Sol' : 'Noite'}</span>
 				</div>
-				<div class="choices" role="radiogroup" aria-label="Ground (theme)">
+				<div class="choices" role="radiogroup" aria-label={t.settings.ground.aria}>
 					{#each GROUNDS as option (option.value)}
 						<button
 							type="button"
@@ -128,18 +134,42 @@
 						</button>
 					{/each}
 				</div>
-				<p class="mt-3 text-base leading-snug text-mute">
-					Sol is the light ground: easier to read when the morning sun hits the box.
-				</p>
+				<p class="mt-3 text-base leading-snug text-mute">{t.settings.ground.note}</p>
+			</section>
+
+			<!-- Language (the same switch as EN | PT in the header) -->
+			<section class="module pb-6">
+				<div class="module-head">
+					<h2>{t.settings.language.heading}</h2>
+					<span>{localeStore.current.toUpperCase()}</span>
+				</div>
+				<div class="choices" role="radiogroup" aria-label={t.settings.language.heading}>
+					{#each LOCALES as locale (locale)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={localeStore.current === locale}
+							class="choice"
+							class:on={localeStore.current === locale}
+							lang={HTML_LANG[locale]}
+							onclick={() => localeStore.set(locale)}
+						>
+							<span class="display text-[1.75rem]">{t.shell.languageNames[locale]}</span>
+							<span class="mt-1 block text-sm leading-tight opacity-80"
+								>{LANGUAGE_HINT[locale]()}</span
+							>
+						</button>
+					{/each}
+				</div>
 			</section>
 
 			<!-- Units -->
 			<section class="module pb-6">
 				<div class="module-head">
-					<h2>Units</h2>
-					<span>For your PRs</span>
+					<h2>{t.settings.units.heading}</h2>
+					<span>{t.settings.units.forPrs}</span>
 				</div>
-				<div class="choices" role="radiogroup" aria-label="Units">
+				<div class="choices" role="radiogroup" aria-label={t.settings.units.heading}>
 					{#each UNITS as option (option.value)}
 						<button
 							type="button"
@@ -160,8 +190,8 @@
 			<!-- Sound -->
 			<section class="module pb-6">
 				<div class="module-head">
-					<h2>Clock sound</h2>
-					<span>{audioService.isMuted ? 'Off' : 'On'}</span>
+					<h2>{t.settings.sound.heading}</h2>
+					<span>{audioService.isMuted ? t.settings.sound.off : t.settings.sound.on}</span>
 				</div>
 				<button
 					type="button"
@@ -172,14 +202,11 @@
 				>
 					<span class="flex items-center gap-2.5">
 						<Icon name={audioService.isMuted ? 'volume-off' : 'volume'} size={20} stroke={2.6} />
-						Beeps and voice cues
+						{t.settings.sound.toggle}
 					</span>
-					<span>{audioService.isMuted ? 'Off' : 'On'}</span>
+					<span>{audioService.isMuted ? t.settings.sound.off : t.settings.sound.on}</span>
 				</button>
-				<p class="mt-3 text-base leading-snug text-mute">
-					3-2-1, "halfway", "ten seconds" and "time". Turn the phone's volume up: the music in the
-					box is loud.
-				</p>
+				<p class="mt-3 text-base leading-snug text-mute">{t.settings.sound.note}</p>
 			</section>
 		</div>
 
@@ -187,11 +214,11 @@
 			<!-- This phone -->
 			<section class="module pb-6" id="sync">
 				<div class="module-head">
-					<h2>This phone</h2>
+					<h2>{t.settings.phone.heading}</h2>
 					<span>
 						{syncStore.lastSyncedAt
-							? `Checked ${timeAgo(syncStore.lastSyncedAt, now)}`
-							: 'Not checked yet'}
+							? t.settings.phone.checked(timeAgo(syncStore.lastSyncedAt, now))
+							: t.settings.phone.notChecked}
 					</span>
 				</div>
 				<div
@@ -222,8 +249,7 @@
 						{#each syncStore.failed as change (change.id)}
 							<li class="border-b border-line py-3">
 								<p class="legend text-danger-ink">
-									{CHANGE[change.type]}
-									{change.entity === 'wod' ? 'a WoD' : 'a PR'}
+									{t.settings.phone.change[change.type][change.entity]}
 								</p>
 								<p class="mt-1 text-base leading-snug">{change.error}</p>
 							</li>
@@ -239,7 +265,7 @@
 						onclick={syncNow}
 					>
 						<Icon name="refresh" size={18} stroke={2.8} />
-						{syncing ? 'Syncing' : 'Sync now'}
+						{syncing ? t.settings.phone.syncing : t.settings.phone.syncNow}
 					</button>
 					{#if syncStore.failed.length > 0}
 						<button
@@ -247,27 +273,25 @@
 							class="btn btn-danger flex-1"
 							onclick={() => (discardOpen = true)}
 						>
-							Discard refused
+							{t.settings.phone.discardRefused}
 						</button>
 					{/if}
 				</div>
-				<p class="mt-3 text-base leading-snug text-mute">
-					WoDs and PRs are saved on this phone, so the app opens and the timers run with no signal.
-				</p>
+				<p class="mt-3 text-base leading-snug text-mute">{t.settings.phone.note}</p>
 			</section>
 
 			<!-- Box -->
 			{#if data.activeWorkspace}
 				<section class="module pb-6">
 					<div class="module-head">
-						<h2>Your box</h2>
-						<span>{ROLE[data.activeWorkspace.role] ?? data.activeWorkspace.role}</span>
+						<h2>{t.settings.box.heading}</h2>
+						<span>{t.common.roles[data.activeWorkspace.role] ?? data.activeWorkspace.role}</span>
 					</div>
 					<p class="display text-[2.5rem] break-words">{data.activeWorkspace.name}</p>
 					<a href={resolve('/settings/workspace')} class="btn mt-4 w-full justify-between">
 						<span class="flex items-center gap-2.5">
 							<Icon name="users" size={20} stroke={2.6} />
-							Members and invites
+							{t.settings.box.membersAndInvites}
 						</span>
 						<Icon name="arrow-right" size={20} stroke={2.8} />
 					</a>
@@ -277,7 +301,7 @@
 			<!-- Account -->
 			<section class="module pb-6 lg:hidden">
 				<div class="module-head">
-					<h2>Account</h2>
+					<h2>{t.settings.account}</h2>
 					<span class="truncate normal-case">{data.user.email}</span>
 				</div>
 				<LogoutButton class="btn btn-quiet w-full" />
@@ -288,10 +312,10 @@
 
 <ConfirmDialog
 	bind:open={discardOpen}
-	title="Discard refused changes?"
-	message="The changes the server refused are thrown away and this phone goes back to what the server has. Changes still waiting to be sent are kept."
-	confirmLabel="Discard"
-	cancelLabel="Keep them"
+	title={t.settings.phone.discardTitle}
+	message={t.settings.phone.discardMessage}
+	confirmLabel={t.settings.phone.discard}
+	cancelLabel={t.settings.phone.keepThem}
 	danger
 	onconfirm={discardFailed}
 />
