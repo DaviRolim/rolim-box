@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 
 export interface FailedChange {
 	id: string;
-	entity: 'wod' | 'pr';
+	entity: 'wod' | 'pr' | 'bank';
 	type: 'create' | 'update' | 'delete';
 	entityId: string;
 	error: string;

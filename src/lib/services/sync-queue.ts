@@ -27,7 +27,7 @@ import { t } from '$lib/i18n';
 export interface SyncOperation {
 	id: string;
 	type: 'create' | 'update' | 'delete';
-	entity: 'wod' | 'pr';
+	entity: 'wod' | 'pr' | 'bank';
 	entityId: string;
 	payload: unknown;
 	createdAt: number;
@@ -260,6 +260,11 @@ function buildRequest(operation: SyncOperation): { url: string; init: RequestIni
 		if (type === 'create') return { url: '/api/wods', init: json('POST', payload) };
 		if (type === 'update') return { url: `/api/wods/${entityId}`, init: json('PUT', payload) };
 		if (type === 'delete') return { url: `/api/wods/${entityId}`, init: { method: 'DELETE' } };
+	}
+	if (entity === 'bank') {
+		if (type === 'create') return { url: '/api/bank', init: json('POST', payload) };
+		if (type === 'update') return { url: `/api/bank/${entityId}`, init: json('PUT', payload) };
+		if (type === 'delete') return { url: `/api/bank/${entityId}`, init: { method: 'DELETE' } };
 	}
 	if (entity === 'pr') {
 		if (type === 'create') return { url: '/api/prs', init: json('POST', payload) };

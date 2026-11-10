@@ -9,6 +9,7 @@
 	import { themeStore, type ThemeChoice } from '$lib/stores/theme.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import { wodStore } from '$lib/stores/wods.svelte';
+	import { bankStore } from '$lib/stores/bank.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import LogoutButton from '$lib/components/shell/LogoutButton.svelte';
@@ -68,6 +69,7 @@
 		try {
 			await retrySync();
 			const ok = await wodStore.refresh();
+			void bankStore.refresh();
 			if (ok) toastStore.success(t.settings.phone.upToDate);
 			else if (syncStore.isOffline) toastStore.info(t.settings.phone.stillOffline);
 			else toastStore.error(t.settings.phone.noAnswer);
@@ -79,6 +81,7 @@
 	async function discardFailed() {
 		discardOpen = false;
 		await wodStore.discardFailedChanges();
+		await bankStore.reload();
 		toastStore.success(t.settings.phone.discarded);
 	}
 

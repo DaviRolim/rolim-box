@@ -183,7 +183,10 @@ export async function pullWoD(id: string): Promise<WoD | null | 'failed'> {
 // Write (cache first, then queue)
 // ============================================================================
 
-/** Create a WoD. The id is generated here and kept by the server. */
+/**
+ * Create a WoD. The id is generated here and kept by the server.
+ * `bankWodId` tells the server the WoD is a bank WoD being put on a day (see bank.ts).
+ */
 export async function createWoD(data: CreateWoDInput): Promise<WoD> {
 	if (!browser) throw new Error('createWoD can only be called in the browser');
 
@@ -205,7 +208,7 @@ export async function createWoD(data: CreateWoDInput): Promise<WoD> {
 		type: 'create',
 		entity: 'wod',
 		entityId: id,
-		payload: toPayload(wod),
+		payload: data.bankWodId ? { ...toPayload(wod), bankWodId: data.bankWodId } : toPayload(wod),
 		status: 'pending'
 	});
 

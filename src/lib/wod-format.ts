@@ -76,6 +76,12 @@ const GENERIC_NAMES = new Set([
 	'workout of the day'
 ]);
 
+/** A section name that says nothing about the workout ("WoD", "Metcon", ...). */
+export function isGenericName(name: string): boolean {
+	const trimmed = name.trim().toLowerCase();
+	return !trimmed || GENERIC_NAMES.has(trimmed);
+}
+
 /** The section people mean when they ask "what's the WoD today?" */
 export function mainSection(wod: Pick<WoD, 'sections'>): Section | null {
 	const sections = wod.sections;
@@ -271,13 +277,44 @@ export function vaiDoer(wod: Pick<WoD, 'sections'>): string | null {
 	}
 	if (!best) return null;
 
-	return (
-		best.text
-			.replace(/\s*\([^)]*\)/g, '') // loads: "(43/30 kg)"
-			.replace(/\s*[@,;].*$/, '') // "@ 70%", ", unbroken"
-			.replace(/\s+(or|ou)\s+.*$/i, '') // scaling: "or ring rows"
-			.trim() || null
-	);
+	return bareMovement(best.text) || null;
+}
+
+/** A movement as the coach wrote it, without loads or scaling notes. */
+function bareMovement(text: string): string {
+	return text
+		.replace(/\s*\([^)]*\)/g, '') // loads: "(43/30 kg)"
+		.replace(/\s*[@,;].*$/, '') // "@ 70%", ", unbroken"
+		.replace(/\s+(or|ou)\s+.*$/i, '') // scaling: "or ring rows"
+		.trim();
+}
+
+/**
+ * The main movements of a WoD, in the order they are written, without reps or loads:
+ * ["Thrusters", "Pull-ups"]. Helps pick a WoD from a list at a glance.
+ */
+export function mainMovements(wod: Pick<WoD, 'sections'>, max = 3): string[] {
+	const main = mainSection(wod);
+	if (!main) return [];
+
+	const seen = new Set<string>();
+	const moves: string[] = [];
+	for (const line of parseBoard(main.content)) {
+		if (line.kind !== 'move') continue;
+		let text = line.text || line.qty || '';
+		// "Min 1: 15/12 cal row" comes back as "15/12 cal row": drop the count again.
+		const counted = text.match(QTY);
+		if (counted?.[2]) text = counted[2];
+		text = bareMovement(text);
+		if (!text || /^\d/.test(text)) continue;
+		const pretty = text.charAt(0).toUpperCase() + text.slice(1);
+		const key = pretty.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		moves.push(pretty);
+		if (moves.length >= max) break;
+	}
+	return moves;
 }
 
 // ---------------------------------------------------------------------------

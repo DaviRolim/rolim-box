@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { audioService } from '$lib/services/audio.svelte';
 	import { wodStore } from '$lib/stores/wods.svelte';
+	import { bankStore } from '$lib/stores/bank.svelte';
 	import { syncStore } from '$lib/stores/sync.svelte';
 	import Toasts from '$lib/components/ui/Toasts.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
@@ -32,7 +33,9 @@
 	const path = $derived(page.url.pathname);
 	// A running clock owns the whole screen: no bars, no navigation.
 	const bare = $derived(page.route.id === '/(app)/timers/[id]');
-	const isActive = (href: string) => path === href || path.startsWith(href + '/');
+	const under = (href: string) => path === href || path.startsWith(href + '/');
+	// The bank is the other half of the WoDs screen (coaches only).
+	const isActive = (href: string) => under(href) || (href === '/workouts' && under('/bank'));
 
 	// One store feeds every screen. Opening it here means Today, WoDs and the clock all read
 	// the same list, and it is already there when the person moves between them.
@@ -40,6 +43,12 @@
 	$effect(() => {
 		const workspaceId = data.activeWorkspaceId;
 		untrack(() => void wodStore.open(workspaceId));
+	});
+
+	// The bank is a coach tool: athletes never fetch it, and nothing of it is kept on their phones.
+	$effect(() => {
+		const workspaceId = data.canEdit ? data.activeWorkspaceId : null;
+		untrack(() => void bankStore.open(workspaceId));
 	});
 
 	onMount(() => {
