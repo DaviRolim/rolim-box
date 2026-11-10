@@ -92,6 +92,8 @@ export const ICONS = {
 		'M16 21h3a2 2 0 0 0 2-2v-3'
 	],
 	board: ['M3 4h18v12H3z', 'M8 21h8', 'M12 16v5'],
+	/** The WoD bank: a box to keep WoDs in. */
+	archive: ['M3 8h18v13H3z', 'M1 3h22v5H1z', 'M10 12h4'],
 	eye: ['M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
 	'eye-off': [
 		'M9.88 9.88a3 3 0 1 0 4.24 4.24',

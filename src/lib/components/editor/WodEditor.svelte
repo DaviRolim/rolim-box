@@ -5,6 +5,7 @@
 	import { addDays, formatLong, isIsoDate, todayIso } from '$lib/date';
 	import { sectionTypes } from '$lib/config/section-types';
 	import { wodStore } from '$lib/stores/wods.svelte';
+	import { bankStore } from '$lib/stores/bank.svelte';
 	import { syncStore } from '$lib/stores/sync.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import { parseTimerConfig, serializeTimerConfig } from '$lib/types/timer';
@@ -15,17 +16,26 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import Poster from '$lib/components/wod/Poster.svelte';
 	import SectionBlock from '$lib/components/wod/SectionBlock.svelte';
+	import ScheduleSheet from '$lib/components/bank/ScheduleSheet.svelte';
 	import SectionEditor from './SectionEditor.svelte';
 	import type { SectionDraft } from './types';
+	import { BANK_DESCRIPTION_MAX, BANK_NAME_MAX, type BankWod } from '$lib/types/bank';
 	import { t } from '$lib/i18n';
 
 	/**
 	 * The coach's bench. Everything is edited in place: no dialogs, no steps. The right-hand side
 	 * (or the Preview tab on a phone) shows the board exactly as athletes will get it.
+	 *
+	 * In bank mode it edits a WoD of the bank instead: a name takes the place of the date, and
+	 * sections are optional, so a name and a rough idea are enough to save it.
 	 */
 	interface Props {
-		/** The WoD being edited, or null for a new one. */
-		wod: WoD | null;
+		/** 'day' edits a dated WoD (the default), 'bank' a WoD of the bank. */
+		mode?: 'day' | 'bank';
+		/** The WoD being edited, or null for a new one (day mode). */
+		wod?: WoD | null;
+		/** The bank WoD being edited, or null for a new idea (bank mode). */
+		bankWod?: BankWod | null;
 		workspaceId: string;
 		/** Whether the server can run the Magic Wand. */
 		aiEnabled: boolean;
@@ -33,12 +43,25 @@
 		initialDate?: string;
 	}
 
-	let { wod, workspaceId, aiEnabled, initialDate }: Props = $props();
+	let {
+		mode = 'day',
+		wod = null,
+		bankWod = null,
+		workspaceId,
+		aiEnabled,
+		initialDate
+	}: Props = $props();
 
+	// svelte-ignore state_referenced_locally
+	const inBank = mode === 'bank';
 	const today = todayIso();
-	const isNew = $derived(wod === null);
+	const isNew = $derived(inBank ? bankWod === null : wod === null);
 	const backHref = $derived(
-		wod ? resolve('/(app)/workouts/[id]', { id: wod.id }) : resolve('/workouts')
+		inBank
+			? resolve('/bank')
+			: wod
+				? resolve('/(app)/workouts/[id]', { id: wod.id })
+				: resolve('/workouts')
 	);
 
 	/** A new WoD starts on the first day from today that has nothing programmed. */
@@ -50,7 +73,7 @@
 		return today;
 	}
 
-	function toDrafts(source: WoD | null): SectionDraft[] {
+	function toDrafts(source: Pick<WoD, 'sections'> | null): SectionDraft[] {
 		return (source?.sections ?? []).map((s) => ({
 			key: s.id,
 			type: s.type,
@@ -62,54 +85,70 @@
 
 	// The editor works on its own copy; the WoD it was opened with is only the starting point.
 	// svelte-ignore state_referenced_locally
+	const source = inBank ? bankWod : wod;
+	// svelte-ignore state_referenced_locally
 	let date = $state(
-		wod?.date ?? (initialDate && isIsoDate(initialDate) ? initialDate : firstOpenDay())
+		inBank
+			? today
+			: (wod?.date ?? (initialDate && isIsoDate(initialDate) ? initialDate : firstOpenDay()))
 	);
 	// svelte-ignore state_referenced_locally
-	let brief = $state(wod?.description ?? '');
-	// svelte-ignore state_referenced_locally
-	let drafts = $state<SectionDraft[]>(toDrafts(wod));
+	let name = $state(bankWod?.name ?? '');
+	let brief = $state(source?.description ?? '');
+	let drafts = $state<SectionDraft[]>(toDrafts(source));
 
 	let view = $state<'edit' | 'preview'>('edit');
 	let saving = $state(false);
 	let showErrors = $state(false);
 	let removed = $state<{ draft: SectionDraft; index: number } | null>(null);
 
-	const snapshot = () => JSON.stringify({ date, brief: brief.trim(), drafts });
+	const snapshot = () => JSON.stringify({ date, name: name.trim(), brief: brief.trim(), drafts });
 	let saved = $state(snapshot());
 	const dirty = $derived(snapshot() !== saved);
 
 	// --- Validation -----------------------------------------------------------
 
-	const dateError = $derived(!isIsoDate(date) ? t.editor.errors.pickDate : '');
-	const briefError = $derived(brief.length > 500 ? t.editor.errors.briefTooLong : '');
-	const sectionsError = $derived(drafts.length === 0 ? t.editor.errors.noSections : '');
+	const dateError = $derived(!inBank && !isIsoDate(date) ? t.editor.errors.pickDate : '');
+	const nameError = $derived(
+		!inBank
+			? ''
+			: !name.trim()
+				? t.bank.editor.nameRequired
+				: name.trim().length > BANK_NAME_MAX
+					? t.bank.editor.nameTooLong
+					: ''
+	);
+	const briefError = $derived(
+		brief.length > BANK_DESCRIPTION_MAX ? t.editor.errors.briefTooLong : ''
+	);
+	// An idea in the bank may have no sections yet; a WoD on the board needs at least one.
+	const sectionsError = $derived(!inBank && drafts.length === 0 ? t.editor.errors.noSections : '');
 	const draftsValid = $derived(
 		drafts.every((d) => d.name.trim() && d.name.length <= 100 && d.content.length <= 2000)
 	);
-	const valid = $derived(!dateError && !briefError && !sectionsError && draftsValid);
+	const valid = $derived(!dateError && !nameError && !briefError && !sectionsError && draftsValid);
 
 	const sameDay = $derived(
-		isIsoDate(date) ? wodStore.onDate(date).filter((other) => other.id !== wod?.id) : []
+		!inBank && isIsoDate(date) ? wodStore.onDate(date).filter((other) => other.id !== wod?.id) : []
 	);
 
 	// --- Preview --------------------------------------------------------------
 
 	const preview = $derived<WoD>({
-		id: wod?.id ?? 'preview',
+		id: source?.id ?? 'preview',
 		workspaceId,
 		date: isIsoDate(date) ? date : today,
 		description: brief.trim() || null,
 		sections: drafts.map((d, order) => ({
 			id: d.key,
-			wodId: wod?.id ?? 'preview',
+			wodId: source?.id ?? 'preview',
 			type: d.type,
 			name: d.name.trim() || sectionTypes[d.type].label,
 			content: d.content,
 			order,
 			timerConfig: d.timer ? serializeTimerConfig(d.timer) : null
 		})),
-		createdAt: wod?.createdAt ?? new Date(),
+		createdAt: source?.createdAt ?? new Date(),
 		updatedAt: new Date()
 	});
 	const previewMain = $derived(mainSection(preview));
@@ -267,14 +306,13 @@
 			firstInvalid?.scrollIntoView({ block: 'center', behavior: 'auto' });
 			firstInvalid?.focus?.();
 			toastStore.error(
-				sectionsError || dateError || briefError || t.editor.errors.sectionsNeedName
+				nameError || sectionsError || dateError || briefError || t.editor.errors.sectionsNeedName
 			);
 			return;
 		}
 
 		saving = true;
-		const payload = {
-			date,
+		const content = {
 			description: brief.trim() || null,
 			sections: drafts.map((d, order) => ({
 				id: d.key,
@@ -287,22 +325,33 @@
 		};
 
 		try {
-			if (wod) await wodStore.update(wod.id, payload);
-			else await wodStore.create({ workspaceId, ...payload });
+			if (inBank) {
+				const payload = { name: name.trim(), ...content };
+				if (bankWod) await bankStore.update(bankWod.id, payload);
+				else await bankStore.create({ workspaceId, ...payload });
+			} else {
+				const payload = { date, ...content };
+				if (wod) await wodStore.update(wod.id, payload);
+				else await wodStore.create({ workspaceId, ...payload });
+			}
 
 			saved = snapshot();
 			toastStore.success(
 				syncStore.isOffline
 					? t.editor.toast.savedOffline
-					: wod
-						? t.editor.toast.updated
-						: t.editor.toast.savedFor(formatLong(date))
+					: inBank
+						? bankWod
+							? t.bank.editor.updated
+							: t.bank.editor.saved
+						: wod
+							? t.editor.toast.updated
+							: t.editor.toast.savedFor(formatLong(date))
 			);
 			leaving = true;
-			await goto(resolve('/workouts'));
+			await goto(resolve(inBank ? '/bank' : '/workouts'));
 		} catch (error) {
 			console.error('Failed to save WoD:', error);
-			toastStore.error(t.editor.toast.saveFailed);
+			toastStore.error(inBank ? t.bank.editor.saveFailed : t.editor.toast.saveFailed);
 			saving = false;
 		}
 	}
@@ -320,7 +369,7 @@
 		leaveOpen = false;
 		// `leaveTo` is the URL SvelteKit was already navigating to, so it needs no resolving.
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		void goto(leaveTo ? leaveTo.pathname + leaveTo.search : resolve('/workouts'));
+		void goto(leaveTo ? leaveTo.pathname + leaveTo.search : backHref);
 	}
 
 	function onBeforeUnload(event: BeforeUnloadEvent) {
@@ -338,6 +387,34 @@
 		}
 	}
 
+	// An existing bank WoD can go straight onto a day from here, once what is on screen is saved.
+	let scheduleOpen = $state(false);
+	const canSchedule = $derived(inBank && !!bankWod && !dirty && !saving);
+
+	const heading = $derived(
+		inBank
+			? isNew
+				? t.bank.editor.newIdea
+				: t.bank.editor.editIdea
+			: isNew
+				? t.editor.newWod
+				: t.editor.editWod
+	);
+	const saveShort = $derived(
+		inBank ? t.bank.editor.saveShort : isNew ? t.editor.saveWodShort : t.editor.save
+	);
+	const saveLong = $derived(
+		saving
+			? t.editor.saving
+			: inBank
+				? isNew
+					? t.bank.editor.save
+					: t.bank.editor.saveChanges
+				: isNew
+					? t.editor.saveWod
+					: t.editor.saveChanges
+	);
+
 	const quickDates = $derived([
 		{ key: 'today', label: t.editor.today, value: today },
 		{ key: 'tomorrow', label: t.editor.tomorrow, value: addDays(today, 1) }
@@ -354,7 +431,7 @@
 		</a>
 		<div class="min-w-0 flex-1">
 			<h1 class="truncate display text-[2rem] lg:text-[2.5rem]">
-				{isNew ? t.editor.newWod : t.editor.editWod}
+				{heading}
 			</h1>
 			<p class="mt-0.5 truncate legend {dirty ? 'text-warn-ink' : 'text-mute'}">
 				{#if saving}{t.editor.status.saving}{:else if dirty}{t.editor.status
@@ -363,7 +440,7 @@
 		</div>
 		<button type="button" class="btn btn-pink flex-none" disabled={saving} onclick={save}>
 			<Icon name="check" size={20} stroke={3.4} />
-			{isNew ? t.editor.saveWodShort : t.editor.save}
+			{saveShort}
 			<kbd class="hidden border border-current px-1.5 py-0.5 legend lg:inline">⌘S</kbd>
 		</button>
 	</header>
@@ -400,44 +477,72 @@
 				void save();
 			}}
 		>
-			<!-- Date -->
-			<div class="module pb-5">
-				<div class="module-head">
-					<span>{t.editor.when}</span><span>{isIsoDate(date) ? formatLong(date) : ''}</span>
-				</div>
-				<label for="wod-date" class="sr-only">{t.editor.date}</label>
-				<div class="flex flex-wrap items-center gap-2">
+			{#if inBank}
+				<!-- Name (a bank WoD has no date) -->
+				<div class="module pb-5">
+					<div class="module-head">
+						<label for="bank-name">{t.bank.editor.name}</label>
+						<span class="flex items-center gap-1.5">
+							<Icon name="archive" size={14} stroke={2.6} />
+							{t.bank.editor.noDate}
+						</span>
+					</div>
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
-						id="wod-date"
-						type="date"
-						class="input w-auto min-w-[12rem] flex-1 sm:flex-none"
-						bind:value={date}
-						required
-						aria-invalid={showErrors && !!dateError}
+						id="bank-name"
+						type="text"
+						class="input"
+						autocomplete="off"
+						maxlength={BANK_NAME_MAX + 20}
+						placeholder={t.bank.editor.namePlaceholder}
+						bind:value={name}
+						autofocus={isNew}
+						aria-invalid={showErrors && !!nameError}
 					/>
-					{#each quickDates as option (option.key)}
-						<button
-							type="button"
-							class="tag min-h-11 px-3 {date === option.value ? 'tag-ink' : ''}"
-							aria-pressed={date === option.value}
-							onclick={() => (date = option.value)}
-						>
-							{option.label}
-						</button>
-					{/each}
+					{#if showErrors && nameError}
+						<p class="mt-1.5 text-base font-semibold text-danger-ink">{nameError}</p>
+					{/if}
 				</div>
-				{#if showErrors && dateError}
-					<p class="mt-1.5 text-base font-semibold text-danger-ink">{dateError}</p>
-				{/if}
-				{#if sameDay.length > 0}
-					<p class="notice notice-warn mt-3">
-						{t.editor.sameDay(
-							formatLong(date),
-							sameDay.map((w) => wodTitle(w))
-						)}
-					</p>
-				{/if}
-			</div>
+			{:else}
+				<!-- Date -->
+				<div class="module pb-5">
+					<div class="module-head">
+						<span>{t.editor.when}</span><span>{isIsoDate(date) ? formatLong(date) : ''}</span>
+					</div>
+					<label for="wod-date" class="sr-only">{t.editor.date}</label>
+					<div class="flex flex-wrap items-center gap-2">
+						<input
+							id="wod-date"
+							type="date"
+							class="input w-auto min-w-[12rem] flex-1 sm:flex-none"
+							bind:value={date}
+							required
+							aria-invalid={showErrors && !!dateError}
+						/>
+						{#each quickDates as option (option.key)}
+							<button
+								type="button"
+								class="tag min-h-11 px-3 {date === option.value ? 'tag-ink' : ''}"
+								aria-pressed={date === option.value}
+								onclick={() => (date = option.value)}
+							>
+								{option.label}
+							</button>
+						{/each}
+					</div>
+					{#if showErrors && dateError}
+						<p class="mt-1.5 text-base font-semibold text-danger-ink">{dateError}</p>
+					{/if}
+					{#if sameDay.length > 0}
+						<p class="notice notice-warn mt-3">
+							{t.editor.sameDay(
+								formatLong(date),
+								sameDay.map((w) => wodTitle(w))
+							)}
+						</p>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Brief + Magic Wand -->
 			<div class="module pb-5">
@@ -449,7 +554,7 @@
 					id="wod-brief"
 					class="input"
 					rows="3"
-					placeholder={t.editor.brief.placeholder}
+					placeholder={inBank ? t.bank.editor.briefPlaceholder : t.editor.brief.placeholder}
 					bind:value={brief}
 					aria-invalid={!!briefError}
 					aria-describedby="wod-brief-help"
@@ -545,11 +650,15 @@
 			>
 				{#if drafts.length === 0}
 					<p
-						class="mb-3 text-lg leading-snug {showErrors
+						class="mb-3 text-lg leading-snug {showErrors && sectionsError
 							? 'font-semibold text-danger-ink'
 							: 'text-dim'}"
 					>
-						{showErrors ? sectionsError : t.editor.sections.empty}
+						{showErrors && sectionsError
+							? sectionsError
+							: inBank
+								? t.bank.editor.sectionsEmpty
+								: t.editor.sections.empty}
 					</p>
 				{/if}
 				<div class="flex flex-wrap items-center gap-2">
@@ -573,8 +682,18 @@
 
 			<div class="mt-8 flex flex-col gap-2 border-t border-line pt-5 sm:flex-row-reverse">
 				<button type="submit" class="btn btn-pink btn-slab sm:flex-1" disabled={saving}>
-					{saving ? t.editor.saving : isNew ? t.editor.saveWod : t.editor.saveChanges}
+					{saveLong}
 				</button>
+				{#if canSchedule}
+					<button
+						type="button"
+						class="btn sm:min-h-[4.5rem] sm:px-6"
+						onclick={() => (scheduleOpen = true)}
+					>
+						<Icon name="calendar" size={20} stroke={2.6} />
+						{t.bank.list.schedule}
+					</button>
+				{/if}
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- built with resolve() above -->
 				<a href={backHref} class="btn btn-quiet sm:min-h-[4.5rem] sm:px-8">{t.editor.cancel}</a>
 			</div>
@@ -590,10 +709,14 @@
 				<span>{t.editor.preview.live}</span>
 			</div>
 			<div class="frame">
-				{#if drafts.length === 0 && !brief.trim()}
+				{#if drafts.length === 0 && !brief.trim() && !(inBank && name.trim())}
 					<p class="py-10 text-center text-lg text-mute">{t.editor.preview.empty}</p>
 				{:else}
-					<Poster wod={preview} />
+					<Poster
+						wod={preview}
+						name={inBank ? name : undefined}
+						stamp={inBank ? t.bank.editor.stamp : undefined}
+					/>
 					<div class="mt-6">
 						{#each preview.sections as section, index (section.id)}
 							<SectionBlock
@@ -609,6 +732,10 @@
 		</aside>
 	</div>
 </div>
+
+{#if inBank && bankWod}
+	<ScheduleSheet item={bankWod} bind:open={scheduleOpen} />
+{/if}
 
 <ConfirmDialog
 	bind:open={leaveOpen}

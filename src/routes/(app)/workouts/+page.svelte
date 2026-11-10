@@ -28,6 +28,8 @@
 	import Sheet from '$lib/components/ui/Sheet.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import DuplicateSheet from '$lib/components/wod/DuplicateSheet.svelte';
+	import SaveToBankSheet from '$lib/components/bank/SaveToBankSheet.svelte';
+	import WodsSwitch from '$lib/components/bank/WodsSwitch.svelte';
 	import type { WoD } from '$lib/types/wod';
 	import { t } from '$lib/i18n';
 
@@ -42,6 +44,7 @@
 	let selected = $state<WoD | null>(null);
 	let actionsOpen = $state(false);
 	let duplicateOpen = $state(false);
+	let bankOpen = $state(false);
 	let deleteOpen = $state(false);
 	let deleting = $state(false);
 
@@ -103,6 +106,12 @@
 		duplicateOpen = true;
 	}
 
+	function askSaveToBank(wod: WoD) {
+		selected = wod;
+		actionsOpen = false;
+		bankOpen = true;
+	}
+
 	function askDelete(wod: WoD) {
 		selected = wod;
 		actionsOpen = false;
@@ -159,7 +168,13 @@
 		{/if}
 	</header>
 
-	<div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+	{#if data.canEdit}
+		<div class="mt-5">
+			<WodsSwitch current="calendar" />
+		</div>
+	{/if}
+
+	<div class="flex flex-col gap-3 lg:flex-row lg:items-center {data.canEdit ? 'mt-4' : 'mt-5'}">
 		<div class="relative lg:w-96">
 			<label for="wod-search" class="sr-only">{t.today.list.search}</label>
 			<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-mute">
@@ -297,6 +312,18 @@
 											>
 												<Icon name="copy" size={20} stroke={2.4} />
 											</button>
+											<button
+												type="button"
+												class="icon-btn"
+												onclick={() => askSaveToBank(wod)}
+												aria-label={t.today.list.saveToBankAria(
+													wodTitle(wod),
+													formatLong(wod.date)
+												)}
+												title={t.bank.save.button}
+											>
+												<Icon name="archive" size={20} stroke={2.4} />
+											</button>
 											<a
 												href={resolve('/(app)/workouts/[id]/edit', { id: wod.id })}
 												class="icon-btn"
@@ -336,6 +363,16 @@
 											<span class="text-mute max-sm:hidden">{t.today.list.nothingYet}</span>
 										</span>
 									</a>
+									{#if data.canEdit}
+										<a
+											href="{resolve('/bank')}?for={row.date}"
+											class="from-bank"
+											aria-label={t.today.list.fromBankAria(formatLong(row.date))}
+										>
+											<Icon name="archive" size={16} stroke={2.6} />
+											<span class="max-lg:hidden">{t.bank.list.fromBank}</span>
+										</a>
+									{/if}
 								{/if}
 							</li>
 						{/each}
@@ -364,6 +401,10 @@
 				<Icon name="copy" size={20} stroke={2.6} />
 				{t.today.list.duplicate}
 			</button>
+			<button type="button" class="btn justify-start" onclick={() => askSaveToBank(wod)}>
+				<Icon name="archive" size={20} stroke={2.6} />
+				{t.bank.save.button}
+			</button>
 			<button
 				type="button"
 				class="btn justify-start"
@@ -384,6 +425,8 @@
 </Sheet>
 
 <DuplicateSheet wod={selected} bind:open={duplicateOpen} />
+
+<SaveToBankSheet wod={selected} bind:open={bankOpen} />
 
 <ConfirmDialog
 	bind:open={deleteOpen}
@@ -454,6 +497,29 @@
 	}
 	.what.open {
 		background-image: repeating-linear-gradient(-45deg, var(--c-line) 0 1px, transparent 1px 9px);
+	}
+	.from-bank {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.375rem;
+		min-width: 3.25rem;
+		padding: 0 0.875rem;
+		border-left: 1px solid var(--c-line);
+		font-family: var(--font-mono);
+		font-stretch: 75%;
+		font-weight: 700;
+		font-size: 0.75rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--c-dim);
+		text-decoration: none;
+	}
+	@media (hover: hover) {
+		.from-bank:hover {
+			color: var(--c-ink);
+			background: var(--c-panel);
+		}
 	}
 	.tools {
 		display: none;

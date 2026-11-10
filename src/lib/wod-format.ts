@@ -130,7 +130,7 @@ function firstSentence(text: string | null | undefined): string {
 }
 
 /** Everything searchable about a WoD, lower-cased. */
-export function wodSearchText(wod: WoD): string {
+export function wodSearchText(wod: Pick<WoD, 'description' | 'sections'>): string {
 	return [wod.description ?? '', ...wod.sections.flatMap((s) => [s.name, s.content])]
 		.join('\n')
 		.toLowerCase();

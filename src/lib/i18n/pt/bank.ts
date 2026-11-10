@@ -73,7 +73,7 @@ export const bank: Dict['bank'] = {
 			`Copia o nome, o recado e ${n === 1 ? '1 parte' : `${n} partes`}. O banco fica com a cópia dele pra próxima vez.`,
 		copiesIdea:
 			'Ainda não tem partes, então a cópia abre no editor pra você terminar. A ideia continua no banco.',
-		submit: (day) => `Colocar ${day}`,
+		submit: (day) => `Colocar na ${day}`,
 		pickDay: 'Escolhe um dia',
 		working: 'Colocando no quadro',
 		cancel: 'Cancelar',

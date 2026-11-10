@@ -776,8 +776,8 @@ const BANK: BankSeed[] = [
 			{
 				type: 'wod',
 				name: 'Tabata triplet',
-				content: 'Tabata air squats\nTabata push-ups\nTabata sit-ups\n\n1 min rest between',
-				timerConfig: timer.tabata(24)
+				content: 'Tabata, alternating every round:\nAir squats\nPush-ups\nSit-ups',
+				timerConfig: timer.tabata()
 			}
 		],
 		writtenDaysAgo: 14,
