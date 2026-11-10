@@ -1,429 +1,493 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import {
+		addDays,
+		dayOfMonth,
+		formatDayMonth,
+		formatLong,
+		formatWeekday,
+		startOfWeek,
+		todayIso,
+		weekLabel
+	} from '$lib/date';
 	import { wodStore } from '$lib/stores/wods.svelte';
+	import { syncStore } from '$lib/stores/sync.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
-	import { authFetch } from '$lib/services/auth-fetch';
-	import ConfirmModal from '$lib/components/ConfirmModal.svelte';
-	import Skeleton from '$lib/components/Skeleton.svelte';
-	import Card from '$lib/components/Card.svelte';
-	import Button from '$lib/components/Button.svelte';
-	import type { PageData } from './$types';
+	import {
+		mainSection,
+		sectionTimer,
+		timerChip,
+		vaiDoer,
+		wodSearchText,
+		wodSummary,
+		wodTitle
+	} from '$lib/wod-format';
+	import { TIMER_LABELS, TIMER_TYPES, type TimerType } from '$lib/types/timer';
+	import Icon from '$lib/components/ui/Icon.svelte';
+	import Sheet from '$lib/components/ui/Sheet.svelte';
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import DuplicateSheet from '$lib/components/wod/DuplicateSheet.svelte';
 	import type { WoD } from '$lib/types/wod';
 
-	let { data }: { data: PageData } = $props();
+	let { data } = $props();
 
-	// State management
-	let wods = $state<WoD[]>([]);
-	let isLoading = $state(true);
-	let isLoadingMore = $state(false);
-	let nextCursor = $state<string | null>(null);
-	let deleteModalOpen = $state(false);
-	let duplicateModalOpen = $state(false);
-	let selectedWodId = $state<string | null>(null);
-	let duplicateDate = $state(new Date().toISOString().split('T')[0]);
+	const PAGE = 60;
+	const today = todayIso();
 
-	onMount(async () => {
-		if (data.workspaceId) {
-			try {
-				await wodStore.open(data.workspaceId);
-				wods = wodStore.wods;
-				// Determine if there are more pages based on cached count
-				// The background fetch in listWoDs will paginate through all data,
-				// but for the "Load More" UI, check the API for the initial cursor
-				if (wods.length >= 20) {
-					const oldest = wods[wods.length - 1];
-					nextCursor = oldest?.date ?? null;
-				}
-			} catch (error) {
-				console.error('Failed to load workouts:', error);
-				toastStore.error('Failed to load workouts');
-			}
-		}
-		isLoading = false;
+	let query = $state('');
+	let format = $state<TimerType | null>(null);
+	let limit = $state(PAGE);
+	let selected = $state<WoD | null>(null);
+	let actionsOpen = $state(false);
+	let duplicateOpen = $state(false);
+	let deleteOpen = $state(false);
+	let deleting = $state(false);
+
+	type Row = { kind: 'wod'; date: string; wod: WoD } | { kind: 'open'; date: string };
+
+	const formatOf = (wod: WoD) => {
+		const main = mainSection(wod);
+		return main ? sectionTimer(main) : null;
+	};
+
+	const filtering = $derived(query.trim().length > 0 || format !== null);
+
+	const matches = $derived.by(() => {
+		const needle = query.trim().toLowerCase();
+		return wodStore.wods.filter((wod) => {
+			if (format && formatOf(wod)?.type !== format) return false;
+			if (needle && !`${wodTitle(wod).toLowerCase()}\n${wodSearchText(wod)}`.includes(needle))
+				return false;
+			return true;
+		});
 	});
 
-	async function loadMore() {
-		if (!data.workspaceId || !nextCursor || isLoadingMore) return;
-		isLoadingMore = true;
-		try {
-			const params = new URLSearchParams({
-				workspaceId: data.workspaceId,
-				cursor: nextCursor
-			});
-			const response = await authFetch(`/api/wods?${params}`);
-			if (response.ok) {
-				const { wods: newWods, nextCursor: newCursor } = await response.json();
-				const mapped: WoD[] = newWods.map((w: any) => ({
-					...w,
-					createdAt: new Date(w.createdAt),
-					updatedAt: new Date(w.updatedAt)
-				}));
-				// Deduplicate by id (cache may already have some)
-				const existingIds = new Set(wods.map((w) => w.id));
-				const unique = mapped.filter((w) => !existingIds.has(w.id));
-				wods = [...wods, ...unique];
-				nextCursor = newCursor;
+	// Coaches also see the days of this week that are still open, so a gap in the programming
+	// is visible where it will happen.
+	const rows = $derived.by(() => {
+		const list: Row[] = matches
+			.slice(0, limit)
+			.map((wod) => ({ kind: 'wod', date: wod.date, wod }));
+		if (data.canEdit && !filtering && !wodStore.loading) {
+			const taken = new Set(wodStore.wods.map((w) => w.date));
+			const end = addDays(startOfWeek(today), 6);
+			for (let day = today; day <= end; day = addDays(day, 1)) {
+				if (!taken.has(day)) list.push({ kind: 'open', date: day });
 			}
-		} catch (error) {
-			console.error('Failed to load more workouts:', error);
-			toastStore.error('Failed to load more workouts');
-		} finally {
-			isLoadingMore = false;
+			list.sort((a, b) => b.date.localeCompare(a.date));
 		}
+		return list;
+	});
+
+	const weeks = $derived.by(() => {
+		const groups: { start: string; rows: Row[] }[] = [];
+		for (const row of rows) {
+			const start = startOfWeek(row.date);
+			const last = groups[groups.length - 1];
+			if (last && last.start === start) last.rows.push(row);
+			else groups.push({ start, rows: [row] });
+		}
+		return groups;
+	});
+
+	function openActions(wod: WoD) {
+		selected = wod;
+		actionsOpen = true;
 	}
 
-	// Format date in a human-readable way
-	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr + 'T00:00:00');
-		return date.toLocaleDateString('en-US', {
-			weekday: 'long',
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
+	function askDuplicate(wod: WoD) {
+		selected = wod;
+		actionsOpen = false;
+		duplicateOpen = true;
 	}
 
-	// Truncate description for preview
-	function truncateDescription(description: string | null): string {
-		if (!description) return 'No description';
-		return description.length > 100 ? description.slice(0, 100) + '...' : description;
-	}
-
-	// Get section count
-	function getSectionCount(sections: any[]): number {
-		return sections.length;
-	}
-
-	// Handle delete workflow
-	function handleDeleteClick(wodId: string) {
-		selectedWodId = wodId;
-		deleteModalOpen = true;
+	function askDelete(wod: WoD) {
+		selected = wod;
+		actionsOpen = false;
+		deleteOpen = true;
 	}
 
 	async function confirmDelete() {
-		if (!selectedWodId) return;
-
+		if (!selected) return;
+		deleting = true;
 		try {
-			await wodStore.remove(selectedWodId);
-			wods = wodStore.wods;
-			toastStore.success('Workout deleted successfully');
+			const title = wodTitle(selected);
+			await wodStore.remove(selected.id);
+			toastStore.success(`"${title}" deleted.`);
+			deleteOpen = false;
+			selected = null;
 		} catch (error) {
-			console.error('Failed to delete workout:', error);
-			toastStore.error('Failed to delete workout');
+			console.error('Failed to delete WoD:', error);
+			toastStore.error('Could not delete this WoD.');
 		} finally {
-			deleteModalOpen = false;
-			selectedWodId = null;
+			deleting = false;
 		}
 	}
 
-	function cancelDelete() {
-		deleteModalOpen = false;
-		selectedWodId = null;
-	}
-
-	// Handle duplicate workflow
-	function handleDuplicateClick(wodId: string) {
-		selectedWodId = wodId;
-		duplicateDate = new Date().toISOString().split('T')[0];
-		duplicateModalOpen = true;
-	}
-
-	async function confirmDuplicate() {
-		if (!selectedWodId) return;
-
-		try {
-			await wodStore.duplicate(selectedWodId, duplicateDate);
-			wods = wodStore.wods;
-			toastStore.success('Workout duplicated successfully');
-		} catch (error) {
-			console.error('Failed to duplicate workout:', error);
-			toastStore.error('Failed to duplicate workout');
-		} finally {
-			duplicateModalOpen = false;
-			selectedWodId = null;
-		}
-	}
-
-	function cancelDuplicate() {
-		duplicateModalOpen = false;
-		selectedWodId = null;
-	}
-
-	// Navigation handlers
-	function handleView(wodId: string) {
-		goto(`/workouts/${wodId}`);
-	}
-
-	function handleEdit(wodId: string) {
-		goto(`/workouts/${wodId}/edit`);
-	}
-
-	function handleNewWod() {
-		goto('/workouts/new');
+	function subline(wod: WoD): string {
+		const hurts = vaiDoer(wod);
+		if (hurts) return hurts;
+		return wodSummary(wod);
 	}
 </script>
 
-<!-- Delete Confirmation Modal -->
-<ConfirmModal
-	bind:open={deleteModalOpen}
-	title="Delete Workout"
-	message="Are you sure you want to delete this workout? This action cannot be undone."
-	confirmText="Delete"
-	cancelText="Cancel"
-	variant="danger"
-	onConfirm={confirmDelete}
-	onCancel={cancelDelete}
-/>
+<svelte:head>
+	<title>WoDs - RolimBox</title>
+</svelte:head>
 
-{#if duplicateModalOpen}
-	<div class="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-		<button
-			type="button"
-			class="absolute inset-0 h-full w-full cursor-default bg-bg-base/80 backdrop-blur-sm"
-			onclick={cancelDuplicate}
-			aria-label="Close modal"
-		></button>
-		<Card class="relative w-full max-w-sm border-accent-500/20 shadow-2xl shadow-black">
-			<div class="space-y-6">
-				<div class="space-y-2">
-					<h3 class="text-xl font-black tracking-tight text-white uppercase">Duplicate WOD</h3>
-					<p class="text-sm text-text-muted">Choose a new date for this workout.</p>
-				</div>
-
-				<div class="space-y-2">
-					<label
-						for="dup-date"
-						class="text-[10px] font-bold tracking-widest text-accent-400 uppercase"
-						>Target Date</label
-					>
-					<input
-						type="date"
-						id="dup-date"
-						bind:value={duplicateDate}
-						class="w-full rounded-lg border border-white/10 bg-white/5 p-3 text-white outline-none focus:border-accent-500/50"
-					/>
-				</div>
-
-				<div class="flex gap-3 pt-2">
-					<Button variant="secondary" class="flex-1" onclick={cancelDuplicate}>CANCEL</Button>
-					<Button variant="primary" class="flex-1" onclick={confirmDuplicate}>DUPLICATE</Button>
-				</div>
-			</div>
-		</Card>
-	</div>
-{/if}
-
-<div class="flex flex-col gap-8 p-4 pb-24 md:p-6">
-	<!-- Header Section -->
-	<header class="flex items-end justify-between border-b border-white/10 pb-4">
-		<div>
-			<h1
-				class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
-			>
-				Workouts
-			</h1>
-			<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+<div class="page">
+	<header class="flex items-end justify-between gap-4">
+		<div class="min-w-0">
+			<p class="legend text-mute">
+				{#if wodStore.loading}
+					Reading the board
+				{:else}
+					{wodStore.wods.length} on the board{wodStore.stale && !syncStore.isOffline
+						? ' · could not refresh'
+						: ''}
+				{/if}
+			</p>
+			<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">WoDs</h1>
 		</div>
-		<Button
-			variant="primary"
-			size="sm"
-			onclick={handleNewWod}
-			class="shadow-lg shadow-accent-500/20"
-		>
-			<svg
-				class="mr-2 h-4 w-4"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="3"
-			>
-				<path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round" />
-			</svg>
-			NEW WOD
-		</Button>
+		{#if data.canEdit}
+			<a href={resolve('/workouts/new')} class="btn btn-pink mb-1 flex-none lg:hidden">
+				<Icon name="plus" size={20} stroke={3.4} />
+				New WoD
+			</a>
+		{/if}
 	</header>
 
-	<!-- Workouts List -->
-	<div class="flex flex-col gap-4">
-		{#if !data.workspaceId}
-			<Card
-				class="flex flex-col items-center justify-center gap-4 border-dashed border-white/10 bg-transparent py-12 text-center"
+	<div class="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
+		<div class="relative lg:w-96">
+			<label for="wod-search" class="sr-only">Search WoDs</label>
+			<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-mute">
+				<Icon name="search" size={20} stroke={2.6} />
+			</span>
+			<input
+				id="wod-search"
+				type="search"
+				class="input pl-11"
+				placeholder="Search: fran, thrusters, emom"
+				autocomplete="off"
+				bind:value={query}
+			/>
+		</div>
+		<div
+			class="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0"
+			role="group"
+			aria-label="Format"
+		>
+			<button
+				type="button"
+				class="tag min-h-11 flex-none px-3 {format === null ? 'tag-ink' : ''}"
+				aria-pressed={format === null}
+				onclick={() => (format = null)}
 			>
-				<div class="flex h-16 w-16 items-center justify-center rounded-full bg-error/10 text-error">
-					<svg
-						class="h-8 w-8"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-					>
-						<circle cx="12" cy="12" r="10" />
-						<line x1="12" y1="8" x2="12" y2="12" />
-						<line x1="12" y1="16" x2="12.01" y2="16" />
-					</svg>
-				</div>
-				<div class="space-y-1">
-					<h2 class="text-xl font-bold text-white">No Workspace Found</h2>
-					<p class="mx-auto max-w-xs text-sm text-text-muted">
-						Please create or join a workspace to manage workouts.
-					</p>
-				</div>
-			</Card>
-		{:else if isLoading}
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each Array(4) as _}
-					<Card class="space-y-4">
-						<div class="flex items-start justify-between">
-							<Skeleton variant="text" height="1.5rem" width="40%" />
-							<Skeleton variant="text" height="1rem" width="20%" />
-						</div>
-						<Skeleton variant="text" height="1rem" width="100%" />
-						<div class="flex gap-2 pt-2">
-							<Skeleton variant="button" width="80px" height="36px" />
-							<Skeleton variant="button" width="80px" height="36px" />
-						</div>
-					</Card>
+				All
+			</button>
+			{#each TIMER_TYPES as type (type)}
+				<button
+					type="button"
+					class="tag min-h-11 flex-none px-3 {format === type ? 'tag-ink' : ''}"
+					aria-pressed={format === type}
+					onclick={() => (format = format === type ? null : type)}
+				>
+					{TIMER_LABELS[type]}
+				</button>
+			{/each}
+		</div>
+	</div>
+
+	<div class="mt-6">
+		{#if wodStore.loading}
+			<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading WoDs">
+				{#each [0, 1, 2, 3, 4, 5] as row (row)}
+					<div class="led h-[4.5rem]"></div>
 				{/each}
 			</div>
-		{:else if wods.length === 0}
-			<Card
-				class="flex flex-col items-center justify-center gap-6 border-dashed border-white/10 bg-transparent py-16 text-center"
-			>
-				<div class="relative">
-					<div class="absolute inset-0 rounded-full bg-accent-500/20 blur-2xl"></div>
-					<div
-						class="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-text-muted"
-					>
-						<svg
-							class="h-10 w-10"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="1.5"
-						>
-							<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-							<path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-						</svg>
-					</div>
-				</div>
-				<div class="space-y-1">
-					<h2 class="text-xl font-bold text-white">No workouts yet</h2>
-					<p class="text-sm text-text-muted">
-						Your training library is empty. Start your journey today!
-					</p>
-				</div>
-				<Button variant="outline" size="sm" onclick={handleNewWod}>CREATE FIRST WOD</Button>
-			</Card>
+		{:else if wodStore.wods.length === 0}
+			<div class="border-2 border-line-strong gridlines px-5 py-8 lg:p-12">
+				<p class="inline-block -rotate-3 sign text-[3rem] text-pink-ink" lang="pt-BR">Tá vazio.</p>
+				<h2 class="mt-4 display text-[3rem] lg:text-[4rem]">No WoDs yet</h2>
+				<p class="mt-3 max-w-md text-lg leading-snug text-dim">
+					{#if wodStore.stale}
+						The server cannot be reached and nothing is saved on this phone yet.
+					{:else if data.canEdit}
+						This box has an empty board. Program the first one and it shows up on everyone's phone.
+					{:else}
+						The coaches have not programmed anything in this box yet.
+					{/if}
+				</p>
+				{#if wodStore.stale}
+					<button type="button" class="btn btn-ink mt-6" onclick={() => wodStore.refresh()}>
+						<Icon name="refresh" size={18} stroke={2.6} />
+						Try again
+					</button>
+				{:else if data.canEdit}
+					<a href={resolve('/workouts/new')} class="btn btn-pink mt-6">
+						<Icon name="plus" size={20} stroke={3.4} />
+						Program the first WoD
+					</a>
+				{/if}
+			</div>
+		{:else if matches.length === 0}
+			<div class="border-2 border-line-strong px-5 py-8">
+				<h2 class="display text-[2.5rem]">No match</h2>
+				<p class="mt-2 text-lg text-dim">Nothing on the board matches that search.</p>
+				<button
+					type="button"
+					class="btn btn-quiet mt-5"
+					onclick={() => {
+						query = '';
+						format = null;
+					}}
+				>
+					Clear search
+				</button>
+			</div>
 		{:else}
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each wods as wod (wod.id)}
-					<Card
-						class="group relative overflow-hidden border-l-2 border-l-transparent transition-all duration-300 hover:border-l-accent-500"
-					>
-						<div class="flex flex-col gap-4">
-							<div class="flex items-center justify-between">
-								<div class="flex items-center gap-3">
-									<div
-										class="flex h-10 w-10 items-center justify-center rounded-lg border border-white/5 bg-bg-surface font-bold text-accent-400"
+			{#each weeks as week (week.start)}
+				<section class="week">
+					<div class="module-head">
+						<h2>{weekLabel(week.start, today)}</h2>
+						<span
+							>{formatDayMonth(week.start, today)} – {formatDayMonth(
+								addDays(week.start, 6),
+								today
+							)}</span
+						>
+					</div>
+					<ul>
+						{#each week.rows as row (row.kind === 'wod' ? row.wod.id : `open-${row.date}`)}
+							<li
+								class="row"
+								class:is-today={row.date === today}
+								class:is-future={row.date > today}
+							>
+								<div class="day">
+									<span class="legend text-[0.6875rem]"
+										>{formatWeekday(row.date, 'short').slice(0, 3)}</span
 									>
-										{new Date(wod.date).getDate()}
-									</div>
-									<div>
-										<h3 class="font-bold tracking-tight text-text-primary uppercase">
-											{new Date(wod.date).toLocaleDateString('en-US', {
-												month: 'short',
-												year: 'numeric'
-											})}
-										</h3>
-										<p
-											class="text-[10px] leading-none font-bold tracking-widest text-text-muted uppercase"
-										>
-											{new Date(wod.date).toLocaleDateString('en-US', { weekday: 'long' })}
-										</p>
-									</div>
+									<span class="display text-[2rem]">{dayOfMonth(row.date)}</span>
 								</div>
-								<div
-									class="rounded-full border border-white/5 bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest text-text-secondary uppercase"
-								>
-									{getSectionCount(wod.sections)}
-									{getSectionCount(wod.sections) === 1 ? 'Section' : 'Sections'}
-								</div>
-							</div>
 
-							<p class="line-clamp-2 text-sm leading-relaxed text-text-secondary">
-								{truncateDescription(wod.description)}
-							</p>
-
-							<div class="mt-auto flex items-center justify-between border-t border-white/5 pt-2">
-								<div class="flex gap-2">
-									<Button
-										variant="secondary"
-										size="xs"
-										onclick={() => handleView(wod.id)}
-										class="text-[10px]">VIEW</Button
-									>
-									<Button
-										variant="outline"
-										size="xs"
-										onclick={() => handleEdit(wod.id)}
-										class="text-[10px]">EDIT</Button
-									>
-								</div>
-								<div class="flex gap-1">
-									<button
-										class="rounded-lg p-2 text-text-muted transition-colors hover:bg-white/5 hover:text-accent-400"
-										onclick={() => handleDuplicateClick(wod.id)}
-										title="Duplicate"
-									>
-										<svg
-											class="h-4 w-4"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
+								{#if row.kind === 'wod'}
+									{@const wod = row.wod}
+									{@const timer = formatOf(wod)}
+									<a href={resolve('/(app)/workouts/[id]', { id: wod.id })} class="what">
+										<span class="block truncate display text-[2rem] lg:text-[2.25rem]"
+											>{wodTitle(wod)}</span
 										>
-											<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-											<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-										</svg>
-									</button>
-									<button
-										class="rounded-lg p-2 text-text-muted transition-colors hover:bg-error/5 hover:text-error"
-										onclick={() => handleDeleteClick(wod.id)}
-										title="Delete"
-									>
-										<svg
-											class="h-4 w-4"
-											viewBox="0 0 24 24"
-											fill="none"
-											stroke="currentColor"
-											stroke-width="2"
+										<span class="mt-1.5 flex items-center gap-2 legend text-dim">
+											{#if timer}<span class="flex-none text-ink">{timerChip(timer)}</span>{/if}
+											{#if timer && subline(wod)}<span aria-hidden="true">/</span>{/if}
+											<span class="truncate">{subline(wod)}</span>
+										</span>
+									</a>
+									{#if data.canEdit}
+										<div class="tools">
+											<button
+												type="button"
+												class="icon-btn"
+												onclick={() => askDuplicate(wod)}
+												aria-label="Duplicate {wodTitle(wod)}, {formatLong(wod.date)}"
+												title="Duplicate"
+											>
+												<Icon name="copy" size={20} stroke={2.4} />
+											</button>
+											<a
+												href={resolve('/(app)/workouts/[id]/edit', { id: wod.id })}
+												class="icon-btn"
+												aria-label="Edit {wodTitle(wod)}, {formatLong(wod.date)}"
+												title="Edit"
+											>
+												<Icon name="edit" size={20} stroke={2.4} />
+											</a>
+											<button
+												type="button"
+												class="icon-btn"
+												onclick={() => askDelete(wod)}
+												aria-label="Delete {wodTitle(wod)}, {formatLong(wod.date)}"
+												title="Delete"
+											>
+												<Icon name="trash" size={20} stroke={2.4} />
+											</button>
+										</div>
+										<button
+											type="button"
+											class="more"
+											onclick={() => openActions(wod)}
+											aria-label="Actions for {wodTitle(wod)}, {formatLong(wod.date)}"
 										>
-											<polyline points="3 6 5 6 21 6" />
-											<path
-												d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-											/>
-										</svg>
-									</button>
-								</div>
-							</div>
-						</div>
-					</Card>
-				{/each}
-			</div>
+											<Icon name="more" size={24} stroke={3} />
+										</button>
+									{/if}
+								{:else}
+									<a href="{resolve('/workouts/new')}?date={row.date}" class="what open">
+										<span class="flex items-center gap-2 legend text-dim">
+											<Icon name="plus" size={14} stroke={3.4} />
+											<span class="text-ink"
+												>Program {row.date === today
+													? 'today'
+													: formatWeekday(row.date, 'long')}</span
+											>
+											<span class="text-mute max-sm:hidden">· nothing on the board yet</span>
+										</span>
+									</a>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
 
-			{#if nextCursor}
-				<div class="flex justify-center pt-4">
-					<Button
-						variant="secondary"
-						size="sm"
-						onclick={loadMore}
-						disabled={isLoadingMore}
-					>
-						{isLoadingMore ? 'Loading...' : 'LOAD MORE'}
-					</Button>
-				</div>
+			{#if matches.length > limit}
+				<button type="button" class="btn btn-quiet mt-6 w-full" onclick={() => (limit += PAGE)}>
+					Show older WoDs ({matches.length - limit} more)
+				</button>
 			{/if}
 		{/if}
 	</div>
 </div>
+
+<Sheet
+	bind:open={actionsOpen}
+	title={selected ? wodTitle(selected) : ''}
+	legend={selected ? formatLong(selected.date) : undefined}
+>
+	{#if selected}
+		{@const wod = selected}
+		<div class="flex flex-col gap-2">
+			<button type="button" class="btn justify-start" onclick={() => askDuplicate(wod)}>
+				<Icon name="copy" size={20} stroke={2.6} />
+				Duplicate
+			</button>
+			<button
+				type="button"
+				class="btn justify-start"
+				onclick={() => {
+					actionsOpen = false;
+					void goto(resolve('/(app)/workouts/[id]/edit', { id: wod.id }));
+				}}
+			>
+				<Icon name="edit" size={20} stroke={2.6} />
+				Edit
+			</button>
+			<button type="button" class="btn btn-danger justify-start" onclick={() => askDelete(wod)}>
+				<Icon name="trash" size={20} stroke={2.6} />
+				Delete
+			</button>
+		</div>
+	{/if}
+</Sheet>
+
+<DuplicateSheet wod={selected} bind:open={duplicateOpen} />
+
+<ConfirmDialog
+	bind:open={deleteOpen}
+	title="Delete this WoD?"
+	legend={selected ? `${wodTitle(selected)} · ${formatLong(selected.date)}` : undefined}
+	message="It disappears from everyone's board. This cannot be undone."
+	confirmLabel={deleting ? 'Deleting' : 'Delete WoD'}
+	cancelLabel="Keep it"
+	danger
+	busy={deleting}
+	onconfirm={confirmDelete}
+/>
+
+<style>
+	.page {
+		padding: 1.5rem calc(1rem + var(--safe-right)) 0 calc(1rem + var(--safe-left));
+		max-width: 64rem;
+	}
+	.week {
+		border-top: 2px solid var(--c-ink);
+		margin-bottom: 1.5rem;
+	}
+	.row {
+		display: grid;
+		grid-template-columns: 3.75rem minmax(0, 1fr) auto;
+		align-items: stretch;
+		min-height: 4.75rem;
+		border-top: 1px solid var(--c-line);
+	}
+	.row:has(.open) {
+		min-height: 3.5rem;
+	}
+	.row:has(.open) .day {
+		flex-direction: row;
+		gap: 0.375rem;
+		align-items: baseline;
+		padding-top: 0.75rem;
+	}
+	.row:has(.open) .day :global(.display) {
+		font-size: 1.375rem;
+	}
+	.day {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem;
+		padding-top: 0.25rem;
+		background: var(--c-panel);
+		color: var(--c-ink);
+	}
+	.is-today .day {
+		background: var(--c-pink);
+		color: var(--c-on-fill);
+	}
+	.is-future .day {
+		background: transparent;
+		box-shadow: inset 0 0 0 1px var(--c-line-strong);
+	}
+	.what {
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		min-width: 0;
+		padding: 0.625rem 0.75rem 0.5rem 0.875rem;
+		color: var(--c-ink);
+		text-decoration: none;
+	}
+	.what.open {
+		background-image: repeating-linear-gradient(-45deg, var(--c-line) 0 1px, transparent 1px 9px);
+	}
+	.tools {
+		display: none;
+	}
+	.more {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 3.25rem;
+		color: var(--c-dim);
+		border-left: 1px solid var(--c-line);
+	}
+	@media (hover: hover) {
+		.row:hover .what:not(.open) {
+			background: var(--c-panel);
+		}
+		.what.open:hover {
+			background-color: var(--c-panel);
+		}
+	}
+	@media (min-width: 1024px) {
+		.page {
+			padding: 2.25rem 2.5rem 0;
+		}
+		.row {
+			grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+		}
+		.tools {
+			display: flex;
+			align-items: center;
+			gap: 0.375rem;
+			padding-left: 0.75rem;
+		}
+		.more {
+			display: none;
+		}
+	}
+</style>

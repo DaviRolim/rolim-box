@@ -1,91 +1,325 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { enhance } from '$app/forms';
+	import { onMount, untrack } from 'svelte';
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { audioService } from '$lib/services/audio.svelte';
-	import { clearAllCachedData } from '$lib/db/indexeddb';
-	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
-	import BottomNav from '$lib/components/BottomNav.svelte';
-	import Toast from '$lib/components/Toast.svelte';
-	import WorkspaceSwitcher from '$lib/components/WorkspaceSwitcher.svelte';
+	import { wodStore } from '$lib/stores/wods.svelte';
+	import { syncStore } from '$lib/stores/sync.svelte';
+	import Toasts from '$lib/components/ui/Toasts.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
+	import Logo from '$lib/components/ui/Logo.svelte';
+	import SyncChip from '$lib/components/shell/SyncChip.svelte';
+	import WorkspaceSwitcher from '$lib/components/shell/WorkspaceSwitcher.svelte';
+	import LogoutButton from '$lib/components/shell/LogoutButton.svelte';
+	import type { IconName } from '$lib/components/ui/icons';
 
 	let { data, children } = $props();
 
-	onMount(() => {
-		// Defer audio preloading to avoid blocking initial render
-		if ('requestIdleCallback' in window) {
-			requestIdleCallback(() => audioService.preload());
-		} else {
-			// Fallback for Safari
-			setTimeout(() => audioService.preload(), 1000);
-		}
+	const NAV: {
+		href: '/dashboard' | '/workouts' | '/timers' | '/prs';
+		label: string;
+		icon: IconName;
+	}[] = [
+		{ href: '/dashboard', label: 'Today', icon: 'today' },
+		{ href: '/workouts', label: 'WoDs', icon: 'list' },
+		{ href: '/timers', label: 'Clock', icon: 'timer' },
+		{ href: '/prs', label: 'PRs', icon: 'trophy' }
+	];
 
-		// Unlock AudioContext on first user interaction (required for iOS Safari)
+	const path = $derived(page.url.pathname);
+	// A running clock owns the whole screen: no bars, no navigation.
+	const bare = $derived(page.route.id === '/(app)/timers/[id]');
+	const isActive = (href: string) => path === href || path.startsWith(href + '/');
+
+	// One store feeds every screen. Opening it here means Today, WoDs and the clock all read
+	// the same list, and it is already there when the person moves between them.
+	// (Untracked: the store's own state must not re-run this, or a failed refresh would loop.)
+	$effect(() => {
+		const workspaceId = data.activeWorkspaceId;
+		untrack(() => void wodStore.open(workspaceId));
+	});
+
+	onMount(() => {
+		// Voice cues are loaded when the phone is idle, not while the WoD is being drawn.
+		if ('requestIdleCallback' in window) requestIdleCallback(() => audioService.preload());
+		else setTimeout(() => audioService.preload(), 1000);
+
+		// iOS only lets audio start from a tap: unlock it on the first one.
 		const unlock = () => audioService.unlockAudio();
 		document.addEventListener('touchstart', unlock, { once: true });
 		document.addEventListener('click', unlock, { once: true });
+
+		// Ask the service worker to keep a copy of Today, so the next open works without signal.
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.ready
+				.then((registration) => registration.active?.postMessage({ type: 'warm' }))
+				.catch(() => {});
+		}
 	});
+
+	function onKeydown(event: KeyboardEvent) {
+		if (!data.canEdit || bare) return;
+		if (event.metaKey || event.ctrlKey || event.altKey) return;
+		const target = event.target as HTMLElement | null;
+		if (target?.closest('input, textarea, select, [contenteditable], dialog')) return;
+		if (event.key === 'n' || event.key === 'N') {
+			event.preventDefault();
+			void goto(resolve('/workouts/new'));
+		}
+	}
 </script>
 
-<Toast />
+<svelte:window onkeydown={onKeydown} />
 
-<div class="min-h-screen bg-bg-base text-text-primary">
-	<OfflineBanner />
+<Toasts />
 
-	<header
-		class="sticky top-0 z-50 border-b border-white/5 bg-bg-surface/50 px-4 py-4 backdrop-blur-md"
-	>
-		<div class="mx-auto flex max-w-6xl items-center justify-between">
-			<a href="/dashboard" class="flex items-center gap-2">
-				<div
-					class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent-500 to-accent-600 font-black text-white shadow-lg shadow-accent-500/20"
-				>
-					R
-				</div>
-				<h1 class="text-xl font-black tracking-tighter text-white uppercase italic">RolimBox</h1>
+{#if bare}
+	{@render children()}
+{:else}
+	<div class="shell">
+		<!-- Desktop: the rail -->
+		<aside class="rail" aria-label="RolimBox">
+			<a
+				href={resolve('/dashboard')}
+				class="block px-4 pt-5 pb-4 no-underline"
+				aria-label="RolimBox, today"
+			>
+				<Logo size={34} />
 			</a>
-			<div class="flex items-center gap-4">
-				<div class="hidden sm:block">
-					<WorkspaceSwitcher workspaces={data.workspaces} activeWorkspaceId={data.activeWorkspaceId ?? undefined} />
-				</div>
+
+			{#if data.workspaces.length > 0}
+				<WorkspaceSwitcher
+					workspaces={data.workspaces}
+					activeWorkspaceId={data.activeWorkspaceId}
+					variant="rail"
+				/>
+			{/if}
+
+			{#if !data.hasNoWorkspace}
+				<nav class="mt-2 flex flex-col" aria-label="Main">
+					{#each NAV as item, index (item.href)}
+						<a
+							href={resolve(item.href)}
+							class="rail-link"
+							class:active={isActive(item.href)}
+							aria-current={isActive(item.href) ? 'page' : undefined}
+						>
+							<span class="w-6 legend opacity-70">0{index + 1}</span>
+							<span class="display text-[1.75rem]">{item.label}</span>
+						</a>
+					{/each}
+				</nav>
+
+				{#if data.canEdit}
+					<div class="px-4 pt-5">
+						<a href={resolve('/workouts/new')} class="btn btn-pink w-full justify-between">
+							<span class="flex items-center gap-2">
+								<Icon name="plus" size={20} stroke={3.5} />
+								New WoD
+							</span>
+							<kbd class="border border-current px-1.5 py-0.5 legend">N</kbd>
+						</a>
+					</div>
+				{/if}
+			{/if}
+
+			<div class="mt-auto flex flex-col gap-1 border-t border-line px-4 py-3">
+				<SyncChip />
 				<a
-					href="/settings"
-					class="rounded-lg p-2 text-text-muted transition-colors hover:bg-white/10 hover:text-white"
-					title="Settings"
+					href={resolve('/settings')}
+					class="flex min-h-11 items-center gap-2 px-1 legend no-underline {isActive('/settings')
+						? 'text-ink'
+						: 'text-dim'}"
 				>
-					<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-						<circle cx="12" cy="12" r="3" />
-						<path
-							d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-						/>
-					</svg>
+					<Icon name="settings" size={16} stroke={2.5} />
+					Settings
 				</a>
-				<form
-					action="/logout"
-					method="POST"
-					use:enhance={() => {
-						clearAllCachedData().catch(() => {});
-						if ('caches' in window) {
-							caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
-						}
-					}}
-				>
-					<button
-						type="submit"
-						class="glass-hover rounded-lg border border-white/5 bg-white/5 px-3 py-1.5 text-xs font-bold tracking-wider text-text-muted uppercase transition-all hover:border-error/30 hover:bg-error/5 hover:text-error"
-					>
-						Logout
-					</button>
-				</form>
+				<p class="truncate px-1 pb-2 text-sm text-mute" title={data.user.email}>
+					{data.user.email}
+				</p>
+				<LogoutButton class="btn btn-quiet btn-sm w-full" />
 			</div>
+		</aside>
+
+		<!-- Phone: the top bar -->
+		<header class="topbar">
+			<div class="flex min-w-0 items-center gap-2">
+				<a href={resolve('/dashboard')} class="flex-none no-underline" aria-label="RolimBox, today">
+					<Logo size={28} wordmark={data.workspaces.length <= 1} />
+				</a>
+				{#if data.workspaces.length > 1}
+					<WorkspaceSwitcher
+						workspaces={data.workspaces}
+						activeWorkspaceId={data.activeWorkspaceId}
+						variant="bar"
+					/>
+				{/if}
+			</div>
+			<div class="flex flex-none items-center gap-1">
+				<SyncChip />
+				<a
+					href={resolve('/settings')}
+					class="-mr-2 flex h-12 w-11 flex-none items-center justify-center {isActive('/settings')
+						? 'text-pink-ink'
+						: 'text-ink'}"
+					aria-label="Settings"
+				>
+					<Icon name="settings" size={22} stroke={2.2} />
+				</a>
+			</div>
+		</header>
+
+		<div class="stage">
+			{#if syncStore.isOffline}
+				<div class="status-strip bg-warn text-on-fill" role="status">
+					<Icon name="wifi-off" size={16} stroke={2.8} />
+					<span>Offline. Showing what is saved on this phone.</span>
+				</div>
+			{:else if syncStore.failed.length > 0}
+				<div role="status">
+					<a href={resolve('/settings')} class="status-strip bg-danger text-on-fill no-underline">
+						<Icon name="alert" size={16} stroke={2.8} />
+						<span>
+							{syncStore.failed.length === 1
+								? '1 change was refused by the server.'
+								: `${syncStore.failed.length} changes were refused by the server.`} Review
+						</span>
+					</a>
+				</div>
+			{/if}
+
+			<main>
+				{@render children()}
+			</main>
 		</div>
-	</header>
 
-	<main
-		class="mx-auto min-h-[calc(100vh-140px)] max-w-6xl"
-		style="padding-bottom: calc(var(--bottom-nav-min-height) + env(safe-area-inset-bottom) + 2rem)"
-	>
-		{@render children()}
-	</main>
+		<!-- Phone: the bottom navigation -->
+		{#if !data.hasNoWorkspace}
+			<nav class="tabs" aria-label="Main">
+				{#each NAV as item (item.href)}
+					<a
+						href={resolve(item.href)}
+						class="tab"
+						class:active={isActive(item.href)}
+						aria-current={isActive(item.href) ? 'page' : undefined}
+					>
+						<Icon name={item.icon} size={24} stroke={isActive(item.href) ? 2.6 : 2} />
+						<span class="legend">{item.label}</span>
+					</a>
+				{/each}
+			</nav>
+		{/if}
+	</div>
+{/if}
 
-	<BottomNav />
-</div>
+<style>
+	.shell {
+		min-height: 100dvh;
+	}
+
+	.rail {
+		display: none;
+	}
+
+	.topbar {
+		position: sticky;
+		top: 0;
+		z-index: 40;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		height: calc(var(--bar-h) + var(--safe-top));
+		padding: var(--safe-top) calc(1rem + var(--safe-right)) 0 calc(1rem + var(--safe-left));
+		background: var(--c-bg);
+		border-bottom: 2px solid var(--c-ink);
+	}
+
+	.stage {
+		padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 1.5rem);
+	}
+
+	.status-strip {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem calc(1rem + var(--safe-right)) 0.5rem calc(1rem + var(--safe-left));
+		font-family: var(--font-mono);
+		font-stretch: 75%;
+		font-size: 0.75rem;
+		font-weight: 700;
+		line-height: 1.3;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.tabs {
+		position: fixed;
+		z-index: 40;
+		inset: auto 0 0 0;
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		height: calc(var(--nav-h) + var(--safe-bottom));
+		padding-bottom: var(--safe-bottom);
+		padding-inline: var(--safe-left) var(--safe-right);
+		background: var(--c-bg);
+		border-top: 2px solid var(--c-ink);
+	}
+	.tab {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3rem;
+		color: var(--c-mute);
+		text-decoration: none;
+	}
+	.tab + .tab {
+		border-left: 1px solid var(--c-line);
+	}
+	.tab.active {
+		color: var(--c-on-fill);
+		background: var(--c-pink);
+	}
+
+	@media (min-width: 1024px) {
+		.rail {
+			position: fixed;
+			inset: 0 auto 0 0;
+			z-index: 40;
+			display: flex;
+			flex-direction: column;
+			width: var(--rail-w);
+			background: var(--c-bg);
+			border-right: 2px solid var(--c-ink);
+			overflow-y: auto;
+		}
+		.rail-link {
+			display: flex;
+			align-items: baseline;
+			gap: 0.75rem;
+			padding: 0.75rem 1rem 0.625rem;
+			border-bottom: 1px solid var(--c-line);
+			color: var(--c-dim);
+			text-decoration: none;
+		}
+		.rail-link:hover {
+			color: var(--c-ink);
+			background: var(--c-panel);
+		}
+		.rail-link.active {
+			color: var(--c-on-fill);
+			background: var(--c-pink);
+		}
+		.topbar,
+		.tabs {
+			display: none;
+		}
+		.stage {
+			margin-left: var(--rail-w);
+			padding-bottom: 3rem;
+		}
+	}
+</style>

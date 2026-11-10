@@ -68,7 +68,11 @@ export const load: LayoutServerLoad = async ({ locals, cookies, url }) => {
 		...base,
 		workspaces: workspaces.map((w) => ({ id: w.id, name: w.name, role: w.role })),
 		activeWorkspaceId: activeWorkspace.id,
-		activeWorkspace: { id: activeWorkspace.id, name: activeWorkspace.name, role: activeWorkspace.role },
+		activeWorkspace: {
+			id: activeWorkspace.id,
+			name: activeWorkspace.name,
+			role: activeWorkspace.role
+		},
 		role: activeWorkspace.role,
 		canEdit: canEditWods(activeWorkspace.role),
 		hasNoWorkspace: false

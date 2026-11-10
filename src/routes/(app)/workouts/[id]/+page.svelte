@@ -1,188 +1,171 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { formatLong, formatShort } from '$lib/date';
 	import { wodStore } from '$lib/stores/wods.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
-	import Skeleton from '$lib/components/Skeleton.svelte';
-	import Button from '$lib/components/Button.svelte';
-	import Card from '$lib/components/Card.svelte';
-	import SectionList from '$lib/components/sections/SectionList.svelte';
-	import type { PageData } from './$types';
+	import { wodTitle } from '$lib/wod-format';
+	import Icon from '$lib/components/ui/Icon.svelte';
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import WodView from '$lib/components/wod/WodView.svelte';
+	import DuplicateSheet from '$lib/components/wod/DuplicateSheet.svelte';
 	import type { WoD } from '$lib/types/wod';
 
-	let { data }: { data: PageData } = $props();
+	let { data } = $props();
 
-	// State
-	let wod = $state<WoD | null>(null);
-	let isLoading = $state(true);
-	let notFound = $state(false);
+	const id = $derived(page.params.id ?? '');
 
-	onMount(async () => {
-		try {
-			const found = await wodStore.find(data.wodId);
-			const loadedWod = found === 'unavailable' ? null : found;
-			if (loadedWod) {
-				wod = loadedWod;
-			} else {
-				notFound = true;
-				toastStore.error('Workout not found');
-			}
-		} catch (error) {
-			console.error('Failed to load workout:', error);
-			toastStore.error('Failed to load workout');
-			notFound = true;
-		} finally {
-			isLoading = false;
-		}
+	// The list usually has it already. If not (deep link, another box), look on the device and
+	// then on the server.
+	let looked = $state<{ id: string; result: WoD | null | 'unavailable' } | null>(null);
+	const listed = $derived(wodStore.get(id));
+	const wod = $derived(
+		listed ?? (looked?.id === id && typeof looked.result === 'object' ? looked.result : null)
+	);
+	const searching = $derived(!wod && (wodStore.loading || looked?.id !== id));
+	const unavailable = $derived(!wod && looked?.id === id && looked.result === 'unavailable');
+
+	$effect(() => {
+		const target = id;
+		if (listed || wodStore.loading || looked?.id === target) return;
+		let cancelled = false;
+		wodStore.find(target).then((result) => {
+			if (!cancelled) looked = { id: target, result };
+		});
+		return () => {
+			cancelled = true;
+		};
 	});
 
-	// Format date in a human-readable way
-	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr + 'T00:00:00');
-		return date.toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
+	let duplicateOpen = $state(false);
+	let deleteOpen = $state(false);
+	let deleting = $state(false);
 
-	// Navigation handlers
-	function handleBack() {
-		goto('/workouts');
-	}
-
-	function handleEdit() {
-		if (wod) {
-			goto(`/workouts/${wod.id}/edit`);
+	async function confirmDelete() {
+		if (!wod) return;
+		deleting = true;
+		try {
+			const title = wodTitle(wod);
+			await wodStore.remove(wod.id);
+			toastStore.success(`"${title}" deleted.`);
+			deleteOpen = false;
+			await goto(resolve('/workouts'));
+		} catch (error) {
+			console.error('Failed to delete WoD:', error);
+			toastStore.error('Could not delete this WoD.');
+		} finally {
+			deleting = false;
 		}
 	}
 </script>
 
-<div class="flex flex-col gap-8 p-4 pb-24 md:p-6 lg:mx-auto lg:max-w-5xl">
-	{#if isLoading}
-		<!-- Loading State -->
-		<div class="space-y-6">
-			<div class="flex items-center justify-between">
-				<div class="space-y-2">
-					<Skeleton variant="text" width="100px" height="20px" />
-					<Skeleton variant="text" width="200px" height="32px" />
-				</div>
-				<Skeleton variant="button" width="100px" height="40px" />
-			</div>
+<svelte:head>
+	<title>{wod ? `${wodTitle(wod)} · ${formatShort(wod.date)}` : 'WoD'} - RolimBox</title>
+</svelte:head>
 
-			<Card class="space-y-4">
-				<Skeleton variant="text" width="100%" height="24px" />
-				<Skeleton variant="text" width="80%" height="24px" />
-			</Card>
+<div class="page">
+	<a
+		href={resolve('/workouts')}
+		class="inline-flex min-h-11 items-center gap-2 legend text-dim no-underline"
+	>
+		<Icon name="arrow-left" size={16} stroke={3} />
+		All WoDs
+	</a>
 
-			<div class="space-y-4">
-				{#each Array(2) as _}
-					<div class="h-40 rounded-2xl border border-white/5 bg-white/5 p-6">
-						<Skeleton variant="text" width="150px" height="24px" />
-						<div class="mt-4 space-y-2">
-							<Skeleton variant="text" width="100%" height="16px" />
-							<Skeleton variant="text" width="100%" height="16px" />
-							<Skeleton variant="text" width="60%" height="16px" />
-						</div>
-					</div>
-				{/each}
-			</div>
-		</div>
-	{:else if notFound || !wod}
-		<!-- 404 State -->
-		<div class="flex min-h-[60vh] flex-col items-center justify-center text-center">
+	<div class="mt-3">
+		{#if wod}
+			<WodView {wod}>
+				{#snippet tools()}
+					{#if data.canEdit}
+						<a href={resolve('/(app)/workouts/[id]/edit', { id: wod.id })} class="btn btn-quiet">
+							<Icon name="edit" size={18} stroke={2.6} />
+							Edit
+						</a>
+						<button type="button" class="btn btn-quiet" onclick={() => (duplicateOpen = true)}>
+							<Icon name="copy" size={18} stroke={2.6} />
+							Duplicate
+						</button>
+						<button
+							type="button"
+							class="btn btn-quiet"
+							onclick={() => (deleteOpen = true)}
+							aria-label="Delete this WoD"
+						>
+							<Icon name="trash" size={18} stroke={2.6} />
+							Delete
+						</button>
+					{/if}
+				{/snippet}
+			</WodView>
+		{:else if searching}
 			<div
-				class="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-white/5 text-4xl text-text-muted"
+				class="grid gap-8 lg:grid-cols-[5fr_7fr] lg:gap-12"
+				aria-busy="true"
+				aria-label="Loading the WoD"
 			>
-				🔍
-			</div>
-			<h1 class="mb-2 text-2xl font-black tracking-tight text-white uppercase">
-				Workout Not Found
-			</h1>
-			<p class="mb-8 max-w-md text-text-secondary">
-				The workout you're looking for doesn't exist or has been deleted.
-			</p>
-			<Button variant="primary" onclick={handleBack}>Back to Library</Button>
-		</div>
-	{:else}
-		<!-- WoD View -->
-		<header class="flex items-center justify-between border-b border-white/10 pb-4">
-			<div class="flex items-center gap-4">
-				<Button variant="ghost" size="sm" onclick={handleBack} class="p-2">
-					<svg
-						class="h-5 w-5"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2.5"
-					>
-						<path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-					</svg>
-				</Button>
 				<div>
-					<div class="flex items-center gap-3">
-						<span class="text-[10px] font-bold tracking-widest text-accent-400 uppercase">
-							{formatDate(wod.date)}
-						</span>
-					</div>
-					<h1 class="text-3xl font-black tracking-tight text-white uppercase">Workout Details</h1>
-					<div class="h-1 w-12 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+					<div class="led h-28 w-full lg:h-40"></div>
+					<div class="led mt-3 h-14 w-3/4"></div>
+				</div>
+				<div class="flex flex-col gap-3">
+					{#each [100, 86, 92, 70] as width (width)}
+						<div class="led h-12" style="width: {width}%"></div>
+					{/each}
 				</div>
 			</div>
-			<Button variant="secondary" size="sm" onclick={handleEdit} class="gap-2">
-				<svg
-					width="16"
-					height="16"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-				>
-					<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-					<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-				</svg>
-				EDIT
-			</Button>
-		</header>
-
-		<!-- Content -->
-		<div class="space-y-8">
-			<!-- Description Section -->
-			{#if wod.description}
-				<Card class="relative overflow-hidden border-l-4 border-l-accent-500">
-					<h3 class="mb-2 text-xs font-bold tracking-widest text-text-muted uppercase">
-						Description
-					</h3>
-					<p class="text-lg leading-relaxed font-medium text-white">
-						{wod.description}
-					</p>
-				</Card>
-			{/if}
-
-			<!-- Sections -->
-			<div class="space-y-6">
-				<div class="flex items-center justify-between">
-					<h2 class="text-xl font-black tracking-tight text-white uppercase">Workout Structure</h2>
-					<span
-						class="rounded-full bg-white/5 px-3 py-1 text-[10px] font-bold tracking-widest text-text-muted uppercase"
-					>
-						{wod.sections.length} Sections
-					</span>
-				</div>
-
-				<SectionList sections={wod.sections} editable={false} />
-
-				<!-- Empty sections state -->
-				{#if wod.sections.length === 0}
-					<div
-						class="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-white/10 bg-white/5 p-12 text-center"
-					>
-						<div class="text-4xl opacity-50">📝</div>
-						<p class="text-sm font-medium text-text-secondary">No sections in this workout.</p>
-						<Button variant="primary" size="sm" onclick={handleEdit}>Add Sections</Button>
-					</div>
-				{/if}
+		{:else if unavailable}
+			<div class="border-2 border-warn px-5 py-8 lg:p-12">
+				<p class="legend text-warn-ink">Offline</p>
+				<h1 class="mt-3 display text-[3.5rem] lg:text-[5rem]">Not on this phone</h1>
+				<p class="mt-3 max-w-md text-lg leading-snug text-dim">
+					This WoD is not saved here and the server cannot be reached right now. It will open as
+					soon as there is a connection.
+				</p>
+				<a href={resolve('/dashboard')} class="btn btn-ink mt-6">Back to today</a>
 			</div>
-		</div>
-	{/if}
+		{:else}
+			<div class="border-2 border-line-strong gridlines px-5 py-8 lg:p-12">
+				<p class="inline-block -rotate-3 sign text-[3.25rem] text-pink-ink" lang="pt-BR">Sumiu.</p>
+				<h1 class="mt-4 display text-[3.5rem] lg:text-[5rem]">WoD not found</h1>
+				<p class="mt-3 max-w-md text-lg leading-snug text-dim">
+					It may have been deleted, or it belongs to a box you are not in.
+				</p>
+				<div class="mt-6 flex flex-wrap gap-2">
+					<a href={resolve('/workouts')} class="btn btn-ink">All WoDs</a>
+					<a href={resolve('/dashboard')} class="btn btn-quiet">Today</a>
+				</div>
+			</div>
+		{/if}
+	</div>
 </div>
+
+<DuplicateSheet
+	{wod}
+	bind:open={duplicateOpen}
+	onduplicated={(copy) => goto(resolve('/(app)/workouts/[id]', { id: copy.id }))}
+/>
+
+<ConfirmDialog
+	bind:open={deleteOpen}
+	title="Delete this WoD?"
+	legend={wod ? `${wodTitle(wod)} · ${formatLong(wod.date)}` : undefined}
+	message="It disappears from everyone's board. This cannot be undone."
+	confirmLabel={deleting ? 'Deleting' : 'Delete WoD'}
+	cancelLabel="Keep it"
+	danger
+	busy={deleting}
+	onconfirm={confirmDelete}
+/>
+
+<style>
+	.page {
+		padding: 0.5rem calc(1rem + var(--safe-right)) 0 calc(1rem + var(--safe-left));
+		max-width: 84rem;
+	}
+	@media (min-width: 1024px) {
+		.page {
+			padding: 1.25rem 2.5rem 0;
+		}
+	}
+</style>
