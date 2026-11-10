@@ -8,3 +8,10 @@ bun.lockb
 # Miscellaneous
 /static/
 /drizzle/
+
+# Historical planning documents and generated images: kept as written
+/docs/plans/
+/docs/prds/
+/docs/specs/
+/screenshots/
+/test-results/

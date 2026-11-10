@@ -1,5 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { eq, and, gt } from 'drizzle-orm';
+import { eq, and, gt, asc } from 'drizzle-orm';
 import { sha256 } from '@oslojs/crypto/sha2';
 import { encodeBase64url, encodeHexLowerCase } from '@oslojs/encoding';
 import { hash, verify } from '@node-rs/argon2';
@@ -117,7 +117,10 @@ export async function getUserWorkspace(userId: string): Promise<table.Workspace 
 	return result[0]?.workspace;
 }
 
-export async function getUserWorkspaces(userId: string): Promise<(table.Workspace & { role: string })[]> {
+export async function getUserWorkspaces(
+	userId: string
+): Promise<(table.Workspace & { role: string })[]> {
+	// Oldest membership first, so a person's main box is the default workspace.
 	const results = await db
 		.select({
 			id: table.workspace.id,
@@ -127,7 +130,8 @@ export async function getUserWorkspaces(userId: string): Promise<(table.Workspac
 		})
 		.from(table.workspaceMember)
 		.innerJoin(table.workspace, eq(table.workspaceMember.workspaceId, table.workspace.id))
-		.where(eq(table.workspaceMember.userId, userId));
+		.where(eq(table.workspaceMember.userId, userId))
+		.orderBy(asc(table.workspaceMember.joinedAt), asc(table.workspace.name));
 
 	return results;
 }
@@ -185,7 +189,9 @@ export async function createWorkspaceInvite(
 	return invite;
 }
 
-export async function getInviteByCode(code: string): Promise<(table.WorkspaceInvite & { workspaceName: string }) | undefined> {
+export async function getInviteByCode(
+	code: string
+): Promise<(table.WorkspaceInvite & { workspaceName: string }) | undefined> {
 	const [result] = await db
 		.select({
 			id: table.workspaceInvite.id,

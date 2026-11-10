@@ -46,7 +46,8 @@ export const actions: Actions = {
 		// Redirect to the requested page or default to home
 		const redirectTo = url.searchParams.get('redirect');
 		// Validate redirect is a safe internal path (prevent open redirect)
-		const safeRedirect = redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
+		const safeRedirect =
+			redirectTo?.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
 
 		throw redirect(302, safeRedirect);
 	}

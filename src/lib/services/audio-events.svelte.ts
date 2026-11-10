@@ -1,5 +1,5 @@
 // src/lib/services/audio-events.svelte.ts
-import type { AudioEvent, AudioCheckContext, TimerEventsConfig, EventTrigger, EventAction } from '$lib/types/audio';
+import type { AudioEvent, AudioCheckContext, EventTrigger } from '$lib/types/audio';
 import type { AudioConfig } from '$lib/types/audio';
 import audioConfigJson from '$lib/config/audio-config.json';
 import { audioService } from './audio.svelte';

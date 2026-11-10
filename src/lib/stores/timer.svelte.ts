@@ -23,7 +23,7 @@ class TimerStore {
 
 	// Internal
 	private engine: TimerEngine | null = null;
-	private totalDurationMs = 0;
+	private totalDurationMs = $state(0);
 
 	// Derived values
 	get remainingMs(): number {
@@ -58,9 +58,7 @@ class TimerStore {
 		switch (this.config.type) {
 			case 'amrap':
 			case 'fortime':
-				return formatTimeMs(
-					this.config.type === 'fortime' ? this.elapsedMs : this.remainingMs
-				);
+				return formatTimeMs(this.config.type === 'fortime' ? this.elapsedMs : this.remainingMs);
 			case 'emom':
 			case 'tabata':
 				return formatTimeMs(this.remainingMs);
@@ -70,6 +68,16 @@ class TimerStore {
 	get progress(): number {
 		if (!this.config || this.totalDurationMs === 0) return 0;
 		return Math.min(1, this.elapsedMs / this.totalDurationMs);
+	}
+
+	/** Full length of the configured timer in ms. */
+	get totalMs(): number {
+		return this.totalDurationMs;
+	}
+
+	/** The clock was stopped by hand before it ran out (a For Time finish, or ending early). */
+	get endedEarly(): boolean {
+		return this.state === 'completed' && this.elapsedMs < this.totalDurationMs;
 	}
 
 	get totalRounds(): number {
@@ -146,6 +154,11 @@ class TimerStore {
 
 	incrementRounds() {
 		this.completedRounds++;
+	}
+
+	/** Take back a round counted by mistake. */
+	decrementRounds() {
+		if (this.completedRounds > 0) this.completedRounds--;
 	}
 
 	// Private methods

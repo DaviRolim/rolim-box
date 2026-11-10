@@ -9,14 +9,19 @@ const audioConfig = audioConfigJson as AudioConfig;
 // ============================================================================
 
 let audioContext: AudioContext | null = null;
+// Plain caches: nothing renders from them, so they do not need to be reactive.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
 const decodedBuffers = new Map<string, AudioBuffer>();
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
 const rawBuffers = new Map<string, ArrayBuffer>();
 let prefetched = false;
 let audioUnlocked = false;
 
 function getAudioContext(): AudioContext {
 	if (!audioContext) {
-		const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+		const Ctx =
+			window.AudioContext ||
+			(window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 		if (!Ctx) throw new Error('AudioContext not supported');
 		audioContext = new Ctx();
 	}

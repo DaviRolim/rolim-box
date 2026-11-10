@@ -26,12 +26,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	const [invite] = await db
 		.select()
 		.from(workspaceInvite)
-		.where(
-			and(
-				eq(workspaceInvite.workspaceId, workspaceId),
-				eq(workspaceInvite.code, code)
-			)
-		);
+		.where(and(eq(workspaceInvite.workspaceId, workspaceId), eq(workspaceInvite.code, code)));
 
 	if (!invite) {
 		return json({ error: 'Invite not found' }, { status: 404 });

@@ -28,27 +28,20 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		const owners = await db
 			.select()
 			.from(workspaceMember)
-			.where(
-				and(
-					eq(workspaceMember.workspaceId, workspaceId),
-					eq(workspaceMember.role, 'owner')
-				)
-			);
+			.where(and(eq(workspaceMember.workspaceId, workspaceId), eq(workspaceMember.role, 'owner')));
 
 		if (owners.length <= 1) {
-			return json({ error: 'Cannot remove yourself as the sole owner. Transfer ownership first.' }, { status: 400 });
+			return json(
+				{ error: 'Cannot remove yourself as the sole owner. Transfer ownership first.' },
+				{ status: 400 }
+			);
 		}
 	}
 
 	// Remove member
 	await db
 		.delete(workspaceMember)
-		.where(
-			and(
-				eq(workspaceMember.userId, userId),
-				eq(workspaceMember.workspaceId, workspaceId)
-			)
-		);
+		.where(and(eq(workspaceMember.userId, userId), eq(workspaceMember.workspaceId, workspaceId)));
 
 	return json({ success: true });
 };

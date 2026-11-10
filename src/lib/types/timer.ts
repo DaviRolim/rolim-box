@@ -23,6 +23,10 @@ export interface TimerContext {
 	sectionId?: string;
 	sectionName?: string;
 	wodId?: string;
+	/** The section's text, so the clock can show the workout next to the time. */
+	content?: string;
+	/** Calendar date of the WoD (YYYY-MM-DD), for the result slip. */
+	date?: string;
 }
 
 // ============================================================================

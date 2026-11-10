@@ -55,10 +55,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const data = validation.data;
 
 	// Verify exercise exists
-	const [ex] = await db
-		.select()
-		.from(exercise)
-		.where(eq(exercise.id, data.exerciseId));
+	const [ex] = await db.select().from(exercise).where(eq(exercise.id, data.exerciseId));
 
 	if (!ex) {
 		return json({ error: 'Exercise not found' }, { status: 404 });

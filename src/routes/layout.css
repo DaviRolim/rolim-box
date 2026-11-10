@@ -1,77 +1,711 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import 'tailwindcss';
-@plugin '@tailwindcss/forms';
-@plugin '@tailwindcss/typography';
 
-@theme {
-	/* Font - Outfit */
-	--font-family-sans: 'Outfit', sans-serif;
+/* ==========================================================================
+   RolimBox design system: "Placar da Casa" (see docs/design-direction.md)
 
-	/* Primary - Deep Zinc/Slate */
-	--color-primary-900: #0f172a;
-	--color-primary-800: #1e293b;
-	--color-primary-700: #334155;
-	--color-primary-600: #475569;
-	--color-primary-500: #64748b;
+   A scoreboard hung on the wall of grandma's house. Two grounds (Noite / Sol),
+   one signal colour (pink means move), three typefaces with one job each.
+   No gradients, no shadows, no blur: hairlines and solid blocks.
+   ========================================================================== */
 
-	/* Backgrounds */
-	--color-bg-base: #030712; /* Very dark blue/black */
-	--color-bg-surface: #111827; /* Dark gray/blue */
-	--color-bg-card: #1f2937; /* Slightly lighter */
+/* --- Fonts (self-hosted, so the installed app has them offline) ----------- */
 
-	/* Accent - Vibrant Pink/Purple Gradient base */
-	--color-accent-500: #ec4899; /* Pink-500 */
-	--color-accent-400: #f472b6; /* Pink-400 */
-	--color-accent-600: #db2777; /* Pink-600 */
-	--color-accent-glow: rgba(236, 72, 153, 0.5);
-
-	/* Secondary Accent - Cyan */
-	--color-secondary-accent: #06b6d4;
-
-	/* Text Colors */
-	--color-text-primary: #f8fafc;
-	--color-text-secondary: #94a3b8;
-	--color-text-muted: #64748b;
-
-	/* Semantic Colors */
-	--color-error: #ef4444;
-	--color-success: #10b981;
-	--color-warning: #f59e0b; /* Amber 500 */
-
-	/* Glassmorphism */
-	--glass-bg: rgba(30, 41, 59, 0.7);
-	--glass-border: rgba(255, 255, 255, 0.1);
-	--glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+@font-face {
+	font-family: 'Archivo Variable';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	font-stretch: 62% 125%;
+	src: url('@fontsource-variable/archivo/files/archivo-latin-wdth-normal.woff2')
+		format('woff2-variations');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+@font-face {
+	font-family: 'Archivo Variable';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 900;
+	font-stretch: 62% 125%;
+	src: url('@fontsource-variable/archivo/files/archivo-latin-ext-wdth-normal.woff2')
+		format('woff2-variations');
+	unicode-range:
+		U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+		U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+		U+A720-A7FF;
+}
+
+@font-face {
+	font-family: 'Martian Mono Variable';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 100 800;
+	font-stretch: 75% 112.5%;
+	src: url('@fontsource-variable/martian-mono/files/martian-mono-latin-wdth-normal.woff2')
+		format('woff2-variations');
+	unicode-range:
+		U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+		U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: 'Londrina Solid';
+	font-style: normal;
+	font-display: swap;
+	font-weight: 900;
+	src: url('@fontsource/londrina-solid/files/londrina-solid-latin-900-normal.woff2') format('woff2');
+}
+
+/* --- Grounds --------------------------------------------------------------- */
 
 :root {
-	--bottom-nav-min-height: 64px;
+	color-scheme: dark;
+
+	/* Noite */
+	--c-bg: #0c0c0d;
+	--c-panel: #161617;
+	--c-raised: #212123;
+	--c-line: #2e2e32;
+	--c-line-strong: #55555c;
+	--c-ink: #f3efe6;
+	--c-dim: #c4c0b6;
+	--c-mute: #96928a;
+	--c-pink-ink: #ff4fa3; /* pink used as text or stroke on the ground */
+	--c-warn-ink: #ffc400;
+	--c-danger-ink: #ff6b5a;
+	--c-ok-ink: #45d483;
+
+	/* The same in both grounds: solid fills that carry black text. */
+	--c-pink: #ff2e93;
+	--c-warn: #ffc400;
+	--c-danger: #ff5a47;
+	--c-ok: #3ddc84;
+	--c-on-fill: #0c0c0d;
+
+	--nav-h: 4.25rem;
+	--bar-h: 3.5rem;
+	--rail-w: 14.5rem;
+	--safe-top: env(safe-area-inset-top, 0px);
+	--safe-bottom: env(safe-area-inset-bottom, 0px);
+	--safe-left: env(safe-area-inset-left, 0px);
+	--safe-right: env(safe-area-inset-right, 0px);
 }
 
-@layer utilities {
-	.glass {
-		background: var(--glass-bg);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
-		border: 1px solid var(--glass-border);
-		box-shadow: var(--glass-shadow);
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='noite']) {
+		color-scheme: light;
+		--c-bg: #f1ede3;
+		--c-panel: #f9f6ef;
+		--c-raised: #ffffff;
+		--c-line: #d6d0c2;
+		--c-line-strong: #8c867a;
+		--c-ink: #0e0e10;
+		--c-dim: #3f3c37;
+		--c-mute: #66625a;
+		--c-pink-ink: #c4006a;
+		--c-warn-ink: #7d5200;
+		--c-danger-ink: #b8200f;
+		--c-ok-ink: #0b7038;
 	}
-	
-	.glass-hover {
-		transition: all 0.3s ease;
+}
+
+:root[data-theme='sol'] {
+	color-scheme: light;
+	--c-bg: #f1ede3;
+	--c-panel: #f9f6ef;
+	--c-raised: #ffffff;
+	--c-line: #d6d0c2;
+	--c-line-strong: #8c867a;
+	--c-ink: #0e0e10;
+	--c-dim: #3f3c37;
+	--c-mute: #66625a;
+	--c-pink-ink: #c4006a;
+	--c-warn-ink: #7d5200;
+	--c-danger-ink: #b8200f;
+	--c-ok-ink: #0b7038;
+}
+
+@theme inline {
+	--font-sans:
+		'Archivo Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+		'Helvetica Neue', Arial, sans-serif;
+	--font-mono:
+		'Martian Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+	--font-sign: 'Londrina Solid', 'Archivo Variable', Impact, sans-serif;
+
+	--color-bg: var(--c-bg);
+	--color-panel: var(--c-panel);
+	--color-raised: var(--c-raised);
+	--color-line: var(--c-line);
+	--color-line-strong: var(--c-line-strong);
+	--color-ink: var(--c-ink);
+	--color-dim: var(--c-dim);
+	--color-mute: var(--c-mute);
+	--color-pink: var(--c-pink);
+	--color-pink-ink: var(--c-pink-ink);
+	--color-warn: var(--c-warn);
+	--color-warn-ink: var(--c-warn-ink);
+	--color-danger: var(--c-danger);
+	--color-danger-ink: var(--c-danger-ink);
+	--color-ok: var(--c-ok);
+	--color-ok-ink: var(--c-ok-ink);
+	--color-on-fill: var(--c-on-fill);
+}
+
+@theme {
+	--ease-snap: cubic-bezier(0.2, 0.9, 0.3, 1);
+
+	--animate-shutter: shutter 0.18s linear both;
+	--animate-slam: slam 0.16s var(--ease-snap) both;
+	--animate-slap: slap 0.2s var(--ease-snap) both;
+	--animate-lift: lift 0.16s var(--ease-snap) both;
+	--animate-sheet: sheet 0.18s var(--ease-snap) both;
+	--animate-beat: beat 1s steps(1, end) infinite;
+	--animate-blink: blink 1s steps(2, jump-none) infinite;
+	--animate-scan: scan 1.4s steps(8, end) infinite;
+
+	/* A scoreboard panel opening, left to right. */
+	@keyframes shutter {
+		from {
+			clip-path: inset(0 100% 0 0);
+		}
+		to {
+			clip-path: inset(0 0 0 0);
+		}
 	}
-	
-	.glass-hover:hover {
-		background: rgba(51, 65, 85, 0.8);
-		border-color: rgba(255, 255, 255, 0.2);
-		transform: translateY(-2px);
-		box-shadow: 0 10px 40px -10px rgba(236, 72, 153, 0.3);
+	/* A name hitting the board. */
+	@keyframes slam {
+		from {
+			transform: scale(1.14);
+			clip-path: inset(0 0 100% 0);
+		}
+		to {
+			transform: none;
+			clip-path: inset(0 0 -10% 0);
+		}
+	}
+	/* Tape being slapped on, crooked. */
+	@keyframes slap {
+		from {
+			transform: rotate(-11deg) scale(1.3);
+			clip-path: inset(0 100% 0 0);
+		}
+		to {
+			transform: rotate(var(--tilt, -2deg));
+			clip-path: inset(-20% -5% -20% -5%);
+		}
+	}
+	@keyframes lift {
+		from {
+			transform: translateY(12px);
+			clip-path: inset(0 0 100% 0);
+		}
+		to {
+			transform: none;
+			clip-path: inset(-10% -10% -10% -10%);
+		}
+	}
+	@keyframes sheet {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: none;
+		}
+	}
+	/* One hit per second: the last ten seconds, the paused clock. */
+	@keyframes beat {
+		0% {
+			transform: scale(1.035);
+		}
+		18% {
+			transform: none;
+		}
+	}
+	@keyframes blink {
+		0% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0.25;
+		}
+	}
+	/* Loading: a lit segment travelling along a row of LEDs. */
+	@keyframes scan {
+		from {
+			background-position: 0 0;
+		}
+		to {
+			background-position: 4rem 0;
+		}
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Type roles
+   -------------------------------------------------------------------------- */
+
+/* The scoreboard: names, numerals, the clock. */
+@utility display {
+	font-family: var(--font-sans);
+	font-stretch: 62%;
+	font-weight: 900;
+	line-height: 0.86;
+	letter-spacing: 0;
+	text-transform: uppercase;
+	font-variant-numeric: tabular-nums;
+}
+
+/* A slightly wider cut of the same voice, for movement names read from a distance. */
+@utility display-wide {
+	font-family: var(--font-sans);
+	font-stretch: 75%;
+	font-weight: 800;
+	line-height: 0.95;
+	text-transform: uppercase;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The instrument legend: small mono capitals. */
+@utility legend {
+	font-family: var(--font-mono);
+	font-stretch: 75%;
+	font-weight: 600;
+	font-size: 0.75rem;
+	line-height: 1.2;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The sign painter. One phrase per screen. */
+@utility sign {
+	font-family: var(--font-sign);
+	font-weight: 900;
+	line-height: 0.9;
+	letter-spacing: 0.01em;
+}
+
+@utility num {
+	font-variant-numeric: tabular-nums;
+	font-feature-settings: 'tnum' 1;
+}
+
+/* --------------------------------------------------------------------------
+   Patterns
+   -------------------------------------------------------------------------- */
+
+/* Hazard tape: paused, offline, "vai doer". */
+@utility hazard {
+	background-color: var(--c-warn);
+	background-image: repeating-linear-gradient(-45deg, var(--c-on-fill) 0 8px, transparent 8px 20px);
+}
+
+/* The finish line. */
+@utility chequer {
+	--sq: 14px;
+	background-color: #f3efe6;
+	background-image:
+		linear-gradient(45deg, #0c0c0d 25%, transparent 25% 75%, #0c0c0d 75%),
+		linear-gradient(45deg, #0c0c0d 25%, transparent 25% 75%, #0c0c0d 75%);
+	background-size: calc(var(--sq) * 2) calc(var(--sq) * 2);
+	background-position:
+		0 0,
+		var(--sq) var(--sq);
+}
+
+/* The blueprint grid behind empty and quiet areas. */
+@utility gridlines {
+	background-image:
+		linear-gradient(to right, var(--c-line) 1px, transparent 1px),
+		linear-gradient(to bottom, var(--c-line) 1px, transparent 1px);
+	background-size: 2rem 2rem;
+}
+
+/* Loading placeholder: a dim LED row with one lit segment running through it. */
+@utility led {
+	background-color: var(--c-panel);
+	background-image: repeating-linear-gradient(
+		90deg,
+		var(--c-line) 0 0.375rem,
+		transparent 0.375rem 0.5rem
+	);
+	position: relative;
+	overflow: hidden;
+	&::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background-image: linear-gradient(90deg, var(--c-line-strong) 0 0.5rem, transparent 0.5rem);
+		background-size: 4rem 100%;
+		animation: var(--animate-scan);
+		mix-blend-mode: normal;
+		opacity: 0.6;
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+@layer base {
+	html {
+		background-color: var(--c-bg);
+		color: var(--c-ink);
+		-webkit-text-size-adjust: 100%;
+		text-size-adjust: 100%;
+		-webkit-tap-highlight-color: transparent;
+		scroll-padding-top: calc(var(--bar-h) + var(--safe-top) + 1rem);
 	}
 
-	.text-gradient {
-		background: linear-gradient(135deg, #f472b6 0%, #a855f7 100%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
+	body {
+		font-family: var(--font-sans);
+		font-weight: 500;
+		font-synthesis: none;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		overscroll-behavior-y: none;
+		min-height: 100dvh;
+	}
+
+	::selection {
+		background: var(--c-pink);
+		color: var(--c-on-fill);
+	}
+
+	/* One focus style everywhere: a hard double ring that shows on any ground or fill. */
+	:focus-visible {
+		outline: 3px solid var(--c-ink);
+		outline-offset: 2px;
+		box-shadow: 0 0 0 2px var(--c-bg);
+	}
+
+	button,
+	a,
+	[role='button'],
+	summary,
+	label,
+	input,
+	select,
+	textarea {
+		touch-action: manipulation;
+	}
+
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']),
+	summary {
+		cursor: pointer;
+	}
+
+	dialog {
+		color: inherit;
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Components
+   -------------------------------------------------------------------------- */
+
+@layer components {
+	/* Buttons: square blocks with scoreboard lettering. */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.625rem;
+		min-height: 3.5rem;
+		padding: 0.5rem 1.25rem;
+		border: 2px solid var(--c-ink);
+		border-radius: 2px;
+		background: transparent;
+		color: var(--c-ink);
+		font-family: var(--font-sans);
+		font-stretch: 68%;
+		font-weight: 800;
+		font-size: 1.25rem;
+		line-height: 1;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+		text-decoration: none;
+		white-space: nowrap;
+		user-select: none;
+		transition: transform 0.06s linear;
+	}
+	.btn:active:not(:disabled) {
+		transform: translateY(2px);
+	}
+	.btn:disabled,
+	.btn[aria-disabled='true'] {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	@media (hover: hover) {
+		.btn:hover:not(:disabled) {
+			background: var(--c-ink);
+			color: var(--c-bg);
+		}
+	}
+
+	.btn-pink {
+		border-color: var(--c-pink);
+		background: var(--c-pink);
+		color: var(--c-on-fill);
+	}
+	.btn-ink {
+		background: var(--c-ink);
+		color: var(--c-bg);
+	}
+	.btn-quiet {
+		border-color: var(--c-line-strong);
+	}
+	.btn-danger {
+		border-color: var(--c-danger);
+		background: var(--c-danger);
+		color: var(--c-on-fill);
+	}
+	.btn-warn {
+		border-color: var(--c-warn);
+		background: var(--c-warn);
+		color: var(--c-on-fill);
+	}
+	@media (hover: hover) {
+		.btn-pink:hover:not(:disabled),
+		.btn-danger:hover:not(:disabled),
+		.btn-warn:hover:not(:disabled) {
+			background: var(--c-ink);
+			border-color: var(--c-ink);
+			color: var(--c-bg);
+		}
+		.btn-ink:hover:not(:disabled) {
+			background: var(--c-pink);
+			border-color: var(--c-pink);
+			color: var(--c-on-fill);
+		}
+	}
+
+	/* The one big action of a screen. */
+	.btn-slab {
+		min-height: 4.5rem;
+		width: 100%;
+		font-size: 1.75rem;
+		font-stretch: 62%;
+		font-weight: 900;
+	}
+	.btn-sm {
+		min-height: 2.75rem;
+		padding: 0.25rem 0.875rem;
+		font-size: 1.0625rem;
+	}
+
+	/* Square icon button: 48px on a pointer, still 48px for a thumb. */
+	.icon-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 3rem;
+		height: 3rem;
+		flex: none;
+		border: 2px solid var(--c-line-strong);
+		border-radius: 2px;
+		color: var(--c-ink);
+		background: transparent;
+	}
+	.icon-btn:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
+	}
+	@media (hover: hover) {
+		.icon-btn:hover:not(:disabled) {
+			border-color: var(--c-ink);
+			background: var(--c-ink);
+			color: var(--c-bg);
+		}
+	}
+
+	/* Fields. 17px so iOS never zooms the page on focus. */
+	.input {
+		display: block;
+		width: 100%;
+		min-height: 3.5rem;
+		padding: 0.75rem 0.875rem;
+		border: 2px solid var(--c-line-strong);
+		border-radius: 2px;
+		background-color: var(--c-panel);
+		color: var(--c-ink);
+		font: inherit;
+		font-size: 1.0625rem;
+		font-weight: 500;
+		line-height: 1.4;
+		appearance: none;
+	}
+	.input::placeholder {
+		color: var(--c-mute);
+		opacity: 1;
+	}
+	.input:hover {
+		border-color: var(--c-mute);
+	}
+	.input:focus,
+	.input:focus-visible {
+		outline: none;
+		box-shadow: none;
+		border-color: var(--c-ink);
+		background-color: var(--c-raised);
+	}
+	.input[aria-invalid='true'] {
+		border-color: var(--c-danger-ink);
+	}
+	.input:disabled {
+		opacity: 0.55;
+	}
+	textarea.input {
+		min-height: 7rem;
+		line-height: 1.5;
+		resize: vertical;
+	}
+	select.input {
+		padding-right: 2.75rem;
+		background-image:
+			linear-gradient(45deg, transparent 50%, var(--c-ink) 50%),
+			linear-gradient(135deg, var(--c-ink) 50%, transparent 50%);
+		background-position:
+			calc(100% - 1.25rem) 50%,
+			calc(100% - 0.875rem) 50%;
+		background-size:
+			0.375rem 0.375rem,
+			0.375rem 0.375rem;
+		background-repeat: no-repeat;
+	}
+	input[type='number'].input {
+		-moz-appearance: textfield;
+	}
+	input[type='number'].input::-webkit-outer-spin-button,
+	input[type='number'].input::-webkit-inner-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
+	input[type='date'].input::-webkit-calendar-picker-indicator {
+		cursor: pointer;
+		padding: 0.25rem;
+	}
+	.field-label {
+		display: block;
+		margin-bottom: 0.5rem;
+		font-family: var(--font-mono);
+		font-stretch: 75%;
+		font-weight: 600;
+		font-size: 0.75rem;
+		line-height: 1.2;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--c-dim);
+	}
+
+	/* A mono tag: format, role, status. */
+	.tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid var(--c-line-strong);
+		border-radius: 2px;
+		font-family: var(--font-mono);
+		font-stretch: 75%;
+		font-weight: 600;
+		font-size: 0.75rem;
+		line-height: 1.2;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		white-space: nowrap;
+		font-variant-numeric: tabular-nums;
+	}
+	.tag-pink {
+		border-color: var(--c-pink);
+		background: var(--c-pink);
+		color: var(--c-on-fill);
+	}
+	.tag-ink {
+		border-color: var(--c-ink);
+		background: var(--c-ink);
+		color: var(--c-bg);
+	}
+	.tag-warn {
+		border-color: var(--c-warn);
+		background: var(--c-warn);
+		color: var(--c-on-fill);
+	}
+
+	/* The heavy rule that opens a module, with its legend sitting on it. */
+	.module {
+		border-top: 2px solid var(--c-ink);
+	}
+	.module-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 1rem;
+		padding-block: 0.5rem;
+		font-family: var(--font-mono);
+		font-stretch: 75%;
+		font-weight: 600;
+		font-size: 0.75rem;
+		line-height: 1.2;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--c-dim);
+	}
+
+	/* Inline notice: something the person should know, not a toast. */
+	.notice {
+		display: flex;
+		gap: 0.75rem;
+		padding: 0.875rem 1rem;
+		border: 2px solid var(--c-line-strong);
+		border-left-width: 0.5rem;
+		border-radius: 2px;
+		background: var(--c-panel);
+		font-size: 1rem;
+		line-height: 1.4;
+	}
+	.notice-warn {
+		border-color: var(--c-warn);
+	}
+	.notice-danger {
+		border-color: var(--c-danger);
+	}
+	.notice-pink {
+		border-color: var(--c-pink);
+	}
+
+	.link {
+		color: var(--c-ink);
+		font-weight: 700;
+		text-decoration: underline;
+		text-decoration-thickness: 2px;
+		text-underline-offset: 3px;
+		text-decoration-color: var(--c-pink);
+	}
+	@media (hover: hover) {
+		.link:hover {
+			background: var(--c-pink);
+			color: var(--c-on-fill);
+		}
+	}
+}
+
+/* --------------------------------------------------------------------------
+   Motion: everything above is decoration. People who ask for less get none.
+   Phase changes on the clock are colour cuts, not animations, so they stay.
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition: none !important;
+		scroll-behavior: auto !important;
 	}
 }

@@ -51,6 +51,8 @@ interface RolimBoxDB extends DBSchema {
 			retries: number;
 			status: 'pending' | 'failed';
 			failedAt?: number;
+			/** Why the server refused the operation (only set when status is 'failed'). */
+			error?: string;
 		};
 		indexes: {
 			'by-entity': string;
@@ -222,18 +224,24 @@ export async function clearCachedExercises(): Promise<void> {
 }
 
 // Personal Record operations
-export async function cachePersonalRecords(prs: RolimBoxDB['personalRecords']['value'][]): Promise<void> {
+export async function cachePersonalRecords(
+	prs: RolimBoxDB['personalRecords']['value'][]
+): Promise<void> {
 	const db = await getDB();
 	const tx = db.transaction('personalRecords', 'readwrite');
 	await Promise.all([...prs.map((pr) => tx.store.put(pr)), tx.done]);
 }
 
-export async function getCachedPersonalRecords(): Promise<RolimBoxDB['personalRecords']['value'][]> {
+export async function getCachedPersonalRecords(): Promise<
+	RolimBoxDB['personalRecords']['value'][]
+> {
 	const db = await getDB();
 	return db.getAll('personalRecords');
 }
 
-export async function cachePersonalRecord(pr: RolimBoxDB['personalRecords']['value']): Promise<void> {
+export async function cachePersonalRecord(
+	pr: RolimBoxDB['personalRecords']['value']
+): Promise<void> {
 	const db = await getDB();
 	await db.put('personalRecords', pr);
 }

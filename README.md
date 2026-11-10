@@ -8,7 +8,8 @@
 - **AI-Powered Assistance**: Use the "Magic Wand" to automatically generate workout sections and descriptions, streamlining the programming process.
 - **Local-First Architecture**: Built with offline support in mind. Your data is cached locally for instant access and synced when you're back online.
 - **Integrated Timer**: Built-in timers to run workouts directly within the app.
-- **Modern UI/UX**: A sleek, responsive interface designed for both desktop and mobile use.
+- **Built for the box**: readable from two metres, big touch targets, light and dark grounds, and a full-screen placar mode.
+- **Installable PWA**: opens and runs the timers with no signal.
 
 ## 🛠️ Technology Stack
 
@@ -22,69 +23,70 @@ RolimBox is built on a cutting-edge stack focused on performance and developer e
 - **AI Integration**: [Vercel AI SDK](https://sdk.vercel.ai)
 - **Testing**: [Playwright](https://playwright.dev)
 
+## 🎨 Design
+
+The interface follows one direction, written down in [docs/design-direction.md](docs/design-direction.md):
+**Placar da Casa**, a scoreboard hung on the wall of grandma's house. Read it before changing
+anything visual. The tokens and shared classes live in `src/routes/layout.css`.
+
+Before/after screenshots of every screen and state are in `screenshots/before` and
+`screenshots/revamp` (phone 390x844 and desktop 1440x900).
+
 ## 🏁 Getting Started
 
-### Prerequisites
+### Run it locally, no accounts needed
 
-- [Node.js](https://nodejs.org/) or [Bun](https://bun.sh/) installed on your machine.
-- A [Turso](https://turso.tech/) account for the database (or use a local SQLite file).
+```bash
+bun install
+cp .env.example .env          # then set DATABASE_URL="file:local.db"
+bun run db:setup              # creates the tables and seeds a realistic box
+bun dev
+```
 
-### Installation
+Log in as a coach with `davi@rolimbox.test` or as an athlete with `bia@rolimbox.test`
+(password `rolimbox123` for every seeded account). The seed refuses to run against anything
+that is not a local `file:` database.
 
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/DaviRolim/rolim-box.git
-    cd rolim-box
-    ```
+The Magic Wand needs `OPENROUTER_API_KEY`. Without it the editor says so and everything else
+works.
 
-2.  Install dependencies:
-    ```bash
-    npm install
-    # or
-    bun install
-    ```
+### With Turso
 
-3.  Set up environment variables:
-    Create a `.env` file in the root directory (copy from `.env.example` if available).
-    ```bash
-    DATABASE_URL=libsql://your-db-name.turso.io
-    DATABASE_AUTH_TOKEN=your-auth-token
-    # For local development:
-    # DATABASE_URL=file:local.db
-    ```
+Set `DATABASE_URL` and `DATABASE_AUTH_TOKEN` in `.env` (see `.env.example`), then:
 
-4.  Start the development server:
-    ```bash
-    npm run dev
-    # or
-    bun dev
-    ```
+```bash
+bun run db:push
+bun dev
+```
 
 ## 🗄️ Database Management
 
 RolimBox uses Drizzle ORM for database management.
 
 ```bash
-# Push schema changes (Development)
-bun run db:push
-
-# Generate migrations
-bun run db:generate
-
-# Run migrations (Production)
-bun run db:migrate
-
-# Open Drizzle Studio to view data
-bun run db:studio
+bun run db:push      # Push schema changes (development)
+bun run db:generate  # Generate migrations
+bun run db:migrate   # Run migrations (production)
+bun run db:studio    # Open Drizzle Studio
+bun run db:seed      # Wipe and reseed the LOCAL database
 ```
 
 ## 🧪 Testing
 
-We use Playwright for End-to-End (E2E) testing.
-
 ```bash
-npm run test:e2e
+bun run check        # svelte-check (types)
+bun run lint         # Prettier + ESLint
+bun run test:unit    # pure helpers (bun test)
+bun run test:e2e     # Playwright, against its own seeded e2e.db
+bun run test         # unit + e2e
 ```
+
+The e2e suite builds the app, seeds `e2e.db` and covers login, today's WoD, placar mode, WoD
+create / edit / duplicate / delete, the Magic Wand without a key, the timers, PRs, and working
+offline (including a WoD written offline and synced later).
+
+To retake the screenshots: `bun --bun run build && bun run preview`, then `bun run screenshots`
+with `--base http://localhost:4173`.
 
 ## 🤝 Contributing
 

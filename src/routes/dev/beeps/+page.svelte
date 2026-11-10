@@ -16,11 +16,16 @@
 	// Extract beep configs from the new event-driven structure
 	const emomEvents = config.timerEvents.emom;
 	const emomBeepEvent = Array.isArray(emomEvents)
-		? emomEvents.find(e => e.action.type === 'beep')
+		? emomEvents.find((e) => e.action.type === 'beep')
 		: null;
-	const emomBeepConfig: BeepConfig = emomBeepEvent?.action.type === 'beep'
-		? { type: 'beep', frequency: emomBeepEvent.action.frequency, duration: emomBeepEvent.action.duration }
-		: { type: 'beep', frequency: 880, duration: 100 };
+	const emomBeepConfig: BeepConfig =
+		emomBeepEvent?.action.type === 'beep'
+			? {
+					type: 'beep',
+					frequency: emomBeepEvent.action.frequency,
+					duration: emomBeepEvent.action.duration
+				}
+			: { type: 'beep', frequency: 880, duration: 100 };
 
 	const beepEntries: BeepEntry[] = [
 		{
@@ -97,8 +102,8 @@
 		<div class="title">
 			<h1>Beep Lab</h1>
 			<p>
-				Click play to preview beep settings from <code>src/lib/config/audio-config.json</code>.
-				Edit the JSON, save, and click again (Vite HMR will refresh this page automatically).
+				Click play to preview beep settings from <code>src/lib/config/audio-config.json</code>. Edit
+				the JSON, save, and click again (Vite HMR will refresh this page automatically).
 			</p>
 		</div>
 
@@ -202,7 +207,8 @@
 	}
 
 	code {
-		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+		font-family:
+			ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
 			monospace;
 		font-size: 0.9em;
 	}
@@ -344,7 +350,9 @@
 		letter-spacing: 0.06em;
 		font-size: 12px;
 		cursor: pointer;
-		transition: transform 0.15s ease, box-shadow 0.15s ease;
+		transition:
+			transform 0.15s ease,
+			box-shadow 0.15s ease;
 		min-height: 44px;
 	}
 
@@ -396,5 +404,3 @@
 		}
 	}
 </style>
-
-

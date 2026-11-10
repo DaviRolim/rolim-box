@@ -10,9 +10,18 @@
 	},
 	"timerEvents": {
 		"amrap": [
-			{ "trigger": { "type": "percentage", "value": 50 }, "action": { "type": "voice", "cue": "halfway" } },
-			{ "trigger": { "type": "remainingMs", "value": 60000 }, "action": { "type": "voice", "cue": "one-minute" } },
-			{ "trigger": { "type": "remainingMs", "value": 10000 }, "action": { "type": "voice", "cue": "ten-seconds" } },
+			{
+				"trigger": { "type": "percentage", "value": 50 },
+				"action": { "type": "voice", "cue": "halfway" }
+			},
+			{
+				"trigger": { "type": "remainingMs", "value": 60000 },
+				"action": { "type": "voice", "cue": "one-minute" }
+			},
+			{
+				"trigger": { "type": "remainingMs", "value": 10000 },
+				"action": { "type": "voice", "cue": "ten-seconds" }
+			},
 			{ "trigger": { "type": "remainingMs", "value": 3000 }, "action": { "type": "countdown" } },
 			{ "trigger": { "type": "remainingMs", "value": 2000 }, "action": { "type": "countdown" } },
 			{ "trigger": { "type": "remainingMs", "value": 1000 }, "action": { "type": "countdown" } }
@@ -20,15 +29,27 @@
 		"fortime": "amrap",
 		"emom": [
 			{ "trigger": { "type": "halfwayRounds" }, "action": { "type": "voice", "cue": "half-emom" } },
-			{ "trigger": { "type": "beforeRoundEnd", "seconds": 10 }, "action": { "type": "beep", "frequency": 880, "duration": 100 } },
+			{
+				"trigger": { "type": "beforeRoundEnd", "seconds": 10 },
+				"action": { "type": "beep", "frequency": 880, "duration": 100 }
+			},
 			{ "trigger": { "type": "beforeRoundEnd", "seconds": 3 }, "action": { "type": "countdown" } },
 			{ "trigger": { "type": "beforeRoundEnd", "seconds": 2 }, "action": { "type": "countdown" } },
 			{ "trigger": { "type": "beforeRoundEnd", "seconds": 1 }, "action": { "type": "countdown" } },
-			{ "trigger": { "type": "roundStart", "skipFirst": true }, "action": { "type": "voice", "cue": "next-round" } }
+			{
+				"trigger": { "type": "roundStart", "skipFirst": true },
+				"action": { "type": "voice", "cue": "next-round" }
+			}
 		],
 		"tabata": [
-			{ "trigger": { "type": "phaseChange", "phase": "work", "skipFirst": true }, "action": { "type": "voice", "cue": "work" } },
-			{ "trigger": { "type": "phaseChange", "phase": "rest" }, "action": { "type": "voice", "cue": "rest" } }
+			{
+				"trigger": { "type": "phaseChange", "phase": "work", "skipFirst": true },
+				"action": { "type": "voice", "cue": "work" }
+			},
+			{
+				"trigger": { "type": "phaseChange", "phase": "rest" },
+				"action": { "type": "voice", "cue": "rest" }
+			}
 		]
 	}
 }

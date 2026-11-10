@@ -1,124 +1,340 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import Card from '$lib/components/Card.svelte';
+	import { resolve } from '$app/paths';
+	import { timeAgo } from '$lib/date';
+	import { audioService } from '$lib/services/audio.svelte';
+	import { retrySync } from '$lib/services/sync-queue';
+	import { invalidatePRCache } from '$lib/services/pr';
+	import { syncStore } from '$lib/stores/sync.svelte';
+	import { themeStore, type ThemeChoice } from '$lib/stores/theme.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
-	import type { PageData } from './$types';
+	import { wodStore } from '$lib/stores/wods.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
+	import LogoutButton from '$lib/components/shell/LogoutButton.svelte';
+	import type { UnitPreference } from '$lib/types/pr';
 
-	let { data }: { data: PageData } = $props();
+	let { data } = $props();
 
-	let unitPreference = $state(data.unitPreference);
-	let isSaving = $state(false);
+	const GROUNDS: { value: ThemeChoice; label: string; hint: string }[] = [
+		{ value: 'auto', label: 'Auto', hint: 'Follows the phone' },
+		{ value: 'sol', label: 'Sol', hint: 'Light, for a bright box' },
+		{ value: 'noite', label: 'Noite', hint: 'Dark' }
+	];
+	const UNITS: { value: UnitPreference; label: string; hint: string }[] = [
+		{ value: 'metric', label: 'Metric', hint: 'kg, metres' },
+		{ value: 'imperial', label: 'Imperial', hint: 'lb, miles' }
+	];
+	const ROLE: Record<string, string> = { owner: 'Owner', coach: 'Coach', member: 'Athlete' };
+	const CHANGE = { create: 'New', update: 'Edit to', delete: 'Delete of' } as const;
 
-	async function handleUnitChange(newUnit: 'metric' | 'imperial') {
-		if (newUnit === unitPreference) return;
+	let savingUnits = $state(false);
+	let syncing = $state(false);
+	let discardOpen = $state(false);
+	let now = $state(Date.now());
 
-		isSaving = true;
+	$effect(() => {
+		const interval = setInterval(() => (now = Date.now()), 30_000);
+		return () => clearInterval(interval);
+	});
+
+	async function setUnits(next: UnitPreference) {
+		if (next === data.unitPreference || savingUnits) return;
+		savingUnits = true;
 		try {
-			const res = await fetch('/api/user/settings', {
+			const response = await fetch('/api/user/settings', {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ unitPreference: newUnit })
+				body: JSON.stringify({ unitPreference: next })
 			});
-
-			if (res.ok) {
-				unitPreference = newUnit;
-				await invalidateAll();
-				toastStore.success('Settings saved');
-			} else {
-				toastStore.error('Failed to save settings');
-			}
-		} catch (error) {
-			console.error('Failed to save settings:', error);
-			toastStore.error('Failed to save settings');
+			if (!response.ok) throw new Error(String(response.status));
+			await invalidatePRCache().catch(() => {});
+			await invalidateAll();
+			toastStore.success(next === 'metric' ? 'PRs now show in kg.' : 'PRs now show in lb.');
+		} catch {
+			toastStore.error('Could not save. This setting needs a connection.');
+		} finally {
+			savingUnits = false;
 		}
-		isSaving = false;
 	}
+
+	async function syncNow() {
+		syncing = true;
+		try {
+			await retrySync();
+			const ok = await wodStore.refresh();
+			if (ok) toastStore.success('Everything is up to date.');
+			else if (syncStore.isOffline) toastStore.info('Still offline. It will sync by itself later.');
+			else toastStore.error('The server did not answer. Try again in a moment.');
+		} finally {
+			syncing = false;
+		}
+	}
+
+	async function discardFailed() {
+		discardOpen = false;
+		await wodStore.discardFailedChanges();
+		toastStore.success('Refused changes discarded. The board matches the server again.');
+	}
+
+	const statusLine = $derived.by(() => {
+		switch (syncStore.status) {
+			case 'offline':
+				return 'Offline. Changes are kept on this phone and sent when the signal is back.';
+			case 'error':
+				return 'The server refused some changes. They need a decision below.';
+			case 'unreachable':
+				return 'Online, but the server is not answering. It will keep trying.';
+			case 'syncing':
+				return 'Sending changes to the server.';
+			case 'pending':
+				return `${syncStore.pending} ${syncStore.pending === 1 ? 'change is' : 'changes are'} waiting to be sent.`;
+			default:
+				return 'Everything on this phone is on the server.';
+		}
+	});
 </script>
 
-<div class="flex flex-col gap-6 p-4 pb-24 md:p-6">
-	<!-- Header -->
-	<header class="border-b border-white/10 pb-4">
-		<h1
-			class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
-		>
-			Settings
-		</h1>
-		<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+<svelte:head>
+	<title>Settings - RolimBox</title>
+</svelte:head>
+
+<div class="page">
+	<header>
+		<p class="truncate legend text-mute">{data.user.email}</p>
+		<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">Settings</h1>
 	</header>
 
-	<!-- Unit Preference -->
-	<Card>
-		<h2 class="mb-4 text-lg font-bold text-white">Units</h2>
-		<p class="mb-4 text-sm text-text-muted">
-			Choose your preferred measurement system for Personal Records.
-		</p>
-
-		<div class="flex gap-4">
-			<button
-				onclick={() => handleUnitChange('metric')}
-				disabled={isSaving}
-				class="flex-1 rounded-lg border-2 p-4 text-left transition-all {unitPreference === 'metric'
-					? 'border-accent-500 bg-accent-500/10'
-					: 'border-white/10 bg-white/5 hover:border-white/20'}"
-			>
-				<div class="flex items-center gap-3">
-					<div
-						class="flex h-5 w-5 items-center justify-center rounded-full border-2 {unitPreference ===
-						'metric'
-							? 'border-accent-500'
-							: 'border-white/30'}"
-					>
-						{#if unitPreference === 'metric'}
-							<div class="h-2.5 w-2.5 rounded-full bg-accent-500"></div>
-						{/if}
-					</div>
-					<div>
-						<p class="font-bold text-white">Metric</p>
-						<p class="text-xs text-text-muted">kg, meters</p>
-					</div>
+	<div class="mt-6 grid gap-x-12 lg:grid-cols-2">
+		<div>
+			<!-- Ground -->
+			<section class="module pb-6">
+				<div class="module-head">
+					<h2>Ground</h2>
+					<span>{themeStore.ground === 'sol' ? 'Sol' : 'Noite'}</span>
 				</div>
-			</button>
-
-			<button
-				onclick={() => handleUnitChange('imperial')}
-				disabled={isSaving}
-				class="flex-1 rounded-lg border-2 p-4 text-left transition-all {unitPreference ===
-				'imperial'
-					? 'border-accent-500 bg-accent-500/10'
-					: 'border-white/10 bg-white/5 hover:border-white/20'}"
-			>
-				<div class="flex items-center gap-3">
-					<div
-						class="flex h-5 w-5 items-center justify-center rounded-full border-2 {unitPreference ===
-						'imperial'
-							? 'border-accent-500'
-							: 'border-white/30'}"
-					>
-						{#if unitPreference === 'imperial'}
-							<div class="h-2.5 w-2.5 rounded-full bg-accent-500"></div>
-						{/if}
-					</div>
-					<div>
-						<p class="font-bold text-white">Imperial</p>
-						<p class="text-xs text-text-muted">lbs, miles</p>
-					</div>
+				<div class="choices" role="radiogroup" aria-label="Ground (theme)">
+					{#each GROUNDS as option (option.value)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={themeStore.choice === option.value}
+							class="choice"
+							class:on={themeStore.choice === option.value}
+							onclick={() => themeStore.set(option.value)}
+						>
+							<span class="display text-[1.75rem]">{option.label}</span>
+							<span class="mt-1 block text-sm leading-tight opacity-80">{option.hint}</span>
+						</button>
+					{/each}
 				</div>
-			</button>
+				<p class="mt-3 text-base leading-snug text-mute">
+					Sol is the light ground: easier to read when the morning sun hits the box.
+				</p>
+			</section>
+
+			<!-- Units -->
+			<section class="module pb-6">
+				<div class="module-head">
+					<h2>Units</h2>
+					<span>For your PRs</span>
+				</div>
+				<div class="choices" role="radiogroup" aria-label="Units">
+					{#each UNITS as option (option.value)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={data.unitPreference === option.value}
+							class="choice"
+							class:on={data.unitPreference === option.value}
+							disabled={savingUnits}
+							onclick={() => setUnits(option.value)}
+						>
+							<span class="display text-[1.75rem]">{option.label}</span>
+							<span class="mt-1 block text-sm leading-tight opacity-80">{option.hint}</span>
+						</button>
+					{/each}
+				</div>
+			</section>
+
+			<!-- Sound -->
+			<section class="module pb-6">
+				<div class="module-head">
+					<h2>Clock sound</h2>
+					<span>{audioService.isMuted ? 'Off' : 'On'}</span>
+				</div>
+				<button
+					type="button"
+					class="btn w-full justify-between {audioService.isMuted ? 'btn-quiet' : 'btn-ink'}"
+					role="switch"
+					aria-checked={!audioService.isMuted}
+					onclick={() => audioService.toggleMute()}
+				>
+					<span class="flex items-center gap-2.5">
+						<Icon name={audioService.isMuted ? 'volume-off' : 'volume'} size={20} stroke={2.6} />
+						Beeps and voice cues
+					</span>
+					<span>{audioService.isMuted ? 'Off' : 'On'}</span>
+				</button>
+				<p class="mt-3 text-base leading-snug text-mute">
+					3-2-1, "halfway", "ten seconds" and "time". Turn the phone's volume up: the music in the
+					box is loud.
+				</p>
+			</section>
 		</div>
-	</Card>
 
-	<!-- Link to Workspace Settings -->
-	<Card>
-		<h2 class="mb-2 text-lg font-bold text-white">Workspace</h2>
-		<p class="mb-4 text-sm text-text-muted">Manage workspace members and invitations.</p>
-		<a
-			href="/settings/workspace"
-			class="inline-flex items-center gap-2 text-sm font-bold text-accent-400 hover:underline"
-		>
-			Workspace Settings
-			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" />
-			</svg>
-		</a>
-	</Card>
+		<div>
+			<!-- This phone -->
+			<section class="module pb-6" id="sync">
+				<div class="module-head">
+					<h2>This phone</h2>
+					<span>
+						{syncStore.lastSyncedAt
+							? `Checked ${timeAgo(syncStore.lastSyncedAt, now)}`
+							: 'Not checked yet'}
+					</span>
+				</div>
+				<div
+					class="notice {syncStore.status === 'error'
+						? 'notice-danger'
+						: syncStore.status === 'synced'
+							? ''
+							: 'notice-warn'}"
+				>
+					<span class="mt-0.5 flex-none">
+						<Icon
+							name={syncStore.status === 'synced'
+								? 'check'
+								: syncStore.isOffline
+									? 'wifi-off'
+									: syncStore.status === 'error'
+										? 'alert'
+										: 'cloud'}
+							size={20}
+							stroke={2.8}
+						/>
+					</span>
+					<p>{statusLine}</p>
+				</div>
+
+				{#if syncStore.failed.length > 0}
+					<ul class="mt-3 border-t border-line">
+						{#each syncStore.failed as change (change.id)}
+							<li class="border-b border-line py-3">
+								<p class="legend text-danger-ink">
+									{CHANGE[change.type]}
+									{change.entity === 'wod' ? 'a WoD' : 'a PR'}
+								</p>
+								<p class="mt-1 text-base leading-snug">{change.error}</p>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+
+				<div class="mt-3 flex flex-wrap gap-2">
+					<button
+						type="button"
+						class="btn flex-1"
+						disabled={syncing || syncStore.isOffline}
+						onclick={syncNow}
+					>
+						<Icon name="refresh" size={18} stroke={2.8} />
+						{syncing ? 'Syncing' : 'Sync now'}
+					</button>
+					{#if syncStore.failed.length > 0}
+						<button
+							type="button"
+							class="btn btn-danger flex-1"
+							onclick={() => (discardOpen = true)}
+						>
+							Discard refused
+						</button>
+					{/if}
+				</div>
+				<p class="mt-3 text-base leading-snug text-mute">
+					WoDs and PRs are saved on this phone, so the app opens and the timers run with no signal.
+				</p>
+			</section>
+
+			<!-- Box -->
+			{#if data.activeWorkspace}
+				<section class="module pb-6">
+					<div class="module-head">
+						<h2>Your box</h2>
+						<span>{ROLE[data.activeWorkspace.role] ?? data.activeWorkspace.role}</span>
+					</div>
+					<p class="display text-[2.5rem] break-words">{data.activeWorkspace.name}</p>
+					<a href={resolve('/settings/workspace')} class="btn mt-4 w-full justify-between">
+						<span class="flex items-center gap-2.5">
+							<Icon name="users" size={20} stroke={2.6} />
+							Members and invites
+						</span>
+						<Icon name="arrow-right" size={20} stroke={2.8} />
+					</a>
+				</section>
+			{/if}
+
+			<!-- Account -->
+			<section class="module pb-6 lg:hidden">
+				<div class="module-head">
+					<h2>Account</h2>
+					<span class="truncate normal-case">{data.user.email}</span>
+				</div>
+				<LogoutButton class="btn btn-quiet w-full" />
+			</section>
+		</div>
+	</div>
 </div>
+
+<ConfirmDialog
+	bind:open={discardOpen}
+	title="Discard refused changes?"
+	message="The changes the server refused are thrown away and this phone goes back to what the server has. Changes still waiting to be sent are kept."
+	confirmLabel="Discard"
+	cancelLabel="Keep them"
+	danger
+	onconfirm={discardFailed}
+/>
+
+<style>
+	.page {
+		padding: 1.5rem calc(1rem + var(--safe-right)) 0 calc(1rem + var(--safe-left));
+		max-width: 72rem;
+	}
+	.choices {
+		display: grid;
+		grid-auto-flow: column;
+		grid-auto-columns: minmax(0, 1fr);
+		border: 2px solid var(--c-ink);
+	}
+	.choice {
+		min-height: 5rem;
+		padding: 0.75rem 0.75rem 0.625rem;
+		text-align: left;
+		color: var(--c-ink);
+	}
+	.choice + .choice {
+		border-left: 2px solid var(--c-ink);
+	}
+	.choice.on {
+		background: var(--c-pink);
+		color: var(--c-on-fill);
+	}
+	.choice:focus-visible {
+		outline-offset: -5px;
+		box-shadow: none;
+	}
+	.choice:disabled {
+		cursor: progress;
+	}
+	@media (hover: hover) {
+		.choice:not(.on):hover {
+			background: var(--c-panel);
+		}
+	}
+	@media (min-width: 1024px) {
+		.page {
+			padding: 2.25rem 2.5rem 0;
+		}
+	}
+</style>

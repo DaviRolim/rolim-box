@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { syncStore } from '$lib/stores/sync.svelte';
+import { syncStore, type FailedChange } from '$lib/stores/sync.svelte';
 import { toastStore } from '$lib/stores/toast.svelte';
 import {
 	addToSyncQueue,
@@ -10,9 +10,18 @@ import {
 } from '$lib/db/indexeddb';
 import { generateId } from '$lib/utils';
 
-// ============================================================================
-// Types
-// ============================================================================
+/**
+ * Outbox for changes made on this device.
+ *
+ * Every write (create / update / delete) is applied to IndexedDB first and recorded here, then
+ * sent to the server in the order it was made. An operation has one of two states:
+ *
+ *  - pending: not on the server yet. Retried automatically: right away, with a short back-off,
+ *    when the connection comes back, when the app is opened or brought to the foreground, and
+ *    on "Sync now".
+ *  - failed: the server refused it (no permission, invalid, target gone). Retrying will not
+ *    help, so it waits for the person to discard it in Settings.
+ */
 
 export interface SyncOperation {
 	id: string;
@@ -24,352 +33,264 @@ export interface SyncOperation {
 	retries: number;
 	status: 'pending' | 'failed';
 	failedAt?: number;
+	error?: string;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
+const RETRY_DELAYS = [1000, 2000, 4000, 8000];
 
-const MAX_RETRIES = 3;
-const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
-
-// ============================================================================
-// State Management
-// ============================================================================
-
-const inFlightOperations = new Set<string>();
-const pendingRetries = new Map<string, ReturnType<typeof setTimeout>>();
+let isProcessing = false;
+let runAgain = false;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryAttempt = 0;
 
 // ============================================================================
-// Queue Operations
+// Queue access
 // ============================================================================
 
-/**
- * Add an operation to the sync queue
- */
+/** Record a change and try to send it. */
 export async function queueOperation(
 	op: Omit<SyncOperation, 'id' | 'createdAt' | 'retries'>
 ): Promise<void> {
 	if (!browser) return;
 
-	const operation: SyncOperation = {
+	await addToSyncQueue({
 		...op,
 		id: generateId(),
 		createdAt: Date.now(),
 		retries: 0,
 		status: 'pending'
-	};
-
-	try {
-		await addToSyncQueue(operation);
-	} catch (error) {
-		console.error('Failed to add operation to sync queue:', error);
-		throw error;
-	}
-
-	// If online, trigger immediate sync
-	if (syncStore.isOnline) {
-		processQueue();
-	}
+	});
+	await publishState();
+	void processQueue();
 }
 
-/**
- * Get all queued operations
- */
 export async function getQueuedOperations(): Promise<SyncOperation[]> {
 	if (!browser) return [];
 	try {
 		return (await getAllSyncQueueOperations()) as SyncOperation[];
 	} catch (error) {
-		console.error('Failed to get queued operations:', error);
+		console.error('Failed to read the sync queue:', error);
 		return [];
 	}
 }
 
-/**
- * Clear all queued operations for a specific entity
- */
+/** Ids of everything with a change that has not been accepted by the server. */
+export async function getUnsyncedEntityIds(): Promise<Set<string>> {
+	const operations = await getQueuedOperations();
+	return new Set(operations.map((op) => op.entityId));
+}
+
+/** Drop every queued operation for one entity. */
 export async function clearQueuedOperations(entityId: string): Promise<void> {
 	if (!browser) return;
-	try {
-		// Clear any pending retries for this entity
-		const operations = await getAllSyncQueueOperations();
-		for (const op of operations) {
-			if (op.entityId === entityId) {
-				const timeoutId = pendingRetries.get(op.id);
-				if (timeoutId) {
-					clearTimeout(timeoutId);
-					pendingRetries.delete(op.id);
-				}
-			}
-		}
-		await clearSyncQueueForEntity(entityId);
-	} catch (error) {
-		console.error('Failed to clear queued operations:', error);
-		throw error;
+	await clearSyncQueueForEntity(entityId);
+	await publishState();
+}
+
+/** Throw away the changes the server refused. Returns what was discarded. */
+export async function discardFailedOperations(): Promise<SyncOperation[]> {
+	const failed = (await getQueuedOperations()).filter((op) => op.status === 'failed');
+	for (const op of failed) {
+		await deleteSyncQueueOperation(op.id);
 	}
+	await publishState();
+	return failed;
+}
+
+async function publishState(): Promise<void> {
+	const operations = await getQueuedOperations();
+	syncStore.pending = operations.filter((op) => op.status === 'pending').length;
+	syncStore.failed = operations
+		.filter((op) => op.status === 'failed')
+		.map(
+			(op): FailedChange => ({
+				id: op.id,
+				entity: op.entity,
+				type: op.type,
+				entityId: op.entityId,
+				error: op.error ?? 'The server did not accept this change.'
+			})
+		);
 }
 
 // ============================================================================
-// Queue Processing
+// Processing
 // ============================================================================
 
-let isProcessing = false;
+type Outcome =
+	| { kind: 'done' }
+	| { kind: 'rejected'; message: string } // the server said no: do not retry
+	| { kind: 'retry' } // network or server trouble: try again later
+	| { kind: 'auth' }; // signed out: stop until the person logs in again
 
 /**
- * Process all pending operations in the queue
- * Called when transitioning from offline to online
+ * Send pending operations, oldest first. Stops at the first one that cannot be delivered right
+ * now, so operations on the same WoD always reach the server in the order they were made.
  */
 export async function processQueue(): Promise<void> {
-	if (!browser || !syncStore.isOnline || isProcessing) return;
-
-	isProcessing = true;
-
-	try {
-		const operations = await getAllSyncQueueOperations();
-
-		// Filter out failed operations and sort by createdAt to maintain FIFO order
-		const pendingOperations = operations.filter((op) => op.status === 'pending');
-		pendingOperations.sort((a, b) => a.createdAt - b.createdAt);
-
-		for (const operation of pendingOperations) {
-			await processOperation(operation as SyncOperation);
-		}
-	} catch (error) {
-		console.error('Error processing sync queue:', error);
-	} finally {
-		isProcessing = false;
-	}
-}
-
-/**
- * Process a single sync operation
- */
-async function processOperation(operation: SyncOperation): Promise<void> {
-	// Check if operation is already being processed
-	if (inFlightOperations.has(operation.id)) {
+	if (!browser || !syncStore.isOnline) return;
+	if (isProcessing) {
+		runAgain = true;
 		return;
 	}
 
-	inFlightOperations.add(operation.id);
+	isProcessing = true;
+	clearRetry();
+	let stalled = false;
 
 	try {
-		await executeSyncOperation(operation);
-		// Success - remove from queue and clear any pending retry
-		const timeoutId = pendingRetries.get(operation.id);
-		if (timeoutId) {
-			clearTimeout(timeoutId);
-			pendingRetries.delete(operation.id);
-		}
-		try {
-			await deleteSyncQueueOperation(operation.id);
-		} catch (error) {
-			console.error(`Failed to delete operation ${operation.id} from queue:`, error);
+		const operations = (await getQueuedOperations())
+			.filter((op) => op.status === 'pending')
+			.sort((a, b) => a.createdAt - b.createdAt);
+
+		if (operations.length > 0) syncStore.syncing = true;
+
+		for (const operation of operations) {
+			const outcome = await send(operation);
+
+			if (outcome.kind === 'done') {
+				syncStore.reportReachable(true);
+				await deleteSyncQueueOperation(operation.id);
+				await publishState();
+				continue;
+			}
+
+			if (outcome.kind === 'rejected') {
+				syncStore.reportReachable(true);
+				await updateSyncQueueOperation({
+					...operation,
+					status: 'failed',
+					failedAt: Date.now(),
+					error: outcome.message
+				});
+				await publishState();
+				toastStore.error(`A change could not be saved: ${outcome.message}`, 8000);
+				continue;
+			}
+
+			if (outcome.kind === 'retry') {
+				syncStore.reportReachable(false);
+				await updateSyncQueueOperation({ ...operation, retries: operation.retries + 1 });
+			}
+			stalled = true;
+			break;
 		}
 	} catch (error) {
-		console.error(`Failed to sync operation ${operation.id}:`, error);
-
-		// Increment retry count
-		operation.retries += 1;
-
-		if (operation.retries >= MAX_RETRIES) {
-			// Max retries reached - mark as failed
-			console.error(
-				`Operation ${operation.id} failed after ${MAX_RETRIES} retries. Marking as failed.`
-			);
-			operation.status = 'failed';
-			operation.failedAt = Date.now();
-			toastStore.error(
-				'Failed to sync changes. Your edits are saved locally and will retry when possible.',
-				0
-			);
-			try {
-				await updateSyncQueueOperation(operation);
-			} catch (updateError) {
-				console.error(`Failed to update operation ${operation.id} status:`, updateError);
-			}
-		} else {
-			// Schedule retry with exponential backoff
-			if (operation.retries === 1) {
-				toastStore.info('Syncing changes...retrying');
-			}
-			const delay = RETRY_DELAYS[operation.retries - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
-
-			try {
-				await updateSyncQueueOperation(operation);
-			} catch (updateError) {
-				console.error(`Failed to update operation ${operation.id} retry count:`, updateError);
-			}
-
-			// Retry after delay
-			const timeoutId = setTimeout(async () => {
-				pendingRetries.delete(operation.id);
-				if (syncStore.isOnline) {
-					await processOperation(operation);
-				}
-			}, delay);
-			pendingRetries.set(operation.id, timeoutId);
-		}
+		console.error('Error processing the sync queue:', error);
+		stalled = true;
 	} finally {
-		inFlightOperations.delete(operation.id);
+		isProcessing = false;
+		syncStore.syncing = false;
+		await publishState().catch(() => {});
+	}
+
+	if (runAgain) {
+		runAgain = false;
+		void processQueue();
+	} else if (stalled) {
+		scheduleRetry();
+	} else {
+		retryAttempt = 0;
 	}
 }
 
-/**
- * Execute a sync operation by calling the appropriate API endpoint
- */
-async function executeSyncOperation(operation: SyncOperation): Promise<void> {
+/** "Sync now": start over with the back-off and try straight away. */
+export function retrySync(): Promise<void> {
+	retryAttempt = 0;
+	return processQueue();
+}
+
+function scheduleRetry(): void {
+	if (retryAttempt >= RETRY_DELAYS.length) return; // wait for the next trigger (online, foreground, manual)
+	const delay = RETRY_DELAYS[retryAttempt++];
+	retryTimer = setTimeout(() => {
+		retryTimer = null;
+		void processQueue();
+	}, delay);
+}
+
+function clearRetry(): void {
+	if (retryTimer) {
+		clearTimeout(retryTimer);
+		retryTimer = null;
+	}
+}
+
+async function send(operation: SyncOperation): Promise<Outcome> {
+	const request = buildRequest(operation);
+	if (!request) {
+		return { kind: 'rejected', message: 'This kind of change is not supported.' };
+	}
+
+	let response: Response;
+	try {
+		response = await fetch(request.url, request.init);
+	} catch {
+		return { kind: 'retry' };
+	}
+
+	if (response.ok) return { kind: 'done' };
+	// Deleting something that is already gone is the outcome we wanted.
+	if (operation.type === 'delete' && response.status === 404) return { kind: 'done' };
+	if (response.status === 401) return { kind: 'auth' };
+	if (response.status === 408 || response.status === 429 || response.status >= 500) {
+		return { kind: 'retry' };
+	}
+
+	let message = `The server refused it (${response.status}).`;
+	try {
+		const body = await response.json();
+		if (typeof body?.error === 'string') message = body.error;
+	} catch {
+		// no JSON body
+	}
+	return { kind: 'rejected', message };
+}
+
+function buildRequest(operation: SyncOperation): { url: string; init: RequestInit } | null {
+	const json = (method: string, body: unknown): RequestInit => ({
+		method,
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body)
+	});
 	const { type, entity, entityId, payload } = operation;
 
 	if (entity === 'wod') {
-		switch (type) {
-			case 'create': {
-				const response = await fetch('/api/wods', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(payload)
-				});
-
-				if (!response.ok) {
-					let errorMessage = 'Failed to create WoD';
-					try {
-						const error = await response.json();
-						errorMessage = error.error || errorMessage;
-					} catch {
-						// Response has no JSON body
-					}
-					throw new Error(errorMessage);
-				}
-				break;
-			}
-
-			case 'update': {
-				const response = await fetch(`/api/wods/${entityId}`, {
-					method: 'PUT',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(payload)
-				});
-
-				if (!response.ok) {
-					let errorMessage = 'Failed to update WoD';
-					try {
-						const error = await response.json();
-						errorMessage = error.error || errorMessage;
-					} catch {
-						// Response has no JSON body
-					}
-					throw new Error(errorMessage);
-				}
-				break;
-			}
-
-			case 'delete': {
-				const response = await fetch(`/api/wods/${entityId}`, {
-					method: 'DELETE'
-				});
-
-				if (!response.ok && response.status !== 204) {
-					let errorMessage = 'Failed to delete WoD';
-					try {
-						const error = await response.json();
-						errorMessage = error.error || errorMessage;
-					} catch {
-						// Response has no JSON body
-					}
-					throw new Error(errorMessage);
-				}
-				break;
-			}
-
-			default:
-				throw new Error(`Unsupported operation type: ${type}`);
-		}
-	} else if (entity === 'pr') {
-		switch (type) {
-			case 'create': {
-				const response = await fetch('/api/prs', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(payload)
-				});
-
-				if (!response.ok) {
-					let errorMessage = 'Failed to create PR';
-					try {
-						const error = await response.json();
-						errorMessage = error.error || errorMessage;
-					} catch {
-						// Response has no JSON body
-					}
-					throw new Error(errorMessage);
-				}
-				break;
-			}
-
-			case 'delete': {
-				const response = await fetch(`/api/prs/${entityId}`, {
-					method: 'DELETE'
-				});
-
-				if (!response.ok && response.status !== 204) {
-					let errorMessage = 'Failed to delete PR';
-					try {
-						const error = await response.json();
-						errorMessage = error.error || errorMessage;
-					} catch {
-						// Response has no JSON body
-					}
-					throw new Error(errorMessage);
-				}
-				break;
-			}
-
-			default:
-				throw new Error(`Unsupported operation type for PR: ${type}`);
-		}
-	} else {
-		throw new Error(`Unsupported entity type: ${entity}`);
+		if (type === 'create') return { url: '/api/wods', init: json('POST', payload) };
+		if (type === 'update') return { url: `/api/wods/${entityId}`, init: json('PUT', payload) };
+		if (type === 'delete') return { url: `/api/wods/${entityId}`, init: { method: 'DELETE' } };
 	}
+	if (entity === 'pr') {
+		if (type === 'create') return { url: '/api/prs', init: json('POST', payload) };
+		if (type === 'delete') return { url: `/api/prs/${entityId}`, init: { method: 'DELETE' } };
+	}
+	return null;
 }
 
 // ============================================================================
-// Sync Trigger Setup
+// Triggers
 // ============================================================================
 
-/**
- * Initialize sync queue listener
- * Call this once when the app starts
- */
-export function initializeSyncQueue(): void {
-	if (!browser) return;
-
-	let wasOnline = navigator.onLine;
-
-	window.addEventListener('online', () => {
-		if (!wasOnline) {
-			console.log('Back online - processing sync queue');
-			processQueue();
+/** Wire up the automatic triggers. Runs once, when this module is first imported in the browser. */
+async function initializeSyncQueue(): Promise<void> {
+	// Earlier versions marked operations as failed after three network errors and never tried
+	// them again. Those are deliverable, so put them back in line; only operations the server
+	// refused (they carry an `error`) stay failed.
+	for (const op of await getQueuedOperations()) {
+		if (op.status === 'failed' && !op.error) {
+			await updateSyncQueueOperation({ ...op, status: 'pending', retries: 0 });
 		}
-		wasOnline = true;
-	});
-
-	window.addEventListener('offline', () => {
-		wasOnline = false;
-	});
-
-	// Also process queue on init if online
-	if (navigator.onLine) {
-		processQueue();
 	}
+	await publishState();
+
+	window.addEventListener('online', () => void retrySync());
+	document.addEventListener('visibilitychange', () => {
+		if (document.visibilityState === 'visible') void retrySync();
+	});
+
+	void processQueue();
 }
 
-// Auto-initialize when module is imported in browser
 if (browser) {
-	initializeSyncQueue();
+	void initializeSyncQueue();
 }

@@ -1,114 +1,121 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import Skeleton from '$lib/components/Skeleton.svelte';
+	import { formatDayMonth } from '$lib/date';
 	import { toastStore } from '$lib/stores/toast.svelte';
 	import {
-		formatPRValue,
 		type ExerciseWithBestPR,
 		type ExerciseCategory,
 		EXERCISE_CATEGORIES
 	} from '$lib/types/pr';
-	import type { PageData } from './$types';
+	import { getExercisesWithPRs, invalidatePRCache } from '$lib/services/pr';
+	import { debounce } from '$lib/utils';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import PRModal from './PRModal.svelte';
 	import ImportPRModal from './ImportPRModal.svelte';
 	import LeaderboardTab from './LeaderboardTab.svelte';
-	import { getExercisesWithPRs, invalidatePRCache } from '$lib/services/pr';
-	import { debounce } from '$lib/utils';
+	import { prParts } from './pr-format';
 
-	let { data }: { data: PageData } = $props();
+	let { data } = $props();
 
-	// Reactive derived values from props
-	let unitPreference = $derived(data.unitPreference);
-	let activeWorkspaceId = $derived(data.activeWorkspaceId);
+	// The person's units and box come from the app layout, so this screen needs no request of
+	// its own and opens offline.
+	const unitPreference = $derived(data.unitPreference);
+	const activeWorkspaceId = $derived(data.activeWorkspaceId);
 
-	// Client-side state
 	let exercises = $state<ExerciseWithBestPR[]>([]);
 	let loading = $state(true);
+	let loadError = $state(false);
 
-	// Load exercises on mount
-	onMount(async () => {
-		exercises = await getExercisesWithPRs();
+	async function load() {
+		loadError = false;
+		try {
+			exercises = await getExercisesWithPRs();
+		} catch (error) {
+			console.error('Failed to load PRs:', error);
+			loadError = true;
+		}
 		loading = false;
-	});
+	}
 
-	// Tab state
+	onMount(load);
+
+	// Tabs
 	type TabId = 'my-prs' | 'leaderboard';
 	let activeTab = $state<TabId>('my-prs');
-
 	const tabs: { id: TabId; label: string }[] = [
 		{ id: 'my-prs', label: 'My PRs' },
 		{ id: 'leaderboard', label: 'Leaderboard' }
 	];
 
-	// Category state - 'recorded' is a special filter showing all exercises with PRs
+	function onTabKeydown(event: KeyboardEvent) {
+		if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+		event.preventDefault();
+		activeTab = activeTab === 'my-prs' ? 'leaderboard' : 'my-prs';
+		document.getElementById(`tab-${activeTab}`)?.focus();
+	}
+
+	// 'recorded' is a special filter: every exercise that has a PR, whatever its category.
 	type ActiveCategory = ExerciseCategory | 'recorded';
 
-	// Check if user has any PRs to determine default category
-	let hasAnyPRs = $derived(exercises.some((ex: ExerciseWithBestPR) => ex.bestPR !== null));
-	let defaultCategory = $derived<ActiveCategory>(hasAnyPRs ? 'recorded' : 'weightlifting');
+	const recorded = $derived(exercises.filter((ex) => ex.bestPR !== null));
+	const defaultCategory = $derived<ActiveCategory>(
+		recorded.length > 0 ? 'recorded' : 'weightlifting'
+	);
 
-	// State
 	let searchQuery = $state('');
 	let debouncedSearchQuery = $state('');
-	const updateSearch = debounce((v: string) => {
-		debouncedSearchQuery = v;
+	const updateSearch = debounce((value: string) => {
+		debouncedSearchQuery = value;
 	}, 250);
 	$effect(() => {
 		updateSearch(searchQuery);
 	});
-	let activeCategory = $state<ActiveCategory | null>(null);
 
-	// Use default category if none selected yet
-	let effectiveCategory = $derived<ActiveCategory>(activeCategory ?? defaultCategory);
+	let activeCategory = $state<ActiveCategory | null>(null);
+	const effectiveCategory = $derived<ActiveCategory>(activeCategory ?? defaultCategory);
+	const isSearching = $derived(debouncedSearchQuery.trim().length > 0);
+
 	let selectedExercise = $state<ExerciseWithBestPR | null>(null);
 	let modalOpen = $state(false);
 	let importModalOpen = $state(false);
 
-	// Derived
-	let filteredExercises = $derived.by(() => {
-		let result = exercises;
-
-		// Filter by search (uses debounced value for performance)
-		if (debouncedSearchQuery.trim()) {
-			const query = debouncedSearchQuery.toLowerCase();
-			result = result.filter((ex: ExerciseWithBestPR) => ex.name.toLowerCase().includes(query));
-		} else if (effectiveCategory === 'recorded') {
-			// Show only exercises with recorded PRs (from all categories)
-			result = result.filter((ex: ExerciseWithBestPR) => ex.bestPR !== null);
-		} else {
-			// Filter by category only when not searching
-			result = result.filter((ex: ExerciseWithBestPR) => ex.category === effectiveCategory);
+	const filteredExercises = $derived.by(() => {
+		if (isSearching) {
+			const query = debouncedSearchQuery.trim().toLowerCase();
+			return exercises.filter((ex) => ex.name.toLowerCase().includes(query));
 		}
-
-		return result;
+		if (effectiveCategory === 'recorded') return recorded;
+		return exercises.filter((ex) => ex.category === effectiveCategory);
 	});
 
-	// Group exercises by category (used when 'recorded' is active)
-	let groupedExercises = $derived.by(() => {
-		if (effectiveCategory !== 'recorded') return null;
+	const categoryLabels: Record<ExerciseCategory, string> = {
+		weightlifting: 'Weightlifting',
+		benchmark: 'Benchmarks',
+		gymnastics: 'Gymnastics',
+		cardio: 'Cardio'
+	};
 
-		const groups: Record<ExerciseCategory, ExerciseWithBestPR[]> = {
-			weightlifting: [],
-			benchmark: [],
-			gymnastics: [],
-			cardio: []
-		};
-
-		for (const ex of filteredExercises as ExerciseWithBestPR[]) {
-			groups[ex.category].push(ex);
+	// One group per category when showing everything recorded, a single group otherwise.
+	const groups = $derived.by(() => {
+		if (isSearching)
+			return [{ key: 'search', label: 'Search results', exercises: filteredExercises }];
+		if (effectiveCategory !== 'recorded') {
+			return [
+				{
+					key: effectiveCategory,
+					label: categoryLabels[effectiveCategory],
+					exercises: filteredExercises
+				}
+			];
 		}
-
-		// Return only non-empty groups in the correct order
 		return EXERCISE_CATEGORIES.map((category) => ({
-			category,
-			exercises: groups[category]
+			key: category as string,
+			label: categoryLabels[category],
+			exercises: filteredExercises.filter((ex) => ex.category === category)
 		})).filter((group) => group.exercises.length > 0);
 	});
 
-	let isSearching = $derived(debouncedSearchQuery.trim().length > 0);
-
-	// Handlers
-	function handleExerciseClick(exercise: ExerciseWithBestPR) {
+	function openExercise(exercise: ExerciseWithBestPR) {
 		selectedExercise = exercise;
 		modalOpen = true;
 	}
@@ -118,47 +125,42 @@
 		selectedExercise = null;
 	}
 
-	async function handlePRSaved() {
+	async function reload() {
 		await invalidatePRCache();
 		exercises = await getExercisesWithPRs();
+		// Keep the open sheet pointing at the fresh copy of its exercise.
+		if (selectedExercise) {
+			const id = selectedExercise.id;
+			selectedExercise = exercises.find((ex) => ex.id === id) ?? selectedExercise;
+		}
+	}
+
+	async function handlePRSaved() {
+		await reload();
 		toastStore.success('PR saved!');
 	}
 
 	async function handlePRDeleted() {
-		await invalidatePRCache();
-		exercises = await getExercisesWithPRs();
+		await reload();
 		toastStore.success('PR deleted');
 	}
 
 	async function handleImportSuccess() {
-		await invalidatePRCache();
-		exercises = await getExercisesWithPRs();
+		await reload();
 		toastStore.success('PRs imported successfully!');
 	}
-
-	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr + 'T00:00:00');
-		return date.toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric'
-		});
-	}
-
-	const categoryLabels: Record<ExerciseCategory, string> = {
-		weightlifting: 'Weightlifting',
-		benchmark: 'Benchmarks',
-		gymnastics: 'Gymnastics',
-		cardio: 'Cardio'
-	};
 </script>
+
+<svelte:head>
+	<title>PRs - RolimBox</title>
+</svelte:head>
 
 {#if selectedExercise}
 	<PRModal
 		bind:open={modalOpen}
 		exercise={selectedExercise}
-		unitPreference={unitPreference}
-		workspaceId={activeWorkspaceId}
+		{unitPreference}
+		workspaceId={activeWorkspaceId ?? undefined}
 		onClose={handleModalClose}
 		onSaved={handlePRSaved}
 		onDeleted={handlePRDeleted}
@@ -167,192 +169,325 @@
 
 <ImportPRModal
 	bind:open={importModalOpen}
-	unitPreference={unitPreference}
+	{unitPreference}
 	onClose={() => (importModalOpen = false)}
 	onImported={handleImportSuccess}
 />
 
-<div class="flex flex-col gap-6 p-4 pb-24 md:p-6">
-	<!-- Header -->
-	<header class="flex items-start justify-between border-b border-white/10 pb-4">
-		<div>
-			<h1
-				class="bg-gradient-to-r from-white to-white/50 bg-clip-text text-3xl font-black tracking-tight text-transparent uppercase"
-			>
-				Personal Records
-			</h1>
-			<div class="h-1 w-16 bg-gradient-to-r from-accent-500 to-primary-500"></div>
+<div class="page">
+	<header class="flex items-end justify-between gap-4">
+		<div class="min-w-0">
+			<p class="legend text-mute">
+				{#if loading}
+					Reading the board
+				{:else}
+					{recorded.length} of {exercises.length} logged · {unitPreference === 'metric'
+						? 'kg'
+						: 'lbs'}
+				{/if}
+			</p>
+			<h1 class="mt-2 display text-[4.5rem] lg:text-[6rem]">PRs</h1>
 		</div>
 		{#if activeTab === 'my-prs'}
 			<button
+				type="button"
+				class="btn btn-quiet mb-1 flex-none"
 				onclick={() => (importModalOpen = true)}
-				class="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:bg-white/10 hover:text-white"
 			>
-				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-linecap="round" stroke-linejoin="round" />
-				</svg>
+				<Icon name="upload" size={20} stroke={2.6} />
 				Import
 			</button>
 		{/if}
 	</header>
 
-	<!-- Tab Navigation -->
-	<div class="flex gap-2 border-b border-white/10">
-		{#each tabs as tab}
+	<!-- svelte-ignore a11y_interactive_supports_focus -->
+	<div class="tabs" role="tablist" aria-label="Personal records" onkeydown={onTabKeydown}>
+		{#each tabs as tab (tab.id)}
 			<button
+				type="button"
+				role="tab"
+				id="tab-{tab.id}"
+				aria-selected={activeTab === tab.id}
+				aria-controls="panel-{tab.id}"
+				tabindex={activeTab === tab.id ? 0 : -1}
+				class:on={activeTab === tab.id}
 				onclick={() => (activeTab = tab.id)}
-				class="relative px-4 py-2 text-sm font-bold uppercase transition-colors {activeTab === tab.id
-					? 'text-white'
-					: 'text-text-muted hover:text-white'}"
 			>
 				{tab.label}
-				{#if activeTab === tab.id}
-					<div class="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-500"></div>
-				{/if}
 			</button>
 		{/each}
 	</div>
 
 	{#if activeTab === 'my-prs'}
-		{#if loading}
-			<!-- Loading skeleton -->
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-				{#each Array(8) as _}
-					<div class="rounded-xl border border-white/5 bg-white/5 p-4">
-						<Skeleton variant="text" height="1.25rem" width="80%" />
-						<Skeleton variant="text" height="1.5rem" width="50%" class="mt-2" />
-						<Skeleton variant="text" height="0.75rem" width="60%" class="mt-1" />
-					</div>
-				{/each}
-			</div>
-		{:else}
-		<!-- Search Bar -->
-		<div class="relative">
-			<svg
-				class="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="2"
-			>
-				<circle cx="11" cy="11" r="8" />
-				<path d="m21 21-4.3-4.3" />
-			</svg>
-			<input
-				type="text"
-				placeholder="Search exercises..."
-				bind:value={searchQuery}
-				class="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-12 pr-4 text-white placeholder-text-muted outline-none focus:border-accent-500/50 focus:bg-white/10"
-			/>
-		</div>
-
-		<!-- Category Tabs (hidden when searching) -->
-		{#if !isSearching}
-			<div class="flex gap-2 overflow-x-auto pb-2">
-				<!-- Recorded PRs tab (special filter) -->
-				<button
-					onclick={() => (activeCategory = 'recorded')}
-					class="whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold uppercase transition-all {effectiveCategory ===
-					'recorded'
-						? 'bg-accent-500 text-white'
-						: 'bg-white/5 text-text-muted hover:bg-white/10 hover:text-white'}"
-				>
-					Recorded
-				</button>
-				{#each EXERCISE_CATEGORIES as category}
-					<button
-						onclick={() => (activeCategory = category)}
-						class="whitespace-nowrap rounded-lg px-4 py-2 text-sm font-bold uppercase transition-all {effectiveCategory ===
-						category
-							? 'bg-accent-500 text-white'
-							: 'bg-white/5 text-text-muted hover:bg-white/10 hover:text-white'}"
+		<div id="panel-my-prs" role="tabpanel" aria-labelledby="tab-my-prs" class="mt-5">
+			{#if loading}
+				<div class="flex flex-col gap-2" aria-busy="true" aria-label="Loading PRs">
+					<div class="led h-14"></div>
+					{#each [0, 1, 2, 3, 4, 5] as row (row)}
+						<div class="led h-[4.5rem]"></div>
+					{/each}
+				</div>
+			{:else if loadError || exercises.length === 0}
+				<div class="notice notice-danger" role="alert">
+					<span class="mt-0.5 flex-none text-danger-ink"
+						><Icon name="alert" size={20} stroke={2.6} /></span
 					>
-						{categoryLabels[category]}
-					</button>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- Exercise Grid -->
-		{#if effectiveCategory === 'recorded' && groupedExercises}
-			<!-- Grouped view for recorded PRs -->
-			{#each groupedExercises as group (group.category)}
-				<div class="flex flex-col gap-3">
-					<h2 class="text-sm font-bold uppercase text-text-muted">
-						{categoryLabels[group.category]}
-					</h2>
-					<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{#each group.exercises as exercise (exercise.id)}
-							<button
-								onclick={() => handleExerciseClick(exercise)}
-								class="group relative overflow-hidden rounded-xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-white/10"
-							>
-								<h3 class="font-bold text-white line-clamp-2">{exercise.name}</h3>
-								{#if exercise.bestPR}
-									<p class="mt-2 text-lg font-black text-accent-400">
-										{formatPRValue(exercise.bestPR.value, exercise.measurementType, unitPreference)}
-									</p>
-									<p class="text-xs text-text-muted">{formatDate(exercise.bestPR.date)}</p>
-								{/if}
-
-								<!-- Hover indicator -->
-								<div
-									class="absolute bottom-0 left-0 h-1 w-0 bg-accent-500 transition-all group-hover:w-full"
-								></div>
-							</button>
-						{/each}
+					<div class="min-w-0 flex-1">
+						<p>
+							The exercise list could not be loaded. It is not saved on this phone yet and the
+							server did not answer.
+						</p>
+						<button
+							type="button"
+							class="btn btn-sm btn-quiet mt-3"
+							onclick={() => {
+								loading = true;
+								void load();
+							}}
+						>
+							<Icon name="refresh" size={16} stroke={2.8} />
+							Try again
+						</button>
 					</div>
 				</div>
-			{/each}
-		{:else}
-			<!-- Regular grid view -->
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-				{#each filteredExercises as exercise (exercise.id)}
-					<button
-						onclick={() => handleExerciseClick(exercise)}
-						class="group relative overflow-hidden rounded-xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:border-accent-500/30 hover:bg-white/10"
-					>
-						<h3 class="font-bold text-white line-clamp-2">{exercise.name}</h3>
-						{#if exercise.bestPR}
-							<p class="mt-2 text-lg font-black text-accent-400">
-								{formatPRValue(exercise.bestPR.value, exercise.measurementType, unitPreference)}
-							</p>
-							<p class="text-xs text-text-muted">{formatDate(exercise.bestPR.date)}</p>
-						{:else}
-							<p class="mt-2 text-sm text-text-muted">No PR yet</p>
-						{/if}
+			{:else}
+				<div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+					<div class="relative lg:w-96">
+						<label for="pr-search" class="sr-only">Search exercises</label>
+						<span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-mute">
+							<Icon name="search" size={20} stroke={2.6} />
+						</span>
+						<input
+							id="pr-search"
+							type="search"
+							class="input pl-11"
+							placeholder="Search: snatch, fran, pull-ups"
+							autocomplete="off"
+							bind:value={searchQuery}
+						/>
+					</div>
 
-						<!-- Hover indicator -->
+					<!-- Categories step aside while searching: a search looks at every exercise. -->
+					{#if !isSearching}
 						<div
-							class="absolute bottom-0 left-0 h-1 w-0 bg-accent-500 transition-all group-hover:w-full"
-						></div>
-					</button>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- Empty state -->
-		{#if filteredExercises.length === 0}
-			<div class="flex flex-col items-center justify-center py-12 text-center">
-				<p class="text-text-muted">
-					{#if isSearching}
-						No exercises found
-					{:else if effectiveCategory === 'recorded'}
-						No PRs recorded yet. Select a category to start tracking!
-					{:else}
-						No exercises in this category
+							class="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0"
+							role="group"
+							aria-label="Category"
+						>
+							<button
+								type="button"
+								class="tag min-h-11 flex-none px-3 {effectiveCategory === 'recorded'
+									? 'tag-ink'
+									: ''}"
+								aria-pressed={effectiveCategory === 'recorded'}
+								onclick={() => (activeCategory = 'recorded')}
+							>
+								Recorded
+							</button>
+							{#each EXERCISE_CATEGORIES as category (category)}
+								<button
+									type="button"
+									class="tag min-h-11 flex-none px-3 {effectiveCategory === category
+										? 'tag-ink'
+										: ''}"
+									aria-pressed={effectiveCategory === category}
+									onclick={() => (activeCategory = category)}
+								>
+									{categoryLabels[category]}
+								</button>
+							{/each}
+						</div>
 					{/if}
-				</p>
-			</div>
-		{/if}
-		{/if}
-	{:else if activeTab === 'leaderboard'}
-		{#if activeWorkspaceId}
-			<LeaderboardTab workspaceId={activeWorkspaceId} unitPreference={unitPreference} />
-		{:else}
-			<div class="py-12 text-center">
-				<p class="text-text-muted">No workspace selected</p>
-			</div>
-		{/if}
+				</div>
+
+				<div class="mt-6">
+					{#if filteredExercises.length === 0}
+						{#if isSearching}
+							<div class="border-2 border-line-strong px-5 py-8">
+								<h2 class="display text-[2.5rem]">No match</h2>
+								<p class="mt-2 text-lg text-dim">No exercise is called that.</p>
+								<button type="button" class="btn btn-quiet mt-5" onclick={() => (searchQuery = '')}>
+									Clear search
+								</button>
+							</div>
+						{:else if effectiveCategory === 'recorded'}
+							<div class="border-2 border-line-strong gridlines px-5 py-8 lg:p-12">
+								<p class="inline-block -rotate-3 sign text-[3rem] text-pink-ink" lang="pt-BR">
+									Bora marcar?
+								</p>
+								<h2 class="mt-4 display text-[3rem] lg:text-[4rem]">No PRs yet</h2>
+								<p class="mt-3 max-w-md text-lg leading-snug text-dim">
+									Pick a category, tap a lift and log your best. It goes straight on the box
+									leaderboard.
+								</p>
+								<button
+									type="button"
+									class="btn btn-pink mt-6"
+									onclick={() => (activeCategory = 'weightlifting')}
+								>
+									<Icon name="plus" size={20} stroke={3.4} />
+									Log the first one
+								</button>
+							</div>
+						{:else}
+							<div class="border-2 border-line-strong px-5 py-8">
+								<h2 class="display text-[2.5rem]">Nothing here</h2>
+								<p class="mt-2 text-lg text-dim">There are no exercises in this category.</p>
+							</div>
+						{/if}
+					{:else}
+						{#each groups as group (group.key)}
+							<section class="group">
+								<div class="module-head">
+									<h2>{group.label}</h2>
+									<span>{group.exercises.length}</span>
+								</div>
+								<ul class="tower">
+									{#each group.exercises as exercise (exercise.id)}
+										<li>
+											<button type="button" class="row" onclick={() => openExercise(exercise)}>
+												<span class="min-w-0 flex-1">
+													<span class="name display">{exercise.name}</span>
+													<span class="mt-1.5 block legend text-mute">
+														{#if exercise.bestPR}
+															{formatDayMonth(exercise.bestPR.date)}
+														{:else}
+															No PR yet
+														{/if}
+													</span>
+												</span>
+												{#if exercise.bestPR}
+													{@const parts = prParts(
+														exercise.bestPR.value,
+														exercise.measurementType,
+														unitPreference
+													)}
+													<span class="value">
+														<span class="display">{parts.figure}</span>
+														{#if parts.unit}<span class="legend text-dim">{parts.unit}</span>{/if}
+													</span>
+												{:else}
+													<span class="tag flex-none text-dim">
+														<Icon name="plus" size={12} stroke={3.6} />
+														Log
+													</span>
+												{/if}
+											</button>
+										</li>
+									{/each}
+								</ul>
+							</section>
+						{/each}
+					{/if}
+				</div>
+			{/if}
+		</div>
+	{:else}
+		<div id="panel-leaderboard" role="tabpanel" aria-labelledby="tab-leaderboard" class="mt-5">
+			{#if activeWorkspaceId}
+				{#key activeWorkspaceId}
+					<LeaderboardTab workspaceId={activeWorkspaceId} {unitPreference} />
+				{/key}
+			{:else}
+				<div class="border-2 border-line-strong px-5 py-8">
+					<h2 class="display text-[2.5rem]">No box</h2>
+					<p class="mt-2 text-lg text-dim">
+						The leaderboard belongs to a box. Join one to see where you stand.
+					</p>
+				</div>
+			{/if}
+		</div>
 	{/if}
 </div>
+
+<style>
+	.page {
+		padding: 1.5rem calc(1rem + var(--safe-right)) 0 calc(1rem + var(--safe-left));
+		max-width: 76rem;
+	}
+	.tabs {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		margin-top: 1.25rem;
+		border: 2px solid var(--c-ink);
+	}
+	.tabs button {
+		min-height: 3.25rem;
+		padding-top: 0.1em;
+		font-family: var(--font-sans);
+		font-stretch: 62%;
+		font-weight: 900;
+		font-size: 1.5rem;
+		line-height: 1;
+		text-transform: uppercase;
+		color: var(--c-dim);
+	}
+	.tabs button + button {
+		border-left: 2px solid var(--c-ink);
+	}
+	.tabs button.on {
+		color: var(--c-bg);
+		background: var(--c-ink);
+	}
+	.tabs button:focus-visible {
+		outline-offset: -6px;
+		outline-color: var(--c-pink);
+		box-shadow: none;
+	}
+	.group {
+		border-top: 2px solid var(--c-ink);
+		margin-bottom: 1.5rem;
+	}
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 0.875rem;
+		width: 100%;
+		min-height: 4.5rem;
+		padding: 0.625rem 0.25rem 0.5rem 0;
+		border-top: 1px solid var(--c-line);
+		color: var(--c-ink);
+		text-align: left;
+	}
+	.name {
+		display: block;
+		font-size: 1.625rem;
+		line-height: 0.95;
+		overflow-wrap: anywhere;
+	}
+	.value {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.25rem;
+		flex: none;
+		white-space: nowrap;
+	}
+	.value .display {
+		font-size: 2.25rem;
+		line-height: 0.9;
+	}
+	@media (hover: hover) {
+		.row:hover {
+			background: var(--c-panel);
+		}
+	}
+	@media (min-width: 1024px) {
+		.page {
+			padding: 2.25rem 2.5rem 0;
+		}
+		.tabs {
+			max-width: 28rem;
+		}
+		.tower {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			column-gap: 3rem;
+		}
+		.name {
+			font-size: 1.875rem;
+		}
+		.value .display {
+			font-size: 2.5rem;
+		}
+	}
+</style>

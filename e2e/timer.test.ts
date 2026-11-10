@@ -1,112 +1,107 @@
 import { expect, test } from '@playwright/test';
+import { ATHLETE, EMOM_SECTION, FRAN_SECTION, TODAY_WOD, loginToToday } from './helpers';
 
-test.describe('Timer', () => {
+test.describe('The clock', () => {
 	test.beforeEach(async ({ page }) => {
-		// TODO: Add proper authentication setup
-		// For now, skip tests if redirected to login
-		await page.goto('/timer');
-
-		// Check if redirected to login (authentication required)
-		const url = page.url();
-		if (url.includes('/login')) {
-			test.skip();
-		}
+		await loginToToday(page, ATHLETE);
 	});
 
-	test('can configure and start AMRAP timer', async ({ page }) => {
-		// Verify AMRAP button is visible and active by default
-		const amrapButton = page.locator('button.type-btn:has-text("AMRAP")');
-		await expect(amrapButton).toBeVisible();
-		await expect(amrapButton).toHaveClass(/active/);
+	test('set up any format with the big keys', async ({ page }) => {
+		await page.goto('/timers');
+		await expect(page.getByRole('radio', { name: /^AMRAP/ })).toBeChecked();
 
-		// Verify duration input exists
-		const durationInput = page.locator('input#duration');
-		await expect(durationInput).toBeVisible();
+		const minutes = page.getByLabel('Minutes', { exact: true });
+		await expect(minutes).toHaveValue('20');
+		await page.getByRole('button', { name: 'More minutes' }).click();
+		await expect(minutes).toHaveValue('21');
+		await page.getByRole('button', { name: 'Less minutes' }).click();
+		await expect(minutes).toHaveValue('20');
 
-		// Verify the duration has a default value
-		await expect(durationInput).toHaveValue(/\d+/);
+		await page.getByRole('radio', { name: /^EMOM/ }).click();
+		await expect(page.getByLabel('Rounds', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('Every', { exact: true })).toBeVisible();
 
-		// Click start timer button
-		await page.click('button.btn-start:has-text("START TIMER")');
+		await page.getByRole('radio', { name: /^TABATA/ }).click();
+		await expect(page.getByLabel('Work', { exact: true })).toHaveValue('20');
+		await expect(page.getByLabel('Rest', { exact: true })).toHaveValue('10');
+		await expect(page.getByText('8 × 20s / 10s')).toBeVisible();
 
-		// Verify navigated to timer display
-		await expect(page).toHaveURL('/timer/standalone');
-
-		// Verify timer display is visible
-		await expect(page.locator('.timer-display')).toBeVisible();
-
-		// Verify time display is visible
-		await expect(page.locator('.time-display')).toBeVisible();
-
-		// Verify AMRAP label is shown in header
-		await expect(page.locator('.timer-type:has-text("AMRAP")')).toBeVisible();
+		await page.getByRole('radio', { name: /^FOR TIME/ }).click();
+		await expect(page.getByLabel('Time cap', { exact: true })).toHaveValue('15');
 	});
 
-	test('can switch between timer types', async ({ page }) => {
-		// Verify we start with AMRAP (default)
-		await expect(page.locator('button.type-btn:has-text("AMRAP")')).toHaveClass(/active/);
+	test('a standalone AMRAP counts down, counts rounds, pauses and ends', async ({ page }) => {
+		await page.goto('/timers');
+		await page.getByRole('button', { name: 'Start timer' }).click();
+		await expect(page).toHaveURL(/\/timers\/standalone$/);
 
-		// Click EMOM
-		await page.click('button.type-btn:has-text("EMOM")');
+		// 3-2-1, then the clock runs down from 20:00.
+		const clock = page.getByRole('timer');
+		await expect(clock).toHaveAccessibleName(/^19 minutes 5\d seconds$/, { timeout: 10_000 });
 
-		// Verify EMOM is active
-		await expect(page.locator('button.type-btn:has-text("EMOM")')).toHaveClass(/active/);
+		await page.getByRole('button', { name: 'Count one round' }).click();
+		await page.getByRole('button', { name: 'Count one round' }).click();
+		await page.getByRole('button', { name: 'Take one round back' }).click();
 
-		// Verify rounds input appears
-		await expect(page.locator('input#rounds')).toBeVisible();
+		await page.getByRole('button', { name: 'Pause' }).click();
+		await expect(page.getByText('Paused')).toBeVisible();
+		const frozen = await clock.getAttribute('aria-label');
+		await page.waitForTimeout(1300);
+		await expect(clock).toHaveAttribute('aria-label', frozen!);
 
-		// Verify interval input appears (EMOM specific)
-		await expect(page.locator('input#interval')).toBeVisible();
+		await page.getByRole('button', { name: 'Resume' }).click();
+		await page.getByRole('button', { name: 'Pause' }).click();
+		await page.getByRole('button', { name: 'End here' }).click();
 
-		// Click TABATA
-		await page.click('button.type-btn:has-text("TABATA")');
+		// The finish line.
+		await expect(page.getByText('Acabou!')).toBeVisible();
+		await expect(page.getByRole('status', { name: /^Result: 1 round$/ })).toBeVisible();
+		await expect(page.getByRole('button', { name: /share result/i })).toBeVisible();
 
-		// Verify TABATA is active
-		await expect(page.locator('button.type-btn:has-text("TABATA")')).toHaveClass(/active/);
+		await page.getByRole('button', { name: 'Done' }).click();
+		await expect(page).toHaveURL(/\/timers$/);
 
-		// Verify tabata-specific inputs appear
-		await expect(page.locator('input#tabata-rounds')).toBeVisible();
-		await expect(page.locator('input#work')).toBeVisible();
-		await expect(page.locator('input#rest')).toBeVisible();
-
-		// Click FOR TIME
-		await page.click('button.type-btn:has-text("FOR TIME")');
-
-		// Verify FOR TIME is active
-		await expect(page.locator('button.type-btn:has-text("FOR TIME")')).toHaveClass(/active/);
-
-		// Verify duration input appears (time cap)
-		await expect(page.locator('input#duration')).toBeVisible();
+		// Going back with the browser shows the same clock waiting, it does not start by itself.
+		await page.goBack();
+		await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
+		await page.waitForTimeout(1500);
+		await expect(page.getByRole('timer')).toHaveAccessibleName('20 minutes 00 seconds');
 	});
 
-	test('can configure stepper buttons to change values', async ({ page }) => {
-		// Get initial duration value
-		const durationInput = page.locator('input#duration');
-		const initialValue = await durationInput.inputValue();
-		const initialNum = parseInt(initialValue);
+	test("a WoD's own clock shows the workout, then the time you finished in", async ({ page }) => {
+		await page.goto(`/timers/${FRAN_SECTION}?wod=${TODAY_WOD}`);
+		await expect(page.getByRole('heading', { level: 1, name: 'Fran' })).toBeVisible();
+		await expect(page.getByText('Thrusters (43/30 kg)')).toBeVisible();
 
-		// Click increment button
-		const incrementBtn = page.locator('.field-input-group .stepper-btn:has-text("+")').first();
-		await incrementBtn.click();
+		await page.getByRole('button', { name: 'Start', exact: true }).click();
+		const clock = page.getByRole('timer');
+		await expect(clock).toHaveAccessibleName(/^00 minutes 0[2-9] seconds$/, { timeout: 12_000 });
 
-		// Verify value increased
-		const newValue = await durationInput.inputValue();
-		expect(parseInt(newValue)).toBe(initialNum + 1);
+		await page.getByRole('button', { name: 'Finish' }).click();
+		await expect(page.getByText('Acabou!')).toBeVisible();
+		await expect(page.getByRole('status', { name: /^Result: 00:0\d Time$/ })).toBeVisible();
 
-		// Click decrement button
-		const decrementBtn = page.locator('.field-input-group .stepper-btn:has-text("-")').first();
-		await decrementBtn.click();
-
-		// Verify value decreased back to original
-		const finalValue = await durationInput.inputValue();
-		expect(parseInt(finalValue)).toBe(initialNum);
+		await page.getByRole('button', { name: 'Back to WoD' }).click();
+		await expect(page).toHaveURL(new RegExp(`/workouts/${TODAY_WOD}$`));
 	});
 
-	test('can navigate back from timer config page', async ({ page }) => {
-		// Click back button
-		await page.click('button.btn-back');
+	test('an EMOM shows the round, and leaving mid-workout asks first', async ({ page }) => {
+		await page.goto(`/timers/${EMOM_SECTION}?wod=${TODAY_WOD}`);
+		await page.getByRole('button', { name: 'Start', exact: true }).click();
+		await expect(page.getByText('01/08')).toBeVisible();
+		await expect(page.getByRole('timer')).toHaveAccessibleName(/^00 minutes 5\d seconds$/, {
+			timeout: 10_000
+		});
 
-		// Verify navigated to dashboard
-		await expect(page).toHaveURL('/dashboard');
+		await page.getByRole('button', { name: 'Leave the clock' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Leave the clock?' });
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole('button', { name: 'Back to the clock' }).click();
+		await expect(page.getByText('Paused')).toBeVisible();
+	});
+
+	test('a clock link to a section that is gone says so', async ({ page }) => {
+		await page.goto(`/timers/${'0'.repeat(32)}?wod=${TODAY_WOD}`);
+		await expect(page.getByRole('heading', { name: 'Clock not found' })).toBeVisible();
 	});
 });

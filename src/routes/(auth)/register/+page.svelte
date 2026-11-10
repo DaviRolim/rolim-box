@@ -1,80 +1,84 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import { invalidateAll } from '$app/navigation';
+	import Icon from '$lib/components/ui/Icon.svelte';
 
 	let { form } = $props();
-	let isLoading = $state(false);
+
+	let busy = $state(false);
 </script>
 
 <svelte:head>
-	<title>Register - RolimBox</title>
+	<title>Create an account - RolimBox</title>
 </svelte:head>
 
-<div class="flex min-h-screen items-center justify-center bg-bg-base p-4">
-	<div class="w-full max-w-md">
-		<h1 class="mb-8 text-center text-3xl font-bold text-white">Create Account</h1>
+<p class="legend text-mute">New to the box</p>
+<h1 class="mt-2 display text-[3.5rem]">Create account</h1>
+<p class="mt-3 text-base leading-snug text-dim">
+	Joining an existing box? Ask a coach for an invite link instead: it puts you straight on their
+	board.
+</p>
 
-		<form
-			method="POST"
-			use:enhance={() => {
-				isLoading = true;
-				return async ({ result, update }) => {
-					isLoading = false;
-					if (result.type === 'redirect') {
-						// Invalidate all cached data before redirect to ensure fresh auth state
-						await invalidateAll();
-						// Force a hard navigation to clear any stale state
-						window.location.href = result.location;
-					} else {
-						await update();
-					}
-				};
-			}}
-			class="space-y-4"
-		>
-			{#if form?.error}
-				<div class="rounded bg-red-900/50 p-3 text-red-200">
-					{form.error}
-				</div>
-			{/if}
-
-			<div>
-				<label for="email" class="mb-1 block text-sm text-text-secondary">Email</label>
-				<input
-					type="email"
-					id="email"
-					name="email"
-					required
-					class="w-full rounded border border-gray-700 bg-bg-surface px-4 py-2 text-white focus:border-accent-500 focus:outline-none"
-				/>
-			</div>
-
-			<div>
-				<label for="password" class="mb-1 block text-sm text-text-secondary">Password</label>
-				<input
-					type="password"
-					id="password"
-					name="password"
-					required
-					minlength="8"
-					class="w-full rounded border border-gray-700 bg-bg-surface px-4 py-2 text-white focus:border-accent-500 focus:outline-none"
-				/>
-				<p class="mt-1 text-xs text-text-muted">Minimum 8 characters</p>
-			</div>
-
-			<button
-				type="submit"
-				disabled={isLoading}
-				class="w-full rounded bg-accent-500 px-4 py-2 font-semibold text-white transition hover:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+<form
+	method="POST"
+	class="mt-6 flex flex-col gap-4"
+	use:enhance={() => {
+		busy = true;
+		return async ({ result, update }) => {
+			if (result.type === 'redirect') {
+				window.location.href = result.location;
+			} else {
+				busy = false;
+				await update({ reset: false });
+			}
+		};
+	}}
+>
+	{#if form?.error}
+		<div class="notice notice-danger" role="alert">
+			<span class="mt-0.5 flex-none text-danger-ink"
+				><Icon name="alert" size={20} stroke={2.6} /></span
 			>
-				{isLoading ? 'Creating account...' : 'Register'}
-			</button>
-		</form>
+			<p class="font-semibold">{form.error}</p>
+		</div>
+	{/if}
 
-		<p class="mt-4 text-center text-gray-400">
-			Already have an account?
-			<a href={resolve('/login')} class="text-accent-400 hover:underline">Log in</a>
-		</p>
+	<div>
+		<label for="email" class="field-label">Email</label>
+		<input
+			id="email"
+			name="email"
+			type="email"
+			class="input"
+			autocomplete="email"
+			inputmode="email"
+			autocapitalize="none"
+			spellcheck="false"
+			required
+		/>
 	</div>
-</div>
+
+	<div>
+		<label for="password" class="field-label">Password</label>
+		<input
+			id="password"
+			name="password"
+			type="password"
+			class="input"
+			autocomplete="new-password"
+			minlength="8"
+			aria-describedby="password-help"
+			required
+		/>
+		<p id="password-help" class="mt-1.5 text-base text-mute">At least 8 characters.</p>
+	</div>
+
+	<button type="submit" class="btn btn-pink btn-slab mt-1" disabled={busy}>
+		{busy ? 'Creating' : 'Create account'}
+	</button>
+</form>
+
+<p class="mt-8 border-t border-line-strong pt-5 text-base text-dim">
+	Already have an account?
+	<a href={resolve('/login')} class="link">Log in</a>
+</p>
