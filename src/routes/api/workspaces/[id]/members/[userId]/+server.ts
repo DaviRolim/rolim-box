@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { workspaceMember } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 import * as auth from '$lib/server/auth';
+import { dictFor } from '$lib/i18n';
 
 /**
  * DELETE /api/workspaces/[id]/members/[userId]
@@ -11,7 +12,7 @@ import * as auth from '$lib/server/auth';
  */
 export const DELETE: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const { id: workspaceId, userId } = params;
@@ -19,7 +20,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	// Check if requester is owner
 	const isOwner = await auth.isWorkspaceOwner(locals.user.id, workspaceId);
 	if (!isOwner) {
-		return json({ error: 'Only workspace owners can remove members' }, { status: 403 });
+		return json({ error: dictFor(locals.locale).api.ownersOnly }, { status: 403 });
 	}
 
 	// Check if trying to remove self
@@ -31,10 +32,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			.where(and(eq(workspaceMember.workspaceId, workspaceId), eq(workspaceMember.role, 'owner')));
 
 		if (owners.length <= 1) {
-			return json(
-				{ error: 'Cannot remove yourself as the sole owner. Transfer ownership first.' },
-				{ status: 400 }
-			);
+			return json({ error: dictFor(locals.locale).api.soleOwner }, { status: 400 });
 		}
 	}
 

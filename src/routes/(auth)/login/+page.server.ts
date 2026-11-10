@@ -15,21 +15,21 @@ export const actions: Actions = {
 		const password = formData.get('password');
 
 		if (typeof email !== 'string' || !email.includes('@')) {
-			return fail(400, { error: 'Invalid email address' });
+			return fail(400, { error: 'invalid_email' });
 		}
 
 		if (typeof password !== 'string' || password.length < 1) {
-			return fail(400, { error: 'Password is required' });
+			return fail(400, { error: 'password_required' });
 		}
 
 		const user = await auth.findUserByEmail(email);
 		if (!user) {
-			return fail(400, { error: 'Invalid email or password' });
+			return fail(400, { error: 'bad_credentials' });
 		}
 
 		const validPassword = await auth.verifyPassword(user.passwordHash, password);
 		if (!validPassword) {
-			return fail(400, { error: 'Invalid email or password' });
+			return fail(400, { error: 'bad_credentials' });
 		}
 
 		const token = auth.generateSessionToken();

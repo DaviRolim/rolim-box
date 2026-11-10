@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/ui/Icon.svelte';
+	import { t } from '$lib/i18n';
 
 	let { form } = $props();
 
@@ -9,15 +10,12 @@
 </script>
 
 <svelte:head>
-	<title>Create an account - RolimBox</title>
+	<title>{t.common.pageTitle(t.auth.register.pageTitle)}</title>
 </svelte:head>
 
-<p class="legend text-mute">New to the box</p>
-<h1 class="mt-2 display text-[3.5rem]">Create account</h1>
-<p class="mt-3 text-base leading-snug text-dim">
-	Joining an existing box? Ask a coach for an invite link instead: it puts you straight on their
-	board.
-</p>
+<p class="legend text-mute">{t.auth.register.eyebrow}</p>
+<h1 class="mt-2 display text-[3.5rem]">{t.auth.register.title}</h1>
+<p class="mt-3 text-base leading-snug text-dim">{t.auth.register.intro}</p>
 
 <form
 	method="POST"
@@ -39,12 +37,12 @@
 			<span class="mt-0.5 flex-none text-danger-ink"
 				><Icon name="alert" size={20} stroke={2.6} /></span
 			>
-			<p class="font-semibold">{form.error}</p>
+			<p class="font-semibold">{t.auth.errors[form.error] ?? form.error}</p>
 		</div>
 	{/if}
 
 	<div>
-		<label for="email" class="field-label">Email</label>
+		<label for="email" class="field-label">{t.auth.email}</label>
 		<input
 			id="email"
 			name="email"
@@ -59,7 +57,7 @@
 	</div>
 
 	<div>
-		<label for="password" class="field-label">Password</label>
+		<label for="password" class="field-label">{t.auth.password}</label>
 		<input
 			id="password"
 			name="password"
@@ -70,15 +68,15 @@
 			aria-describedby="password-help"
 			required
 		/>
-		<p id="password-help" class="mt-1.5 text-base text-mute">At least 8 characters.</p>
+		<p id="password-help" class="mt-1.5 text-base text-mute">{t.auth.passwordHelp}</p>
 	</div>
 
 	<button type="submit" class="btn btn-pink btn-slab mt-1" disabled={busy}>
-		{busy ? 'Creating' : 'Create account'}
+		{busy ? t.auth.register.creating : t.auth.register.submit}
 	</button>
 </form>
 
 <p class="mt-8 border-t border-line-strong pt-5 text-base text-dim">
-	Already have an account?
-	<a href={resolve('/login')} class="link">Log in</a>
+	{t.auth.alreadyHaveAccount}
+	<a href={resolve('/login')} class="link">{t.auth.logIn}</a>
 </p>

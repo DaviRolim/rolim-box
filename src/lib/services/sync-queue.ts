@@ -9,6 +9,7 @@ import {
 	clearSyncQueueForEntity
 } from '$lib/db/indexeddb';
 import { generateId } from '$lib/utils';
+import { t } from '$lib/i18n';
 
 /**
  * Outbox for changes made on this device.
@@ -108,7 +109,7 @@ async function publishState(): Promise<void> {
 				entity: op.entity,
 				type: op.type,
 				entityId: op.entityId,
-				error: op.error ?? 'The server did not accept this change.'
+				error: op.error ?? t.settings.sync.notAccepted
 			})
 		);
 }
@@ -164,7 +165,7 @@ export async function processQueue(): Promise<void> {
 					error: outcome.message
 				});
 				await publishState();
-				toastStore.error(`A change could not be saved: ${outcome.message}`, 8000);
+				toastStore.error(t.settings.sync.notSaved(outcome.message), 8000);
 				continue;
 			}
 
@@ -219,7 +220,7 @@ function clearRetry(): void {
 async function send(operation: SyncOperation): Promise<Outcome> {
 	const request = buildRequest(operation);
 	if (!request) {
-		return { kind: 'rejected', message: 'This kind of change is not supported.' };
+		return { kind: 'rejected', message: t.settings.sync.unsupported };
 	}
 
 	let response: Response;
@@ -237,7 +238,7 @@ async function send(operation: SyncOperation): Promise<Outcome> {
 		return { kind: 'retry' };
 	}
 
-	let message = `The server refused it (${response.status}).`;
+	let message = t.settings.sync.refusedStatus(response.status);
 	try {
 		const body = await response.json();
 		if (typeof body?.error === 'string') message = body.error;

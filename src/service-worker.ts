@@ -120,12 +120,25 @@ sw.addEventListener('message', (event) => {
 	);
 });
 
+// The service worker cannot see the language cookie, but the page it serves can: both texts
+// are in the page and a tiny script picks the saved one (English unless PT was chosen).
+// "Sem sinal." is the app's voice and stays Portuguese in both.
 const OFFLINE_PAGE = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Offline - RolimBox</title>
+<script>
+	try {
+		var m = document.cookie.match(/(?:^|;\\s*)rolimbox-lang=([^;]*)/);
+		var lang = (m && m[1]) || localStorage.getItem('rolimbox:lang');
+		if (lang === 'pt') {
+			document.documentElement.lang = 'pt-BR';
+			document.title = 'Sem internet - RolimBox';
+		}
+	} catch (e) {}
+</script>
 <style>
 	body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-end;
 		background: #0c0c0d; color: #f3efe6; font: 500 18px/1.4 system-ui, sans-serif; }
@@ -134,13 +147,15 @@ const OFFLINE_PAGE = `<!doctype html>
 	p { margin: 0 0 24px; color: #c4c0b6; max-width: 32ch; }
 	a { display: block; padding: 20px; background: #ff2e93; color: #0c0c0d; font-weight: 800;
 		text-align: center; text-transform: uppercase; text-decoration: none; }
+	html[lang='pt-BR'] [lang='en'], html:not([lang='pt-BR']) [lang='pt-BR'] { display: none; }
 </style>
 </head>
 <body>
 <main>
 	<h1>Sem sinal.</h1>
-	<p>RolimBox has not been opened on this phone with a connection yet, so there is nothing saved to show. Connect once and it will work offline afterwards.</p>
-	<a href="/dashboard">Try again</a>
+	<p lang="en">RolimBox has not been opened on this phone with a connection yet, so there is nothing saved to show. Connect once and it will work offline afterwards.</p>
+	<p lang="pt-BR">O RolimBox ainda não foi aberto neste celular com internet, então não tem nada salvo pra mostrar. Conecta uma vez e depois ele funciona offline.</p>
+	<a href="/dashboard"><span lang="en">Try again</span><span lang="pt-BR">Tentar de novo</span></a>
 </main>
 </body>
 </html>`;

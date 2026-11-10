@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { user } from '$lib/server/db/schema';
 import { updateUserSettingsSchema } from '$lib/types/pr';
 import { eq } from 'drizzle-orm';
+import { dictFor } from '$lib/i18n';
 
 /**
  * GET /api/user/settings
@@ -11,7 +12,7 @@ import { eq } from 'drizzle-orm';
  */
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	const [userData] = await db
@@ -28,21 +29,21 @@ export const GET: RequestHandler = async ({ locals }) => {
  */
 export const PATCH: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
+		return json({ error: dictFor(locals.locale).api.unauthorized }, { status: 401 });
 	}
 
 	let body;
 	try {
 		body = await request.json();
 	} catch {
-		return json({ error: 'Invalid JSON body' }, { status: 400 });
+		return json({ error: dictFor(locals.locale).api.invalidJson }, { status: 400 });
 	}
 
 	const validation = updateUserSettingsSchema.safeParse(body);
 	if (!validation.success) {
 		return json(
 			{
-				error: 'Validation failed',
+				error: dictFor(locals.locale).api.validationFailed,
 				details: validation.error.flatten()
 			},
 			{ status: 400 }

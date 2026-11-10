@@ -54,23 +54,23 @@ export const actions: Actions = {
 		const inviteCode = params.code;
 
 		if (typeof email !== 'string' || !email.includes('@')) {
-			return fail(400, { error: 'Invalid email address' });
+			return fail(400, { error: 'invalid_email' });
 		}
 
 		if (typeof password !== 'string' || password.length < 8) {
-			return fail(400, { error: 'Password must be at least 8 characters' });
+			return fail(400, { error: 'password_short' });
 		}
 
 		// Validate invite
 		const invite = await auth.getInviteByCode(inviteCode);
 		if (!invite || new Date() > invite.expiresAt) {
-			return fail(400, { error: 'Invalid or expired invite' });
+			return fail(400, { error: 'invite_invalid' });
 		}
 
 		// Check if email exists
 		const existingUser = await auth.findUserByEmail(email);
 		if (existingUser) {
-			return fail(400, { error: 'Email already registered. Please log in instead.' });
+			return fail(400, { error: 'email_taken_login' });
 		}
 
 		// Create user (without personal workspace)
