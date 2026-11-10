@@ -6,6 +6,7 @@
 	import { wodStore } from '$lib/stores/wods.svelte';
 	import { parseTimerConfig } from '$lib/types/timer';
 	import Clock from '$lib/components/clock/Clock.svelte';
+	import { t } from '$lib/i18n';
 
 	const STANDALONE = 'rolimbox:standalone-timer';
 	const AUTOSTART = 'rolimbox:standalone-autostart';
@@ -13,7 +14,26 @@
 	const id = $derived(page.params.id ?? '');
 	const wodId = $derived(page.url.searchParams.get('wod'));
 
-	let problem = $state<{ title: string; detail: string } | null>(null);
+	// What went wrong is kept as a kind, not as text, so it follows the EN | PT switch.
+	type Problem =
+		| { kind: 'noWod' | 'unavailable' | 'notFound' }
+		| { kind: 'noClock'; section: string };
+	let problem = $state<Problem | null>(null);
+	const problemText = $derived.by(() => {
+		const words = t.timer.problem;
+		switch (problem?.kind) {
+			case 'noWod':
+				return { title: words.noWodTitle, detail: words.noWodDetail };
+			case 'unavailable':
+				return { title: words.unavailableTitle, detail: words.unavailableDetail };
+			case 'notFound':
+				return { title: words.notFoundTitle, detail: words.notFoundDetail };
+			case 'noClock':
+				return { title: words.noClockTitle, detail: words.noClockDetail(problem.section) };
+			default:
+				return null;
+		}
+	});
 	let ready = $state(false);
 	let prepared: string | null = null;
 
@@ -53,28 +73,22 @@
 		prepared = key;
 
 		if (!wodId) {
-			problem = {
-				title: 'No WoD',
-				detail: 'This clock link does not say which WoD it belongs to.'
-			};
+			problem = { kind: 'noWod' };
 			return;
 		}
 
 		wodStore.find(wodId).then((wod) => {
 			if (prepared !== key) return;
 			if (wod === 'unavailable') {
-				problem = {
-					title: 'Not on this phone',
-					detail: 'This WoD is not saved here and the server cannot be reached right now.'
-				};
+				problem = { kind: 'unavailable' };
 				return;
 			}
 			const section = wod?.sections.find((s) => s.id === id);
 			const config = section ? parseTimerConfig(section.timerConfig) : null;
 			if (!wod || !section) {
-				problem = { title: 'Clock not found', detail: 'This part of the WoD no longer exists.' };
+				problem = { kind: 'notFound' };
 			} else if (!config) {
-				problem = { title: 'No clock here', detail: `"${section.name}" has no clock set up.` };
+				problem = { kind: 'noClock', section: section.name };
 			} else {
 				timerStore.initialize(config, {
 					sectionId: section.id,
@@ -95,26 +109,26 @@
 </script>
 
 <svelte:head>
-	<title>Clock - RolimBox</title>
+	<title>{t.common.pageTitle(t.timer.setup.title)}</title>
 </svelte:head>
 
 {#if ready}
 	<Clock onexit={exit} />
-{:else if problem}
+{:else if problemText}
 	<div class="flex min-h-dvh flex-col justify-end p-4 pb-8 lg:justify-center lg:p-12">
-		<p class="legend text-warn-ink">Clock</p>
-		<h1 class="mt-3 display text-[4rem] lg:text-[6rem]">{problem.title}</h1>
-		<p class="mt-3 max-w-md text-lg leading-snug text-dim">{problem.detail}</p>
+		<p class="legend text-warn-ink">{t.timer.problem.legend}</p>
+		<h1 class="mt-3 display text-[4rem] lg:text-[6rem]">{problemText.title}</h1>
+		<p class="mt-3 max-w-md text-lg leading-snug text-dim">{problemText.detail}</p>
 		<div class="mt-6 flex flex-wrap gap-2">
-			<a href={resolve('/timers')} class="btn btn-ink">Set up a clock</a>
-			<a href={resolve('/dashboard')} class="btn btn-quiet">Today</a>
+			<a href={resolve('/timers')} class="btn btn-ink">{t.timer.problem.setUp}</a>
+			<a href={resolve('/dashboard')} class="btn btn-quiet">{t.timer.problem.today}</a>
 		</div>
 	</div>
 {:else}
 	<div
 		class="flex min-h-dvh flex-col justify-center gap-3 p-4"
 		aria-busy="true"
-		aria-label="Loading the clock"
+		aria-label={t.timer.problem.loading}
 	>
 		<div class="led h-40"></div>
 		<div class="led h-40"></div>
