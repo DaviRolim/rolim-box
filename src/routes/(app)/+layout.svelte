@@ -82,11 +82,11 @@
 	<div class="shell">
 		<!-- Desktop: the rail -->
 		<aside class="rail" aria-label="RolimBox">
-			<div class="flex items-start justify-between gap-2 pt-5 pr-3 pb-4 pl-4">
+			<div class="flex items-center justify-between gap-2 pt-4 pr-3 pb-3 pl-4">
 				<a href={resolve('/dashboard')} class="block no-underline" aria-label={t.shell.homeLink}>
-					<Logo size={34} />
+					<Logo size={28} />
 				</a>
-				<LangToggle class="-mt-1.5" />
+				<LangToggle />
 			</div>
 
 			{#if data.workspaces.length > 0}
@@ -162,7 +162,7 @@
 				{/if}
 			</div>
 			<div class="flex flex-none items-center gap-1">
-				<SyncChip />
+				<SyncChip compact />
 				<LangToggle />
 				<a
 					href={resolve('/settings')}

@@ -6,6 +6,8 @@ export const editor = {
 	editWod: 'Edit WoD',
 	status: { saving: 'Saving', unsaved: 'Unsaved', blank: 'Blank', saved: 'Saved' },
 	saveWod: 'Save WoD',
+	/** The header button of a new WoD, next to its heading (short: the phone has no room). */
+	saveWodShort: 'Save WoD',
 	save: 'Save',
 	saveChanges: 'Save changes',
 	saving: 'Saving',

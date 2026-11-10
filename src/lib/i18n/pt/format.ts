@@ -5,7 +5,7 @@ export const format: Dict['format'] = {
 		warmup: 'Aquecimento',
 		skill: 'Skill',
 		wod: 'WoD',
-		cooldown: 'Desaquecimento',
+		cooldown: 'Cool-down',
 		stretches: 'Alongamento',
 		custom: 'Extra'
 	},

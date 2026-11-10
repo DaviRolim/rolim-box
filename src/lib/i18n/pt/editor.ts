@@ -7,6 +7,7 @@ export const editor: Dict['editor'] = {
 	editWod: 'Editar WoD',
 	status: { saving: 'Salvando', unsaved: 'Não salvo', blank: 'Em branco', saved: 'Salvo' },
 	saveWod: 'Salvar WoD',
+	saveWodShort: 'Salvar',
 	save: 'Salvar',
 	saveChanges: 'Salvar',
 	saving: 'Salvando',

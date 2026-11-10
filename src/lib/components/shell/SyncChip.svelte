@@ -13,6 +13,12 @@
 		error: 'bg-danger'
 	};
 
+	/**
+	 * `compact` (the phone top bar, which also carries the box name and EN | PT): when all is
+	 * synced the green lamp says it alone; any state that needs attention still gets its word.
+	 */
+	let { compact = false }: { compact?: boolean } = $props();
+
 	const label = $derived.by(() => {
 		switch (syncStore.status) {
 			case 'offline':
@@ -34,8 +40,17 @@
 <a
 	href={resolve('/settings')}
 	class="inline-flex min-h-11 items-center gap-2 px-1 legend text-dim no-underline"
+	class:compact
 	aria-label={t.shell.sync.aria(label)}
 >
 	<span class="h-2.5 w-2.5 flex-none {lamp[syncStore.status]}" aria-hidden="true"></span>
-	{label}
+	{#if !(compact && syncStore.status === 'synced')}{label}{/if}
 </a>
+
+<style>
+	/* The lamp alone still makes a 44px target. */
+	.compact {
+		min-width: 2.75rem;
+		justify-content: center;
+	}
+</style>

@@ -185,6 +185,19 @@
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
+	/* On a phone the type sits between the index and three buttons: give the longer
+	   Portuguese names ("Aquecimento", "Alongamento") the room the chevron was taking. */
+	@media (max-width: 639px) {
+		.type {
+			padding-left: 0.625rem;
+			padding-right: 1.75rem;
+			font-size: 0.875rem;
+			letter-spacing: 0.02em;
+			background-position:
+				calc(100% - 1rem) 50%,
+				calc(100% - 0.625rem) 50%;
+		}
+	}
 	.name {
 		font-stretch: 68%;
 		font-weight: 800;

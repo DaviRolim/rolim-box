@@ -77,7 +77,7 @@ export const auth = {
 		pageTitle: 'Find your box',
 		title: 'No box yet',
 		body: (email: string) =>
-			`You are signed in as ${email}, but you are not on any box\'s board. Ask a coach for an invite link, or type the code they gave you.`,
+			`You are signed in as ${email}, but you are not on any box's board. Ask a coach for an invite link, or type the code they gave you.`,
 		inviteCode: 'Invite code',
 		join: 'Join'
 	},

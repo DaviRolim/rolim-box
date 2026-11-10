@@ -363,7 +363,7 @@
 		</div>
 		<button type="button" class="btn btn-pink flex-none" disabled={saving} onclick={save}>
 			<Icon name="check" size={20} stroke={3.4} />
-			{isNew ? t.editor.saveWod : t.editor.save}
+			{isNew ? t.editor.saveWodShort : t.editor.save}
 			<kbd class="hidden border border-current px-1.5 py-0.5 legend lg:inline">⌘S</kbd>
 		</button>
 	</header>

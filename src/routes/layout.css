@@ -258,6 +258,12 @@
 	font-variant-numeric: tabular-nums;
 }
 
+/* Portuguese capitals carry accents (RELÓGIO, PÓDIO, NÃO) that rise above the scoreboard's
+   tight line box and would touch the legend above: give headings a little headroom. */
+:root:lang(pt-BR) :is(h1, h2):where(.display) {
+	padding-top: 0.12em;
+}
+
 /* A slightly wider cut of the same voice, for movement names read from a distance. */
 @utility display-wide {
 	font-family: var(--font-sans);
