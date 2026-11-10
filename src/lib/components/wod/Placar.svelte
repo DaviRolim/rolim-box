@@ -6,6 +6,7 @@
 	import { getTotalDuration } from '$lib/types/timer';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Board from './Board.svelte';
+	import { t } from '$lib/i18n';
 	import type { WoD } from '$lib/types/wod';
 
 	/**
@@ -88,7 +89,12 @@
 <svelte:window onkeydown={onKeydown} />
 
 {#if open && section}
-	<div class="placar" role="dialog" aria-modal="true" aria-label="Placar mode: {section.name}">
+	<div
+		class="placar"
+		role="dialog"
+		aria-modal="true"
+		aria-label={t.today.placar.dialog(section.name)}
+	>
 		<header class="flex items-center gap-3">
 			<span class="count display" class:main={section.id === main?.id}>
 				{String(index + 1).padStart(2, '0')}<span class="opacity-60"
@@ -106,7 +112,7 @@
 				type="button"
 				class="icon-btn"
 				onclick={() => (open = false)}
-				aria-label="Close placar mode"
+				aria-label={t.today.placar.close}
 			>
 				<Icon name="x" size={24} stroke={2.8} />
 			</button>
@@ -126,7 +132,7 @@
 				class="icon-btn step"
 				onclick={() => step(-1)}
 				disabled={index === 0}
-				aria-label="Previous section"
+				aria-label={t.today.placar.previous}
 			>
 				<Icon name="chevron-left" size={30} stroke={3} />
 			</button>
@@ -137,13 +143,13 @@
 				>
 					<span class="flex items-center gap-2">
 						<span class="max-[430px]:hidden"><Icon name="play" solid size={22} /></span>
-						Start clock
+						{t.today.placar.startClock}
 					</span>
 					<span class="num">{clock(getTotalDuration(timer))}</span>
 				</a>
 			{:else}
 				<div class="flex items-center justify-center legend text-mute" aria-hidden="true">
-					No clock for this part
+					{t.today.placar.noClock}
 				</div>
 			{/if}
 			<button
@@ -151,7 +157,7 @@
 				class="icon-btn step"
 				onclick={() => step(1)}
 				disabled={index >= total - 1}
-				aria-label="Next section"
+				aria-label={t.today.placar.next}
 			>
 				<Icon name="chevron-right" size={30} stroke={3} />
 			</button>

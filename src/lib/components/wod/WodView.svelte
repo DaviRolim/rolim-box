@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { mainSection } from '$lib/wod-format';
+	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Poster from './Poster.svelte';
 	import SectionBlock from './SectionBlock.svelte';
@@ -31,7 +32,7 @@
 			{#if wod.sections.length > 0}
 				<button type="button" class="btn btn-ink flex-1" onclick={() => (placarOpen = true)}>
 					<Icon name="expand" size={20} stroke={2.6} />
-					Placar mode
+					{t.today.view.placarMode}
 				</button>
 			{/if}
 			{@render tools?.()}
@@ -40,13 +41,13 @@
 
 	<div class="order">
 		<div class="module-head">
-			<span>Running order</span>
-			<span>{wod.sections.length} {wod.sections.length === 1 ? 'part' : 'parts'}</span>
+			<span>{t.today.view.runningOrder}</span>
+			<span>{t.today.view.parts(wod.sections.length)}</span>
 		</div>
 		{#each wod.sections as section, index (section.id)}
 			<SectionBlock {section} index={index + 1} main={section.id === main?.id} />
 		{:else}
-			<p class="border-t-2 border-ink py-6 text-lg text-dim">This WoD has no sections yet.</p>
+			<p class="border-t-2 border-ink py-6 text-lg text-dim">{t.today.view.noSections}</p>
 		{/each}
 	</div>
 </div>

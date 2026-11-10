@@ -5,6 +5,7 @@
 	import { wodStore } from '$lib/stores/wods.svelte';
 	import { syncStore } from '$lib/stores/sync.svelte';
 	import { wodTitle } from '$lib/wod-format';
+	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import WeekStrip from '$lib/components/wod/WeekStrip.svelte';
 	import WodView from '$lib/components/wod/WodView.svelte';
@@ -81,7 +82,7 @@
 </script>
 
 <svelte:head>
-	<title>{isToday ? 'Today' : formatShort(selected)} - RolimBox</title>
+	<title>{t.common.pageTitle(isToday ? t.today.dashboard.title : formatShort(selected))}</title>
 </svelte:head>
 
 <WeekStrip bind:selected {today} {marked} />
@@ -90,13 +91,11 @@
 	{#if !isToday}
 		<div class="mb-4 flex items-center justify-between gap-3">
 			<p class="legend text-dim">
-				{away > 0
-					? `In ${away} ${away === 1 ? 'day' : 'days'}`
-					: `${-away} ${away === -1 ? 'day' : 'days'} ago`}
+				{away > 0 ? t.today.dashboard.inDays(away) : t.today.dashboard.daysAgo(-away)}
 			</p>
 			<button type="button" class="btn btn-sm btn-quiet" onclick={() => (selected = today)}>
 				<Icon name={away > 0 ? 'arrow-left' : 'arrow-right'} size={16} stroke={3} />
-				Back to today
+				{t.today.dashboard.backToToday}
 			</button>
 		</div>
 	{/if}
@@ -106,10 +105,10 @@
 		<div
 			class="grid gap-8 lg:grid-cols-[5fr_7fr] lg:gap-12"
 			aria-busy="true"
-			aria-label="Loading the WoD"
+			aria-label={t.today.dashboard.loadingAria}
 		>
 			<div>
-				<p class="legend text-mute">Reading the board</p>
+				<p class="legend text-mute">{t.today.dashboard.readingBoard}</p>
 				<div class="led mt-3 h-28 w-full lg:h-40"></div>
 				<div class="led mt-3 h-14 w-3/4"></div>
 				<div class="led mt-5 h-10 w-1/2"></div>
@@ -122,7 +121,7 @@
 		</div>
 	{:else if wod}
 		{#if wods.length > 1}
-			<div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="WoDs on this day">
+			<div class="mb-4 flex flex-wrap gap-2" role="group" aria-label={t.today.dashboard.wodsOnDay}>
 				{#each wods as option, index (option.id)}
 					<button
 						type="button"
@@ -141,11 +140,11 @@
 				{#if data.canEdit}
 					<a href={resolve('/(app)/workouts/[id]/edit', { id: wod.id })} class="btn btn-quiet">
 						<Icon name="edit" size={18} stroke={2.6} />
-						Edit
+						{t.today.dashboard.edit}
 					</a>
 					<button type="button" class="btn btn-quiet" onclick={() => (duplicateOpen = true)}>
 						<Icon name="copy" size={18} stroke={2.6} />
-						Duplicate
+						{t.today.dashboard.duplicate}
 					</button>
 				{/if}
 			{/snippet}
@@ -153,43 +152,44 @@
 	{:else if neverLoaded}
 		<div class="empty">
 			<p class="legend text-warn-ink">
-				{syncStore.isOffline ? 'Offline' : 'No answer from the server'}
+				{syncStore.isOffline ? t.today.dashboard.offline : t.today.dashboard.noAnswer}
 			</p>
-			<h1 class="mt-3 display text-[3.5rem] lg:text-[5rem]">The board is blank</h1>
+			<h1 class="mt-3 display text-[3.5rem] lg:text-[5rem]">{t.today.dashboard.blankTitle}</h1>
 			<p class="mt-4 max-w-md text-lg leading-snug text-dim">
-				This phone has not saved any WoDs yet and the server cannot be reached. Connect once and
-				everything will be here next time, signal or not.
+				{t.today.dashboard.blankBody}
 			</p>
 			<button type="button" class="btn btn-ink mt-6" onclick={() => wodStore.refresh()}>
 				<Icon name="refresh" size={18} stroke={2.6} />
-				{wodStore.refreshing ? 'Trying' : 'Try again'}
+				{wodStore.refreshing ? t.today.dashboard.trying : t.today.dashboard.tryAgain}
 			</button>
 		</div>
 	{:else}
 		<div class="empty gridlines">
 			<p class="rest sign" lang="pt-BR">Descanso?</p>
-			<h1 class="mt-5 display text-[3.5rem] lg:text-[5rem]">Nothing on the board</h1>
+			<h1 class="mt-5 display text-[3.5rem] lg:text-[5rem]">{t.today.dashboard.emptyTitle}</h1>
 			<p class="mt-3 max-w-md text-lg leading-snug text-dim">
 				{#if data.canEdit}
-					No WoD is programmed for {formatLong(selected)}.
+					{t.today.dashboard.noneProgrammed(formatLong(selected))}
 				{:else if selected < today}
-					There was no WoD on {formatLong(selected)}.
+					{t.today.dashboard.noneWas(formatLong(selected))}
 				{:else}
-					The coaches have not posted {isToday
-						? "today's WoD"
-						: `a WoD for ${formatLong(selected)}`} yet. It shows up here the moment they do.
+					{isToday
+						? t.today.dashboard.notPostedToday
+						: t.today.dashboard.notPostedDay(formatLong(selected))}
 				{/if}
 			</p>
 			<div class="mt-6 flex flex-wrap gap-2">
 				{#if data.canEdit}
 					<a href="{resolve('/workouts/new')}?date={selected}" class="btn btn-pink">
 						<Icon name="plus" size={20} stroke={3.2} />
-						Program {isToday ? 'today' : formatShort(selected)}
+						{isToday
+							? t.today.dashboard.programToday
+							: t.today.dashboard.programDay(formatShort(selected))}
 					</a>
 				{/if}
 				{#if nextUp}
 					<button type="button" class="btn btn-quiet" onclick={() => (selected = nextUp.date)}>
-						Next up: {formatShort(nextUp.date)} · {wodTitle(nextUp)}
+						{t.today.dashboard.nextUp(formatShort(nextUp.date), wodTitle(nextUp))}
 						<Icon name="arrow-right" size={18} stroke={3} />
 					</button>
 				{/if}
