@@ -48,9 +48,9 @@ export const settings = {
 			synced: 'Everything on this phone is on the server.'
 		},
 		change: {
-			create: { wod: 'New WoD', pr: 'New PR' },
-			update: { wod: 'Edit to a WoD', pr: 'Edit to a PR' },
-			delete: { wod: 'Delete of a WoD', pr: 'Delete of a PR' }
+			create: { wod: 'New WoD', pr: 'New PR', bank: 'New bank WoD' },
+			update: { wod: 'Edit to a WoD', pr: 'Edit to a PR', bank: 'Edit to a bank WoD' },
+			delete: { wod: 'Delete of a WoD', pr: 'Delete of a PR', bank: 'Delete of a bank WoD' }
 		},
 		syncing: 'Syncing',
 		syncNow: 'Sync now',
