@@ -89,6 +89,43 @@ export const section = sqliteTable(
 	(table) => [index('section_wod_id_idx').on(table.wodId)]
 );
 
+// WoD bank: workouts the coaches plan to do, with no date yet. Putting one on a day copies it
+// into `wod` / `section`; the bank entry stays so a favourite can be used again.
+// (New tables only: `wod.date` stays NOT NULL.)
+export const bankWod = sqliteTable(
+	'bank_wod',
+	{
+		id: text('id').primaryKey(),
+		workspaceId: text('workspace_id')
+			.notNull()
+			.references(() => workspace.id),
+		name: text('name').notNull(),
+		description: text('description'),
+		// The latest date it was put on (ISO "2026-11-12"), or null when it never was.
+		lastScheduledOn: text('last_scheduled_on'),
+		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()
+	},
+	(table) => [index('bank_wod_workspace_id_idx').on(table.workspaceId)]
+);
+
+// Sections of a bank WoD (same shape as `section`).
+export const bankSection = sqliteTable(
+	'bank_section',
+	{
+		id: text('id').primaryKey(),
+		bankWodId: text('bank_wod_id')
+			.notNull()
+			.references(() => bankWod.id, { onDelete: 'cascade' }),
+		type: text('type').notNull(),
+		name: text('name').notNull(),
+		content: text('content').notNull().default(''),
+		order: integer('order').notNull(),
+		timerConfig: text('timer_config')
+	},
+	(table) => [index('bank_section_bank_wod_id_idx').on(table.bankWodId)]
+);
+
 // Exercise (predefined, seeded)
 export const exercise = sqliteTable('exercise', {
 	id: text('id').primaryKey(),
@@ -129,5 +166,7 @@ export type WorkspaceMember = typeof workspaceMember.$inferSelect;
 export type WorkspaceInvite = typeof workspaceInvite.$inferSelect;
 export type Wod = typeof wod.$inferSelect;
 export type Section = typeof section.$inferSelect;
+export type BankWod = typeof bankWod.$inferSelect;
+export type BankSection = typeof bankSection.$inferSelect;
 export type Exercise = typeof exercise.$inferSelect;
 export type PersonalRecord = typeof personalRecord.$inferSelect;

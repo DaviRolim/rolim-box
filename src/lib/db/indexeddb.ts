@@ -32,6 +32,14 @@ interface RolimBoxDB extends DBSchema {
 			'by-wod': string;
 		};
 	};
+	/** The WoD bank (coaches only). One record per bank WoD, sections included. */
+	bank: {
+		key: string;
+		value: CachedBankWod;
+		indexes: {
+			'by-workspace': string;
+		};
+	};
 	syncMeta: {
 		key: string;
 		value: {
@@ -44,7 +52,7 @@ interface RolimBoxDB extends DBSchema {
 		value: {
 			id: string;
 			type: 'create' | 'update' | 'delete';
-			entity: 'wod' | 'pr';
+			entity: 'wod' | 'pr' | 'bank';
 			entityId: string;
 			payload: unknown;
 			createdAt: number;
@@ -86,8 +94,26 @@ interface RolimBoxDB extends DBSchema {
 	};
 }
 
+export interface CachedBankWod {
+	id: string;
+	workspaceId: string;
+	name: string;
+	description: string | null;
+	sections: {
+		id: string;
+		type: string;
+		name: string;
+		content: string;
+		order: number;
+		timerConfig: string | null;
+	}[];
+	lastScheduledOn: string | null;
+	createdAt: number;
+	updatedAt: number;
+}
+
 const DB_NAME = 'rolimbox';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<RolimBoxDB>> | null = null;
 
@@ -127,6 +153,12 @@ function getDB(): Promise<IDBPDatabase<RolimBoxDB>> {
 				if (!db.objectStoreNames.contains('exercises')) {
 					const exerciseStore = db.createObjectStore('exercises', { keyPath: 'id' });
 					exerciseStore.createIndex('by-category', 'category');
+				}
+
+				// WoD bank store (v4)
+				if (!db.objectStoreNames.contains('bank')) {
+					const bankStore = db.createObjectStore('bank', { keyPath: 'id' });
+					bankStore.createIndex('by-workspace', 'workspaceId');
 				}
 
 				// Personal Records store
@@ -204,6 +236,27 @@ export async function deleteCachedSectionsByWod(wodId: string): Promise<void> {
 export async function clearCachedSections(): Promise<void> {
 	const db = await getDB();
 	await db.clear('sections');
+}
+
+// Bank operations
+export async function cacheBankWod(record: CachedBankWod): Promise<void> {
+	const db = await getDB();
+	await db.put('bank', record);
+}
+
+export async function getCachedBankWod(id: string): Promise<CachedBankWod | undefined> {
+	const db = await getDB();
+	return db.get('bank', id);
+}
+
+export async function getCachedBankByWorkspace(workspaceId: string): Promise<CachedBankWod[]> {
+	const db = await getDB();
+	return db.getAllFromIndex('bank', 'by-workspace', workspaceId);
+}
+
+export async function deleteCachedBankWod(id: string): Promise<void> {
+	const db = await getDB();
+	await db.delete('bank', id);
 }
 
 // Exercise operations
@@ -291,6 +344,7 @@ export async function clearAllCachedData(): Promise<void> {
 	await Promise.all([
 		db.clear('wods'),
 		db.clear('sections'),
+		db.clear('bank'),
 		db.clear('syncMeta'),
 		db.clear('syncQueue'),
 		db.clear('exercises'),

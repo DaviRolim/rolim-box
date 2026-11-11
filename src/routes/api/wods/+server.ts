@@ -12,6 +12,7 @@ import {
 	getSections,
 	serializeWod
 } from '$lib/server/wods';
+import { markBankWodScheduled } from '$lib/server/bank';
 import { eq, and, desc, inArray, asc, lt } from 'drizzle-orm';
 
 /**
@@ -95,6 +96,9 @@ export const GET: RequestHandler = async ({ locals, url }) => {
  *
  * The device may send its own ids (see entityIdSchema). Creating the same id twice is treated
  * as a replay of a request whose response was lost, and returns the existing WoD.
+ *
+ * `bankWodId` marks the WoD as a copy of a bank WoD being put on a day: the bank entry's
+ * "last on" date is updated in the same transaction.
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
 	const d = dictFor(locals.locale);
@@ -157,6 +161,10 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		const createdSections =
 			rows.length > 0 ? await tx.insert(section).values(rows).returning() : [];
 		createdSections.sort((a, b) => a.order - b.order);
+
+		if (data.bankWodId) {
+			await markBankWodScheduled(tx, data.bankWodId, data.workspaceId, data.date);
+		}
 
 		return serializeWod(newWod, createdSections);
 	});

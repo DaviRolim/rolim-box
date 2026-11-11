@@ -10,6 +10,7 @@
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import WodView from '$lib/components/wod/WodView.svelte';
 	import DuplicateSheet from '$lib/components/wod/DuplicateSheet.svelte';
+	import SaveToBankSheet from '$lib/components/bank/SaveToBankSheet.svelte';
 	import type { WoD } from '$lib/types/wod';
 	import { t } from '$lib/i18n';
 
@@ -40,6 +41,7 @@
 	});
 
 	let duplicateOpen = $state(false);
+	let bankOpen = $state(false);
 	let deleteOpen = $state(false);
 	let deleting = $state(false);
 
@@ -86,6 +88,10 @@
 						<button type="button" class="btn btn-quiet" onclick={() => (duplicateOpen = true)}>
 							<Icon name="copy" size={18} stroke={2.6} />
 							{t.today.detail.duplicate}
+						</button>
+						<button type="button" class="btn btn-quiet" onclick={() => (bankOpen = true)}>
+							<Icon name="archive" size={18} stroke={2.6} />
+							{t.bank.save.button}
 						</button>
 						<button
 							type="button"
@@ -145,6 +151,8 @@
 	bind:open={duplicateOpen}
 	onduplicated={(copy) => goto(resolve('/(app)/workouts/[id]', { id: copy.id }))}
 />
+
+<SaveToBankSheet {wod} bind:open={bankOpen} />
 
 <ConfirmDialog
 	bind:open={deleteOpen}

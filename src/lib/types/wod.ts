@@ -51,7 +51,7 @@ export interface WoD {
  */
 export const entityIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'Invalid id');
 
-const wodDateSchema = z
+export const wodDateSchema = z
 	.string()
 	.regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
 	.refine(isIsoDate, 'Invalid date');
@@ -78,7 +78,9 @@ export const createWoDSchema = z.object({
 	workspaceId: z.string().min(1, 'Workspace ID is required'),
 	date: wodDateSchema,
 	description: z.string().max(500, 'Description too long').nullable(),
-	sections: z.array(sectionSchema).default([])
+	sections: z.array(sectionSchema).default([]),
+	/** Set when the WoD is a copy of a bank WoD being put on a day: the bank entry records it. */
+	bankWodId: entityIdSchema.optional()
 });
 
 /**

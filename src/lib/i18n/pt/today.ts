@@ -99,6 +99,8 @@ export const today: Dict['today'] = {
 		editAria: (title, day) => `Editar ${title}, ${day}`,
 		deleteAria: (title, day) => `Apagar ${title}, ${day}`,
 		actionsAria: (title, day) => `Ações de ${title}, ${day}`,
+		saveToBankAria: (title, day) => `Salvar ${title}, ${day}, no banco`,
+		fromBankAria: (day) => `Escolher um WoD do banco pra ${day}`,
 		programToday: 'Programar hoje',
 		programDay: (weekday) => `Programar ${weekday}`,
 		nothingYet: '· nada no quadro ainda',

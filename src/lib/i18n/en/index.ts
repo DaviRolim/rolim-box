@@ -9,6 +9,7 @@ import { prs } from './prs';
 import { auth } from './auth';
 import { settings } from './settings';
 import { api } from './api';
+import { bank } from './bank';
 
 /** English, the default. Its shape is the contract every other locale must meet. */
 export const en = {
@@ -22,7 +23,8 @@ export const en = {
 	prs,
 	auth,
 	settings,
-	api
+	api,
+	bank
 };
 
 export type Dict = typeof en;

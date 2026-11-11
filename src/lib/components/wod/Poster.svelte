@@ -13,11 +13,15 @@
 		wod: WoD;
 		/** Play the arrival sequence (first open of the day). */
 		reveal?: boolean;
+		/** A name to use instead of the derived headline (a bank WoD has its own). */
+		name?: string;
+		/** Words for the stamp line instead of the date (a bank WoD has no date). */
+		stamp?: string;
 	}
 
-	let { wod, reveal = false }: Props = $props();
+	let { wod, reveal = false, name, stamp }: Props = $props();
 
-	const title = $derived(wodTitle(wod));
+	const title = $derived(name?.trim() || wodTitle(wod));
 	const main = $derived(mainSection(wod));
 	const timer = $derived(main ? sectionTimer(main) : null);
 	const strip = $derived(timer ? formatStrip(timer) : null);
@@ -27,8 +31,8 @@
 
 <div class="poster" class:reveal>
 	<p class="stamp flex items-center justify-between gap-3 legend">
-		<span>{formatShort(wod.date)}</span>
-		{#if when}
+		<span>{stamp ?? formatShort(wod.date)}</span>
+		{#if when && !stamp}
 			<span class="tag {wod.date === todayIso() ? 'tag-pink' : 'tag-ink'}">{when}</span>
 		{/if}
 	</p>

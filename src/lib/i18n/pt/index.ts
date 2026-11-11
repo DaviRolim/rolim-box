@@ -10,6 +10,7 @@ import { prs } from './prs';
 import { auth } from './auth';
 import { settings } from './settings';
 import { api } from './api';
+import { bank } from './bank';
 
 /** Português do Brasil, written the way the coaches at the box talk. */
 export const pt: Dict = {
@@ -23,5 +24,6 @@ export const pt: Dict = {
 	prs,
 	auth,
 	settings,
-	api
+	api,
+	bank
 };

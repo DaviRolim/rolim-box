@@ -99,6 +99,8 @@ export const today = {
 		editAria: (title: string, day: string) => `Edit ${title}, ${day}`,
 		deleteAria: (title: string, day: string) => `Delete ${title}, ${day}`,
 		actionsAria: (title: string, day: string) => `Actions for ${title}, ${day}`,
+		saveToBankAria: (title: string, day: string) => `Save ${title}, ${day}, to the bank`,
+		fromBankAria: (day: string) => `Pick a WoD from the bank for ${day}`,
 		programToday: 'Program today',
 		programDay: (weekday: string) => `Program ${weekday}`,
 		nothingYet: '· nothing on the board yet',

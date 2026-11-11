@@ -50,9 +50,9 @@ export const settings: Dict['settings'] = {
 			synced: 'Tudo o que está neste celular já está no servidor.'
 		},
 		change: {
-			create: { wod: 'WoD novo', pr: 'PR novo' },
-			update: { wod: 'Edição de WoD', pr: 'Edição de PR' },
-			delete: { wod: 'WoD apagado', pr: 'PR apagado' }
+			create: { wod: 'WoD novo', pr: 'PR novo', bank: 'WoD novo no banco' },
+			update: { wod: 'Edição de WoD', pr: 'Edição de PR', bank: 'Edição no banco' },
+			delete: { wod: 'WoD apagado', pr: 'PR apagado', bank: 'WoD apagado do banco' }
 		},
 		syncing: 'Sincronizando',
 		syncNow: 'Sincronizar',

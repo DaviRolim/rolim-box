@@ -661,6 +661,131 @@ function buildCalendar(): { date: string; wod: WodSeed }[] {
 }
 
 // ---------------------------------------------------------------------------
+// WoD bank: what the coaches plan to do one day, with no date yet
+// ---------------------------------------------------------------------------
+
+type BankSeed = {
+	key: string;
+	name: string;
+	description: string | null;
+	sections: SectionSeed[];
+	/** Who wrote it down and how many days ago. */
+	writtenDaysAgo: number;
+	/** Day offset of the latest time it was put on the board, or null if it never was. */
+	lastOn: number | null;
+};
+
+const BANK: BankSeed[] = [
+	{
+		key: 'sandbag',
+		name: 'Sandbag chipper',
+		description:
+			'Partner chipper with the sandbags, one works one holds. Carries, cleans over the shoulder, a long run in the middle. Need the two new 40 kg bags first.',
+		sections: [],
+		writtenDaysAgo: 1,
+		lastOn: null
+	},
+	{
+		key: 'tide',
+		name: 'Tide run at Cabo Branco',
+		description:
+			'Low tide on a Saturday: 5k on the sand, 10 burpees every 500m. Check the tide table the night before.',
+		sections: [],
+		writtenDaysAgo: 3,
+		lastOn: null
+	},
+	{
+		key: 'filthy',
+		name: 'Filthy Fifty',
+		description: 'Long benchmark. Pace it from the start; the burpees come late.',
+		sections: [
+			{
+				type: 'warmup',
+				name: 'Warm-up',
+				content: '2 rounds:\n300m row\n10 kettlebell swings\n10 walking lunges\n5 knees-to-elbows'
+			},
+			{
+				type: 'wod',
+				name: 'Filthy Fifty',
+				content:
+					'For time:\n50 box jumps (60/50 cm)\n50 jumping pull-ups\n50 kettlebell swings (16/12 kg)\n50 walking lunges\n50 knees-to-elbows\n50 push presses (20/15 kg)\n50 back extensions\n50 wall balls (9/6 kg)\n50 burpees\n50 double-unders\n\nTime cap: 35 min',
+				timerConfig: timer.fortime(35)
+			},
+			{
+				type: 'cooldown',
+				name: 'Cool-down',
+				content: '5 min easy bike\nHamstring stretch, 1 min per side'
+			}
+		],
+		writtenDaysAgo: 40,
+		lastOn: -34
+	},
+	{
+		key: 'emomDanilo',
+		name: "Danilo's EMOM",
+		description: 'Engine day. Odd minutes hard, even minutes skill. Keep every minute under 40s.',
+		sections: [
+			{
+				type: 'wod',
+				name: 'WoD',
+				content:
+					'Every minute for 24 min:\nMin 1: 15/12 cal row\nMin 2: 8 toes-to-bar\nMin 3: 10 dumbbell snatches (22,5/15 kg)\nMin 4: 30s handstand hold',
+				timerConfig: timer.emom(24)
+			}
+		],
+		writtenDaysAgo: 9,
+		lastOn: null
+	},
+	{
+		key: 'fran',
+		name: 'Fran',
+		description:
+			'Benchmark day. Fran is short and it hurts. Pick a load that keeps the thrusters fast and try to go unbroken on the 21s.',
+		sections: [
+			{
+				type: 'wod',
+				name: 'Fran',
+				content: '21-15-9 for time:\nThrusters (43/30 kg)\nPull-ups\n\nTime cap: 10 min',
+				timerConfig: timer.fortime(10)
+			}
+		],
+		writtenDaysAgo: 60,
+		lastOn: 0
+	},
+	{
+		key: 'nastyGirls',
+		name: 'Nasty Girls',
+		description: null,
+		sections: [
+			{
+				type: 'wod',
+				name: 'Nasty Girls',
+				content:
+					'3 rounds for time:\n50 air squats\n7 muscle-ups (or 14 pull-ups + 14 dips)\n10 hang power cleans (61/43 kg)\n\nTime cap: 20 min',
+				timerConfig: timer.fortime(20)
+			}
+		],
+		writtenDaysAgo: 20,
+		lastOn: -75
+	},
+	{
+		key: 'tabataTriplet',
+		name: 'Tabata triplet',
+		description: 'Short one for a hot day. Lowest score of each Tabata counts.',
+		sections: [
+			{
+				type: 'wod',
+				name: 'Tabata triplet',
+				content: 'Tabata, alternating every round:\nAir squats\nPush-ups\nSit-ups',
+				timerConfig: timer.tabata()
+			}
+		],
+		writtenDaysAgo: 14,
+		lastOn: -48
+	}
+];
+
+// ---------------------------------------------------------------------------
 // People
 // ---------------------------------------------------------------------------
 
@@ -750,6 +875,8 @@ async function main() {
 
 	// Wipe (children first).
 	await db.delete(schema.personalRecord);
+	await db.delete(schema.bankSection);
+	await db.delete(schema.bankWod);
 	await db.delete(schema.section);
 	await db.delete(schema.wod);
 	await db.delete(schema.workspaceInvite);
@@ -884,6 +1011,37 @@ async function main() {
 		await db.insert(schema.section).values(sectionRows.slice(i, i + 50));
 	}
 
+	// WoD bank
+	const bankRows: (typeof schema.bankWod.$inferInsert)[] = [];
+	const bankSectionRows: (typeof schema.bankSection.$inferInsert)[] = [];
+	for (const entry of BANK) {
+		const bankId = id(`bank:${entry.key}`);
+		const written = addDays(today, -entry.writtenDaysAgo);
+		written.setHours(21, 15, 0, 0);
+		bankRows.push({
+			id: bankId,
+			workspaceId: boxId,
+			name: entry.name,
+			description: entry.description,
+			lastScheduledOn: entry.lastOn === null ? null : isoDate(addDays(today, entry.lastOn)),
+			createdAt: written,
+			updatedAt: written
+		});
+		entry.sections.forEach((s, order) => {
+			bankSectionRows.push({
+				id: id(`bank-section:${entry.key}:${order}`),
+				bankWodId: bankId,
+				type: s.type,
+				name: s.name,
+				content: s.content,
+				order,
+				timerConfig: s.timerConfig ?? null
+			});
+		});
+	}
+	await db.insert(schema.bankWod).values(bankRows);
+	await db.insert(schema.bankSection).values(bankSectionRows);
+
 	// Personal records
 	const prRows: (typeof schema.personalRecord.$inferInsert)[] = [];
 	let prIndex = 0;
@@ -920,6 +1078,7 @@ async function main() {
 			`  workspaces: 2  (RolimBox, RolimBox Kids [empty])`,
 			`  wods:       ${wodRows.length}  (${calendar[0].date} → ${calendar[calendar.length - 1].date}, today = ${isoDate(today)})`,
 			`  sections:   ${sectionRows.length}`,
+			`  bank:       ${bankRows.length}  (WoDs with no date)`,
 			`  exercises:  ${exerciseRows.length}`,
 			`  prs:        ${prRows.length}`,
 			`  invites:    RLM-B2X (member), CCH-7KP (coach), EXP-222 (expired)`,
