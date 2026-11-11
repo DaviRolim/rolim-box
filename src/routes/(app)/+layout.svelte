@@ -56,10 +56,16 @@
 		if ('requestIdleCallback' in window) requestIdleCallback(() => audioService.preload());
 		else setTimeout(() => audioService.preload(), 1000);
 
-		// iOS only lets audio start from a tap: unlock it on the first one.
-		const unlock = () => audioService.unlockAudio();
-		document.addEventListener('touchstart', unlock, { once: true });
-		document.addEventListener('click', unlock, { once: true });
+		// iOS only lets audio start from a tap. Each voice element is unlocked once its file has
+		// arrived, so keep listening until every one is (each call is cheap once it is done).
+		const unlock = () => {
+			audioService.unlockAudio();
+			if (!audioService.isUnlocked) return;
+			document.removeEventListener('touchstart', unlock);
+			document.removeEventListener('click', unlock);
+		};
+		document.addEventListener('touchstart', unlock);
+		document.addEventListener('click', unlock);
 
 		// Ask the service worker to keep a copy of Today, so the next open works without signal.
 		if ('serviceWorker' in navigator) {

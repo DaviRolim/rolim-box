@@ -1,6 +1,7 @@
 // src/lib/services/audio.svelte.ts
 import type { AudioConfig, CountdownValue, VoiceCueType } from '$lib/types/audio';
 import audioConfigJson from '$lib/config/audio-config.json';
+import { VoicePlayer, configureAudioSession } from './voice-player';
 
 const audioConfig = audioConfigJson as AudioConfig;
 
@@ -14,8 +15,16 @@ let audioContext: AudioContext | null = null;
 const decodedBuffers = new Map<string, AudioBuffer>();
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
 const rawBuffers = new Map<string, ArrayBuffer>();
-let prefetched = false;
+let prefetching: Promise<void> | null = null;
 let audioUnlocked = false;
+
+// Voice cues: media elements, so other apps' music ducks under them (see voice-player.ts).
+// Beeps stay on the AudioContext below.
+const voicePlayer = new VoicePlayer<VoiceCueType>({
+	createElement: () => new Audio()
+});
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const blobUrls = new Map<VoiceCueType, string>();
 
 function getAudioContext(): AudioContext {
 	if (!audioContext) {
@@ -29,11 +38,18 @@ function getAudioContext(): AudioContext {
 }
 
 /**
- * Unlock AudioContext for iOS Safari.
+ * Unlock audio for iOS Safari, from a tap.
  * iOS requires a buffer source to be started during a user gesture
  * to fully unlock the AudioContext -- ctx.resume() alone is not sufficient.
+ * The voice media elements need their own play() inside the gesture too.
  */
 function unlockAudioContext(): void {
+	configureAudioSession(navigator);
+	// Media elements are unlocked one by one, and only once their file has arrived, so this
+	// runs on every tap until all are done (each element is skipped once unlocked).
+	voicePlayer.unlock(VOICE_FILES);
+	// A tap before the idle preload ran (e.g. straight into a timer): start loading now.
+	void preload();
 	if (audioUnlocked) return;
 	try {
 		const ctx = getAudioContext();
@@ -90,9 +106,13 @@ async function fetchAudioFile(filename: string): Promise<ArrayBuffer | null> {
 	}
 }
 
-async function preload(): Promise<void> {
-	if (prefetched) return;
+/** Fetch every cue once. Memoised, so repeated taps while it runs do not fetch again. */
+function preload(): Promise<void> {
+	prefetching ??= prefetchAll();
+	return prefetching;
+}
 
+async function prefetchAll(): Promise<void> {
 	// Only fetch raw audio data - don't create AudioContext yet
 	// AudioContext must be created on user interaction to comply with browser autoplay policies
 	const fetchPromises = VOICE_FILES.map(async (cue) => {
@@ -100,12 +120,29 @@ async function preload(): Promise<void> {
 		const arrayBuffer = await fetchAudioFile(filename);
 		if (arrayBuffer) {
 			rawBuffers.set(cue, arrayBuffer);
+			attachVoiceSource(cue, arrayBuffer);
 		}
 	});
 
 	await Promise.all(fetchPromises);
-	prefetched = true;
 	console.log(`Audio prefetched: ${rawBuffers.size}/${VOICE_FILES.length} files`);
+}
+
+/**
+ * The element plays a blob: URL of the bytes fetched above, not /audio/voice/<cue>.mp3:
+ * the file is then in memory (no network or cache lookup when the cue fires), and media range
+ * requests never reach the service worker, whose cached 200 responses Safari refuses for media.
+ * The fetch itself still goes through the service worker, so cues keep working offline.
+ */
+function attachVoiceSource(cue: VoiceCueType, bytes: ArrayBuffer): void {
+	if (typeof Audio === 'undefined' || blobUrls.has(cue)) return;
+	try {
+		const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+		blobUrls.set(cue, url);
+		voicePlayer.setSource(cue, url);
+	} catch (e) {
+		console.warn(`Failed to prepare voice element: ${cue}`, e);
+	}
 }
 
 async function getDecodedBuffer(cue: VoiceCueType): Promise<AudioBuffer | null> {
@@ -160,6 +197,7 @@ function playBeepNow(frequency: number, duration: number): void {
 	oscillator.stop(endTime);
 }
 
+/** Fallback only: used when the media element refuses to play (e.g. iOS never unlocked it). */
 async function playVoiceBufferNow(cue: VoiceCueType): Promise<void> {
 	const buffer = await getDecodedBuffer(cue);
 	if (!buffer) {
@@ -183,6 +221,7 @@ class AudioService {
 
 	mute() {
 		this.isMuted = true;
+		voicePlayer.stopAll();
 	}
 
 	unmute() {
@@ -191,12 +230,14 @@ class AudioService {
 
 	toggleMute() {
 		this.isMuted = !this.isMuted;
+		if (this.isMuted) voicePlayer.stopAll();
 	}
 
 	unlockAudio = unlockAudioContext;
 
+	/** True once the AudioContext and every voice element have been unlocked by a tap. */
 	get isUnlocked(): boolean {
-		return audioUnlocked;
+		return audioUnlocked && voicePlayer.isUnlocked(VOICE_FILES);
 	}
 
 	preload = preload;
@@ -219,6 +260,14 @@ class AudioService {
 
 	async playVoiceCue(cue: VoiceCueType): Promise<void> {
 		if (this.isMuted) return;
+		if (voicePlayer.hasSource(cue)) {
+			try {
+				await voicePlayer.play(cue);
+				return;
+			} catch (e) {
+				console.warn(`Voice element refused to play, using Web Audio: ${cue}`, e);
+			}
+		}
 		await ensureContextResumed();
 		await playVoiceBufferNow(cue);
 	}

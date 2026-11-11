@@ -68,6 +68,34 @@ test.describe('The clock', () => {
 		await expect(page.getByRole('timer')).toHaveAccessibleName('20 minutes 00 seconds');
 	});
 
+	test('the voice says "go" through a media element, so music in other apps ducks', async ({
+		page
+	}) => {
+		// Record every media play() the page makes: Web Audio buffers would never show up here.
+		await page.addInitScript(() => {
+			const plays: { src: string; muted: boolean }[] = [];
+			(window as unknown as { __plays: typeof plays }).__plays = plays;
+			const play = HTMLMediaElement.prototype.play;
+			HTMLMediaElement.prototype.play = function () {
+				plays.push({ src: this.src, muted: this.muted });
+				return play.call(this);
+			};
+		});
+		await page.goto('/timers');
+		await page.getByRole('button', { name: 'Start timer' }).click();
+		await expect(page.getByRole('timer')).toHaveAccessibleName(/^19 minutes 5\d seconds$/, {
+			timeout: 10_000
+		});
+
+		const plays = await page.evaluate(
+			() => (window as unknown as { __plays: { src: string; muted: boolean }[] }).__plays
+		);
+		const spoken = plays.filter((p) => !p.muted);
+		expect(spoken.length).toBeGreaterThan(0);
+		// In-memory copies of the fetched cues (the fetch itself is what the service worker caches).
+		expect(spoken.every((p) => p.src.startsWith('blob:'))).toBe(true);
+	});
+
 	test("a WoD's own clock shows the workout, then the time you finished in", async ({ page }) => {
 		await page.goto(`/timers/${FRAN_SECTION}?wod=${TODAY_WOD}`);
 		await expect(page.getByRole('heading', { level: 1, name: 'Fran' })).toBeVisible();
