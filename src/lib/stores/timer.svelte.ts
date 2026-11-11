@@ -102,6 +102,7 @@ class TimerStore {
 		for (const val of [3, 2, 1, 'GO'] as const) {
 			this.countdownValue = val;
 			if (val === 'GO') {
+				audioService.playStartTone();
 				audioService.playVoiceCue('go');
 				await this.sleep(500);
 			} else {
@@ -137,6 +138,7 @@ class TimerStore {
 		this.engine?.destroy();
 		this.state = 'completed';
 		// Play completion sound
+		audioService.playStartTone();
 		audioService.playVoiceCue('time');
 	}
 

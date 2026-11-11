@@ -152,3 +152,19 @@ export function configureAudioSession(nav: unknown): boolean {
 		return false;
 	}
 }
+
+/**
+ * Pick a take at random, never the same one twice in a row, so a workout does not repeat
+ * the exact same line. `random` is injectable for tests.
+ */
+export function pickTake(
+	count: number,
+	previous: number | undefined,
+	random: () => number = Math.random
+): number {
+	if (count <= 1) return 1;
+	if (previous === undefined) return 1 + Math.floor(random() * count);
+	// Choose among the other takes only.
+	const n = 1 + Math.floor(random() * (count - 1));
+	return n >= previous ? n + 1 : n;
+}

@@ -53,6 +53,8 @@ export interface AudioConfig {
 			go: VoiceConfig;
 		};
 		completion: VoiceConfig;
+		/** Long, higher box-clock tone played on GO and at the end. */
+		tone: BeepConfig;
 	};
 	timerEvents: Record<string, TimerEventsConfig>;
 }

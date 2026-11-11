@@ -1,7 +1,7 @@
 // src/lib/services/audio.svelte.ts
 import type { AudioConfig, CountdownValue, VoiceCueType } from '$lib/types/audio';
 import audioConfigJson from '$lib/config/audio-config.json';
-import { VoicePlayer, configureAudioSession } from './voice-player';
+import { VoicePlayer, configureAudioSession, pickTake } from './voice-player';
 
 const audioConfig = audioConfigJson as AudioConfig;
 
@@ -20,11 +20,11 @@ let audioUnlocked = false;
 
 // Voice cues: media elements, so other apps' music ducks under them (see voice-player.ts).
 // Beeps stay on the AudioContext below.
-const voicePlayer = new VoicePlayer<VoiceCueType>({
+const voicePlayer = new VoicePlayer<VoiceFile>({
 	createElement: () => new Audio()
 });
 // eslint-disable-next-line svelte/prefer-svelte-reactivity
-const blobUrls = new Map<VoiceCueType, string>();
+const blobUrls = new Map<VoiceFile, string>();
 
 function getAudioContext(): AudioContext {
 	if (!audioContext) {
@@ -79,18 +79,39 @@ async function ensureContextResumed(): Promise<void> {
 // Preloading
 // ============================================================================
 
-const VOICE_FILES: VoiceCueType[] = [
-	'go',
-	'halfway',
-	'half-emom',
-	'one-minute',
-	'thirty-seconds',
-	'ten-seconds',
-	'time',
-	'next-round',
-	'work',
-	'rest'
-];
+/**
+ * How many recorded takes each cue has: static/audio/voice/<cue>-<n>.mp3, n = 1..count.
+ * Coach voice "Adam" (ElevenLabs eleven_v3). Every take stays under ~3 s, so a cue ends before
+ * the next sound fires (ten-seconds plays at 0:10, the 3-2-1 beeps start at 0:03).
+ */
+export const VOICE_VARIANTS: Record<VoiceCueType, number> = {
+	go: 3,
+	halfway: 3,
+	'half-emom': 2,
+	'one-minute': 3,
+	'thirty-seconds': 1,
+	'ten-seconds': 3,
+	time: 3,
+	'next-round': 3,
+	work: 2,
+	rest: 2
+};
+
+/** One recorded take of a cue, e.g. "ten-seconds-2". */
+type VoiceFile = `${VoiceCueType}-${number}`;
+
+const VOICE_FILES: VoiceFile[] = (Object.keys(VOICE_VARIANTS) as VoiceCueType[]).flatMap((cue) =>
+	Array.from({ length: VOICE_VARIANTS[cue] }, (_, i): VoiceFile => `${cue}-${i + 1}`)
+);
+
+// eslint-disable-next-line svelte/prefer-svelte-reactivity
+const lastTake = new Map<VoiceCueType, number>();
+
+function nextTake(cue: VoiceCueType): VoiceFile {
+	const take = pickTake(VOICE_VARIANTS[cue], lastTake.get(cue));
+	lastTake.set(cue, take);
+	return `${cue}-${take}`;
+}
 
 async function fetchAudioFile(filename: string): Promise<ArrayBuffer | null> {
 	try {
@@ -134,7 +155,7 @@ async function prefetchAll(): Promise<void> {
  * requests never reach the service worker, whose cached 200 responses Safari refuses for media.
  * The fetch itself still goes through the service worker, so cues keep working offline.
  */
-function attachVoiceSource(cue: VoiceCueType, bytes: ArrayBuffer): void {
+function attachVoiceSource(cue: VoiceFile, bytes: ArrayBuffer): void {
 	if (typeof Audio === 'undefined' || blobUrls.has(cue)) return;
 	try {
 		const url = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
@@ -145,7 +166,7 @@ function attachVoiceSource(cue: VoiceCueType, bytes: ArrayBuffer): void {
 	}
 }
 
-async function getDecodedBuffer(cue: VoiceCueType): Promise<AudioBuffer | null> {
+async function getDecodedBuffer(cue: VoiceFile): Promise<AudioBuffer | null> {
 	// Return cached decoded buffer if available
 	if (decodedBuffers.has(cue)) {
 		return decodedBuffers.get(cue)!;
@@ -189,8 +210,11 @@ function playBeepNow(frequency: number, duration: number): void {
 	const startTime = ctx.currentTime;
 	const endTime = startTime + duration / 1000;
 
-	// Fade out to avoid click
+	// Flat tone with a short fade at the end (box-clock beep, no click). Short beeps fade over
+	// their last third, long tones over their last 80 ms.
+	const fade = Math.min(0.08, duration / 3000);
 	gainNode.gain.setValueAtTime(0.5, startTime);
+	gainNode.gain.setValueAtTime(0.5, endTime - fade);
 	gainNode.gain.exponentialRampToValueAtTime(0.01, endTime);
 
 	oscillator.start(startTime);
@@ -198,7 +222,7 @@ function playBeepNow(frequency: number, duration: number): void {
 }
 
 /** Fallback only: used when the media element refuses to play (e.g. iOS never unlocked it). */
-async function playVoiceBufferNow(cue: VoiceCueType): Promise<void> {
+async function playVoiceBufferNow(cue: VoiceFile): Promise<void> {
 	const buffer = await getDecodedBuffer(cue);
 	if (!buffer) {
 		console.warn(`Audio buffer not found: ${cue}`);
@@ -258,18 +282,28 @@ class AudioService {
 		playBeepNow(frequency, duration);
 	}
 
+	/** Play one take of a cue (a random one when the cue has several). */
 	async playVoiceCue(cue: VoiceCueType): Promise<void> {
 		if (this.isMuted) return;
-		if (voicePlayer.hasSource(cue)) {
+		const take = nextTake(cue);
+		if (voicePlayer.hasSource(take)) {
 			try {
-				await voicePlayer.play(cue);
+				await voicePlayer.play(take);
 				return;
 			} catch (e) {
-				console.warn(`Voice element refused to play, using Web Audio: ${cue}`, e);
+				console.warn(`Voice element refused to play, using Web Audio: ${take}`, e);
 			}
 		}
 		await ensureContextResumed();
-		await playVoiceBufferNow(cue);
+		await playVoiceBufferNow(take);
+	}
+
+	/** The long, higher tone of the box clock: on GO and when the clock runs out. */
+	async playStartTone(): Promise<void> {
+		if (this.isMuted) return;
+		await ensureContextResumed();
+		const tone = audioConfig.universal.tone;
+		playBeepNow(tone.frequency, tone.duration);
 	}
 }
 
