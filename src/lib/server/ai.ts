@@ -17,6 +17,13 @@ export class AiNotConfiguredError extends Error {
 	}
 }
 
+/** Magic Wand model on OpenRouter. Override with MAGIC_WAND_MODEL (any OpenRouter model id). */
+export const DEFAULT_WAND_MODEL = 'anthropic/claude-sonnet-5.5';
+
+function wandModel(): string {
+	return env.MAGIC_WAND_MODEL?.trim() || DEFAULT_WAND_MODEL;
+}
+
 // OpenRouter through the OpenAI-compatible provider. Created on first use so a server
 // without a key still boots and every other feature keeps working.
 function openrouter() {
@@ -268,7 +275,7 @@ export type GeneratedWodSection = Omit<GeneratedSection, 'timerConfig'> & {
 
 export async function generateWodSections(description: string): Promise<GeneratedWodSection[]> {
 	const { output } = await generateText({
-		model: openrouter()('google/gemini-3-flash-preview'),
+		model: openrouter().chat(wandModel()),
 		output: Output.object({
 			schema: generateSectionsResponseSchema
 		}),
