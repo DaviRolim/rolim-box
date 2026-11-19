@@ -148,6 +148,7 @@ export const personalRecord = sqliteTable(
 			.references(() => exercise.id, { onDelete: 'cascade' }),
 		value: integer('value').notNull(), // stored in base units: grams, seconds, count, centimeters
 		note: text('note'),
+		videoUrl: text('video_url'),
 		date: text('date').notNull(), // ISO date: "2025-12-27"
 		createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 		updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull()

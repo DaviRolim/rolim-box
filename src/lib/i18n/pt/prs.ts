@@ -55,6 +55,15 @@ export const prs: Dict['prs'] = {
 		note: 'Obs.',
 		notePlaceholder: 'Tava forte, com cinto, dia de campeonato',
 		addNote: 'Adicionar obs.',
+		videoLink: 'Link do vídeo',
+		addVideo: 'Adicionar link de vídeo',
+		editVideo: 'Editar link do vídeo',
+		removeVideo: 'Remover vídeo',
+		addVideoAria: (date) => `Adicionar link de vídeo ao PR de ${date}`,
+		editVideoAria: (date) => `Editar o link do vídeo do PR de ${date}`,
+		watchVideoAria: (date) => `Assistir ao vídeo do PR de ${date} (abre em nova aba)`,
+		videoUrlError: 'Coloca um link HTTP ou HTTPS de até 500 caracteres.',
+		videoSaveFailed: 'Não deu pra salvar o link do vídeo. Tenta de novo.',
 		timeFormatError: 'Escreve o tempo como minutos:segundos, tipo 5:30.',
 		numberError: 'Coloca um número maior que zero.',
 		saveFailed: 'Não deu pra salvar esse PR. Tenta de novo.',
@@ -158,6 +167,7 @@ export const prs: Dict['prs'] = {
 
 	api: {
 		notFound: 'PR não encontrado.',
+		idConflict: 'O ID desse PR já está em uso.',
 		exerciseNotFound: 'Exercício não encontrado.',
 		someExercisesNotFound: 'Alguns exercícios não foram encontrados.',
 		importFailed: 'Não deu pra importar os PRs.',

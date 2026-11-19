@@ -81,17 +81,20 @@ interface RolimBoxDB extends DBSchema {
 	};
 	personalRecords: {
 		key: string;
-		value: {
-			id: string;
-			exerciseId: string;
-			value: number;
-			date: string;
-			note: string | null;
-		};
+		value: CachedPR;
 		indexes: {
 			'by-exercise': string;
 		};
 	};
+}
+
+export interface CachedPR {
+	id: string;
+	exerciseId: string;
+	value: number;
+	date: string;
+	note: string | null;
+	videoUrl?: string | null; // Older cached records do not have this field.
 }
 
 export interface CachedBankWod {
@@ -277,12 +280,30 @@ export async function clearCachedExercises(): Promise<void> {
 }
 
 // Personal Record operations
-export async function cachePersonalRecords(
-	prs: RolimBoxDB['personalRecords']['value'][]
-): Promise<void> {
+export async function cachePersonalRecords(prs: CachedPR[]): Promise<void> {
 	const db = await getDB();
-	const tx = db.transaction('personalRecords', 'readwrite');
-	await Promise.all([...prs.map((pr) => tx.store.put(pr)), tx.done]);
+	const tx = db.transaction(['personalRecords', 'syncQueue'], 'readwrite');
+	const records = tx.objectStore('personalRecords');
+	const [cached, queue] = await Promise.all([
+		records.getAll(),
+		tx.objectStore('syncQueue').getAll()
+	]);
+	const byId = new Map(prs.map((pr) => [pr.id, pr]));
+	const cachedById = new Map(cached.map((pr) => [pr.id, pr]));
+
+	for (const op of queue) {
+		if (op.entity !== 'pr') continue;
+		const local = cachedById.get(op.entityId);
+		const server = byId.get(op.entityId);
+		if (op.type === 'delete') byId.delete(op.entityId);
+		if (op.type === 'create' && local) byId.set(local.id, local);
+		if (op.type === 'update' && local && server) {
+			byId.set(server.id, { ...server, videoUrl: local.videoUrl });
+		}
+	}
+
+	await records.clear();
+	await Promise.all([...Array.from(byId.values(), (pr) => records.put(pr)), tx.done]);
 }
 
 export async function getCachedPersonalRecords(): Promise<
@@ -302,11 +323,6 @@ export async function cachePersonalRecord(
 export async function deleteCachedPersonalRecord(id: string): Promise<void> {
 	const db = await getDB();
 	await db.delete('personalRecords', id);
-}
-
-export async function clearCachedPersonalRecords(): Promise<void> {
-	const db = await getDB();
-	await db.clear('personalRecords');
 }
 
 // Cache status flags
@@ -353,10 +369,24 @@ export async function clearAllCachedData(): Promise<void> {
 }
 
 // Sync queue operations
-export async function addToSyncQueue(operation: RolimBoxDB['syncQueue']['value']): Promise<void> {
+export async function addToSyncQueue(
+	operation: RolimBoxDB['syncQueue']['value'],
+	pr?: CachedPR | null
+): Promise<void> {
 	try {
 		const db = await getDB();
-		await db.put('syncQueue', operation);
+		if (pr === undefined) {
+			await db.put('syncQueue', operation);
+			return;
+		}
+
+		const tx = db.transaction(['personalRecords', 'syncQueue'], 'readwrite');
+		const records = tx.objectStore('personalRecords');
+		await Promise.all([
+			pr ? records.put(pr) : records.delete(operation.entityId),
+			tx.objectStore('syncQueue').put(operation),
+			tx.done
+		]);
 	} catch (error) {
 		console.error('Failed to add to sync queue:', error);
 		throw error;

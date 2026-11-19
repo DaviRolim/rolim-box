@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { formatDayMonth, todayIso } from '$lib/date';
 	import {
 		parseTime,
@@ -7,11 +8,14 @@
 		getWeightUnit,
 		getDistanceUnit,
 		isBetterPR,
+		prVideoUrlSchema,
+		MAX_PR_VIDEO_URL_LENGTH,
 		type ExerciseWithBestPR,
 		type UnitPreference,
 		type ExerciseRankingsResponse
 	} from '$lib/types/pr';
-	import { getUserPRs, createPR, deletePR } from '$lib/services/pr';
+	import type { CachedPR } from '$lib/db/indexeddb';
+	import { getUserPRs, createPR, deletePR, updatePRVideo } from '$lib/services/pr';
 	import Sheet from '$lib/components/ui/Sheet.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import Icon from '$lib/components/ui/Icon.svelte';
@@ -40,19 +44,18 @@
 		onDeleted
 	}: Props = $props();
 
-	// The subset of PersonalRecord fields the device cache keeps.
-	type HistoryPR = {
-		id: string;
-		exerciseId: string;
-		value: number;
-		date: string;
-		note: string | null;
-	};
-	let history = $state<HistoryPR[]>([]);
+	let history = $state<CachedPR[]>([]);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
 	let saveError = $state<string | null>(null);
 	let showNoteField = $state(false);
+	let showVideoField = $state(false);
+	let invalidVideo = $state(false);
+	let editingVideoId = $state<string | null>(null);
+	let editedVideo = $state('');
+	let savingVideo = $state(false);
+	let editVideoError = $state<'invalid' | 'saveFailed' | null>(null);
+	let videoEditTrigger: HTMLButtonElement | null = null;
 	let deleteModalOpen = $state(false);
 	let deleting = $state(false);
 	let prToDelete = $state<string | null>(null);
@@ -63,6 +66,7 @@
 	let inputValue = $state('');
 	let inputDate = $state(todayIso());
 	let inputNote = $state('');
+	let inputVideo = $state('');
 
 	// Start clean and load whenever the sheet opens on an exercise.
 	let loadedFor: string | null = null;
@@ -74,6 +78,8 @@
 		if (loadedFor === exercise.id) return;
 		loadedFor = exercise.id;
 		resetForm();
+		editingVideoId = null;
+		videoEditTrigger = null;
 		rankings = null;
 		void loadHistory();
 		void loadRankings();
@@ -111,7 +117,10 @@
 		inputValue = '';
 		inputDate = todayIso();
 		inputNote = '';
+		inputVideo = '';
 		showNoteField = false;
+		showVideoField = false;
+		invalidVideo = false;
 		saveError = null;
 	}
 
@@ -119,6 +128,10 @@
 		event.preventDefault();
 		const raw = String(inputValue).trim();
 		if (!raw) return;
+		const video = prVideoUrlSchema.safeParse(inputVideo);
+		invalidVideo = !video.success;
+		saveError = null;
+		if (!video.success) return;
 
 		let storageValue: number;
 		switch (exercise.measurementType) {
@@ -149,7 +162,8 @@
 				exerciseId: exercise.id,
 				value: storageValue,
 				date: inputDate,
-				note: inputNote.trim() || null
+				note: inputNote.trim() || null,
+				videoUrl: video.data
 			});
 
 			if (success) {
@@ -165,6 +179,51 @@
 			saveError = t.prs.modal.saveFailed;
 		}
 		isSaving = false;
+	}
+
+	async function openVideoEditor(pr: CachedPR, trigger: HTMLButtonElement) {
+		if (editingVideoId === pr.id) {
+			closeVideoEditor();
+			return;
+		}
+		videoEditTrigger = trigger;
+		editingVideoId = pr.id;
+		editedVideo = pr.videoUrl ?? '';
+		editVideoError = null;
+		await tick();
+		document.getElementById('pr-history-video')?.focus();
+	}
+
+	function closeVideoEditor() {
+		editingVideoId = null;
+		videoEditTrigger?.focus();
+		videoEditTrigger = null;
+	}
+
+	async function saveVideo(pr: CachedPR, input: string) {
+		const video = prVideoUrlSchema.safeParse(input);
+		if (!video.success) {
+			editVideoError = 'invalid';
+			return;
+		}
+
+		savingVideo = true;
+		editVideoError = null;
+		try {
+			if (await updatePRVideo(pr, video.data)) {
+				history = history.map((entry) =>
+					entry.id === pr.id ? { ...entry, videoUrl: video.data } : entry
+				);
+				savingVideo = false;
+				await tick();
+				closeVideoEditor();
+				return;
+			}
+		} catch (error) {
+			console.error('Failed to save PR video:', error);
+		}
+		editVideoError = 'saveFailed';
+		savingVideo = false;
 	}
 
 	function handleDeleteClick(prId: string) {
@@ -221,7 +280,7 @@
 		return history.reduce(
 			(best, pr) =>
 				!best || isBetterPR(pr.value, best.value, exercise.measurementType) ? pr : best,
-			null as HistoryPR | null
+			null as CachedPR | null
 		);
 	});
 
@@ -302,6 +361,35 @@
 			</button>
 		{/if}
 
+		{#if showVideoField}
+			<div class="mt-3">
+				<label for="pr-video" class="field-label">{t.prs.modal.videoLink}</label>
+				<input
+					id="pr-video"
+					type="url"
+					bind:value={inputVideo}
+					maxlength={MAX_PR_VIDEO_URL_LENGTH}
+					aria-invalid={invalidVideo}
+					aria-describedby={invalidVideo ? 'pr-video-error' : undefined}
+					class="input"
+				/>
+				{#if invalidVideo}
+					<p id="pr-video-error" class="notice notice-danger mt-3" role="alert">
+						{t.prs.modal.videoUrlError}
+					</p>
+				{/if}
+			</div>
+		{:else}
+			<button
+				type="button"
+				class="mt-1 inline-flex min-h-11 items-center gap-1.5 legend text-dim"
+				onclick={() => (showVideoField = true)}
+			>
+				<Icon name="plus" size={14} stroke={3.4} />
+				{t.prs.modal.addVideo}
+			</button>
+		{/if}
+
 		{#if saveError}
 			<p id="pr-save-error" class="notice notice-danger mt-3" role="alert">{saveError}</p>
 		{/if}
@@ -337,28 +425,109 @@
 				{#each history as pr (pr.id)}
 					{@const isBest = bestPR?.id === pr.id}
 					{@const parts = prParts(pr.value, exercise.measurementType, unitPreference)}
-					<li class="entry" class:best={isBest}>
-						<span class="mark" aria-hidden="true"></span>
-						<span class="min-w-0 flex-1">
-							<span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-								<span class="display text-[2rem] leading-[0.9]">{parts.figure}</span>
-								{#if parts.unit}<span class="legend text-dim">{parts.unit}</span>{/if}
-								{#if isBest}<span class="tag tag-pink">{t.prs.modal.bestTag}</span>{/if}
+					{@const date = formatDayMonth(pr.date)}
+					<li>
+						<div class="entry" class:best={isBest}>
+							<span class="mark" aria-hidden="true"></span>
+							<span class="min-w-0 flex-1">
+								<span class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+									<span class="display text-[2rem] leading-[0.9]">{parts.figure}</span>
+									{#if parts.unit}<span class="legend text-dim">{parts.unit}</span>{/if}
+									{#if isBest}<span class="tag tag-pink">{t.prs.modal.bestTag}</span>{/if}
+								</span>
+								<span class="mt-1.5 block legend text-mute">{date}</span>
+								{#if pr.note}
+									<span class="mt-1 block text-base leading-snug text-dim">{pr.note}</span>
+								{/if}
 							</span>
-							<span class="mt-1.5 block legend text-mute">{formatDayMonth(pr.date)}</span>
-							{#if pr.note}
-								<span class="mt-1 block text-base leading-snug text-dim">{pr.note}</span>
+							{#if pr.videoUrl}
+								<!-- eslint-disable svelte/no-navigation-without-resolve -- Video URLs are external. -->
+								<a
+									class="icon-btn"
+									href={pr.videoUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									aria-label={t.prs.modal.watchVideoAria(date)}
+								>
+									<Icon name="play" size={20} solid />
+								</a>
+								<!-- eslint-enable svelte/no-navigation-without-resolve -->
 							{/if}
-						</span>
-						<button
-							type="button"
-							class="icon-btn"
-							onclick={() => handleDeleteClick(pr.id)}
-							aria-label={t.prs.modal.deleteAria(formatDayMonth(pr.date))}
-							title={t.common.delete}
-						>
-							<Icon name="trash" size={20} stroke={2.4} />
-						</button>
+							<button
+								type="button"
+								class="icon-btn"
+								disabled={savingVideo}
+								onclick={(event) => openVideoEditor(pr, event.currentTarget)}
+								aria-expanded={editingVideoId === pr.id}
+								aria-label={pr.videoUrl
+									? t.prs.modal.editVideoAria(date)
+									: t.prs.modal.addVideoAria(date)}
+								title={pr.videoUrl ? t.prs.modal.editVideo : t.prs.modal.addVideo}
+							>
+								<Icon name={pr.videoUrl ? 'edit' : 'link'} size={20} stroke={2.4} />
+							</button>
+							<button
+								type="button"
+								class="icon-btn"
+								disabled={savingVideo}
+								onclick={() => handleDeleteClick(pr.id)}
+								aria-label={t.prs.modal.deleteAria(date)}
+								title={t.common.delete}
+							>
+								<Icon name="trash" size={20} stroke={2.4} />
+							</button>
+						</div>
+						{#if editingVideoId === pr.id}
+							<form
+								class="border-t border-line pb-3"
+								novalidate
+								onsubmit={(event) => {
+									event.preventDefault();
+									void saveVideo(pr, editedVideo);
+								}}
+							>
+								<label for="pr-history-video" class="field-label">{t.prs.modal.videoLink}</label>
+								<input
+									id="pr-history-video"
+									type="url"
+									bind:value={editedVideo}
+									maxlength={MAX_PR_VIDEO_URL_LENGTH}
+									aria-invalid={editVideoError === 'invalid'}
+									aria-describedby={editVideoError ? 'pr-edit-video-error' : undefined}
+									class="input"
+								/>
+								{#if editVideoError}
+									<p id="pr-edit-video-error" class="notice notice-danger mt-3" role="alert">
+										{editVideoError === 'invalid'
+											? t.prs.modal.videoUrlError
+											: t.prs.modal.videoSaveFailed}
+									</p>
+								{/if}
+								<div class="mt-2 flex flex-wrap gap-2">
+									<button type="submit" class="btn btn-sm btn-ink" disabled={savingVideo}>
+										{savingVideo ? t.common.saving : t.common.save}
+									</button>
+									{#if pr.videoUrl}
+										<button
+											type="button"
+											class="btn btn-sm btn-quiet"
+											disabled={savingVideo}
+											onclick={() => saveVideo(pr, '')}
+										>
+											{t.prs.modal.removeVideo}
+										</button>
+									{/if}
+									<button
+										type="button"
+										class="btn btn-sm btn-quiet"
+										disabled={savingVideo}
+										onclick={closeVideoEditor}
+									>
+										{t.common.cancel}
+									</button>
+								</div>
+							</form>
+						{/if}
 					</li>
 				{/each}
 			</ul>

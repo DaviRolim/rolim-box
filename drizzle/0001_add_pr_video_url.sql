@@ -1,0 +1,1 @@
+ALTER TABLE `personal_record` ADD `video_url` text;

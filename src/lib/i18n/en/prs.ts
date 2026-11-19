@@ -54,6 +54,15 @@ export const prs = {
 		note: 'Note',
 		notePlaceholder: 'Felt strong, belt on, competition day',
 		addNote: 'Add a note',
+		videoLink: 'Video link',
+		addVideo: 'Add a video link',
+		editVideo: 'Edit video link',
+		removeVideo: 'Remove video',
+		addVideoAria: (date: string) => `Add a video link to the PR of ${date}`,
+		editVideoAria: (date: string) => `Edit the video link for the PR of ${date}`,
+		watchVideoAria: (date: string) => `Watch the video for the PR of ${date} (opens in a new tab)`,
+		videoUrlError: 'Enter an HTTP or HTTPS link up to 500 characters long.',
+		videoSaveFailed: 'The video link could not be saved. Try again.',
 		timeFormatError: 'Write the time as minutes:seconds, for example 5:30.',
 		numberError: 'Enter a number above zero.',
 		saveFailed: 'This PR could not be saved. Try again.',
@@ -162,6 +171,7 @@ export const prs = {
 
 	api: {
 		notFound: 'PR not found.',
+		idConflict: 'This PR ID is already in use.',
 		exerciseNotFound: 'Exercise not found.',
 		someExercisesNotFound: 'Some exercises were not found.',
 		importFailed: 'The PRs could not be imported.',

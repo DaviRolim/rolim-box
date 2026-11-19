@@ -8,21 +8,23 @@ import {
 	getCachedPersonalRecords,
 	cachePersonalRecord,
 	deleteCachedPersonalRecord,
-	clearCachedPersonalRecords,
 	setCacheFlag,
 	hasCacheFlag,
 	clearCacheFlag,
-	getAllSyncQueueOperations
+	type CachedPR
 } from '$lib/db/indexeddb';
-import { queueOperation } from '$lib/services/sync-queue';
+import { getQueuedOperations, queueOperation } from '$lib/services/sync-queue';
 import { syncStore } from '$lib/stores/sync.svelte';
 import { toastStore } from '$lib/stores/toast.svelte';
 import { generateId } from '$lib/utils';
-import type {
-	Exercise,
-	ExerciseWithBestPR,
-	ExerciseCategory,
-	MeasurementType
+import {
+	createPRSchema,
+	prVideoUrlSchema,
+	type Exercise,
+	type ExerciseWithBestPR,
+	type ExerciseCategory,
+	type MeasurementType,
+	type CreatePRInput
 } from '$lib/types/pr';
 
 const EXERCISES_CACHE_KEY = 'exercises-cached';
@@ -34,14 +36,6 @@ interface CachedExercise {
 	category: string;
 	measurementType: string;
 	sortOrder: number;
-}
-
-interface CachedPR {
-	id: string;
-	exerciseId: string;
-	value: number;
-	date: string;
-	note: string | null;
 }
 
 // ============================================================================
@@ -88,7 +82,7 @@ function mapCachedToExercise(cached: CachedExercise): Exercise {
 }
 
 // ============================================================================
-// PERSONAL RECORDS (invalidate on write)
+// PERSONAL RECORDS
 // ============================================================================
 
 export async function getUserPRs(): Promise<CachedPR[]> {
@@ -97,7 +91,7 @@ export async function getUserPRs(): Promise<CachedPR[]> {
 	// Check if PRs are cached
 	const isCached = await hasCacheFlag(PRS_CACHE_KEY);
 
-	if (isCached) {
+	if (isCached || !syncStore.isOnline) {
 		return getCachedPersonalRecords();
 	}
 
@@ -111,12 +105,10 @@ export async function getUserPRs(): Promise<CachedPR[]> {
 		// Cache PRs
 		await cachePersonalRecords(prs);
 		await setCacheFlag(PRS_CACHE_KEY);
-
-		return prs;
 	} catch (error) {
 		console.error('Failed to fetch PRs:', error);
-		return [];
 	}
+	return getCachedPersonalRecords();
 }
 
 // ============================================================================
@@ -154,83 +146,79 @@ export async function getExercisesWithPRs(): Promise<ExerciseWithBestPR[]> {
 }
 
 // ============================================================================
-// OFFLINE-AWARE CREATE / DELETE
+// OFFLINE-AWARE WRITES
 // ============================================================================
 
-interface CreatePRData {
-	exerciseId: string;
-	value: number;
-	date: string;
-	note: string | null;
-}
-
-export async function createPR(data: CreatePRData): Promise<boolean> {
+export async function createPR(input: Omit<CreatePRInput, 'id'>): Promise<boolean> {
 	if (!browser) return false;
+
+	const validation = createPRSchema.safeParse(input);
+	if (!validation.success) return false;
+	const { id = generateId(), ...data } = validation.data;
 
 	// Try online first
 	if (syncStore.isOnline) {
-		try {
-			const response = await authFetch('/api/prs', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
-			});
-
-			if (response.ok) {
-				const pr = await response.json();
-				await cachePersonalRecord(pr);
-				await invalidatePRCache();
-				return true;
-			}
-		} catch {
-			// Network error -- fall through to offline path
+		const response = await authFetch('/api/prs', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ id, ...data })
+		}).catch(() => null);
+		if (response?.ok) {
+			await cachePersonalRecord(await response.json());
+			return true;
 		}
+		if (response && response.status < 500 && response.status !== 408 && response.status !== 429)
+			return false;
 	}
 
-	// Offline (or online fetch failed): optimistic write + queue sync
-	const tempId = generateId();
-	const offlinePR = { id: tempId, ...data };
-	await cachePersonalRecord(offlinePR);
-	await queueOperation({
-		type: 'create',
-		entity: 'pr',
-		entityId: tempId,
-		payload: data,
-		status: 'pending'
-	});
+	await queueOperation(
+		{ type: 'create', entity: 'pr', entityId: id, payload: data, status: 'pending' },
+		{ id, ...data, note: data.note ?? null, videoUrl: data.videoUrl ?? null }
+	);
 	toastStore.info(t.prs.savedOffline);
-	await invalidatePRCache();
+	return true;
+}
+
+export async function updatePRVideo(pr: CachedPR, videoUrl: string | null): Promise<boolean> {
+	if (!browser) return false;
+	const validation = prVideoUrlSchema.safeParse(videoUrl);
+	if (!validation.success) return false;
+
+	await queueOperation(
+		{
+			type: 'update',
+			entity: 'pr',
+			entityId: pr.id,
+			payload: { videoUrl: validation.data },
+			status: 'pending'
+		},
+		{ ...pr, videoUrl: validation.data }
+	);
 	return true;
 }
 
 export async function deletePR(prId: string): Promise<boolean> {
 	if (!browser) return false;
 
-	// Try online first
-	if (syncStore.isOnline) {
-		try {
-			const response = await authFetch(`/api/prs/${prId}`, { method: 'DELETE' });
-			if (response.ok || response.status === 204) {
-				await deleteCachedPersonalRecord(prId);
-				await invalidatePRCache();
-				return true;
-			}
-		} catch {
-			// Network error -- fall through to offline path
+	const queued = await getQueuedOperations();
+	const hasPendingChange = queued.some(
+		(op) => op.entity === 'pr' && op.entityId === prId && op.status === 'pending'
+	);
+	if (syncStore.isOnline && !hasPendingChange) {
+		const response = await authFetch(`/api/prs/${prId}`, { method: 'DELETE' }).catch(() => null);
+		if (response?.ok || response?.status === 404) {
+			await deleteCachedPersonalRecord(prId);
+			return true;
 		}
+		if (response && response.status < 500 && response.status !== 408 && response.status !== 429)
+			return false;
 	}
 
-	// Offline (or online fetch failed): optimistic delete + queue sync
-	await deleteCachedPersonalRecord(prId);
-	await queueOperation({
-		type: 'delete',
-		entity: 'pr',
-		entityId: prId,
-		payload: null,
-		status: 'pending'
-	});
+	await queueOperation(
+		{ type: 'delete', entity: 'pr', entityId: prId, payload: null, status: 'pending' },
+		null
+	);
 	toastStore.info(t.prs.deletedOffline);
-	await invalidatePRCache();
 	return true;
 }
 
@@ -241,7 +229,6 @@ export async function deletePR(prId: string): Promise<boolean> {
 export async function invalidatePRCache(): Promise<void> {
 	if (!browser) return;
 	await clearCacheFlag(PRS_CACHE_KEY);
-	await clearCachedPersonalRecords();
 }
 
 /**
@@ -259,18 +246,7 @@ export async function refreshPRCache(): Promise<boolean> {
 			throw new Error('Failed to fetch PRs');
 		}
 
-		const serverPRs: CachedPR[] = await response.json();
-
-		const queued = (await getAllSyncQueueOperations()).filter((op) => op.entity === 'pr');
-		const deleted = new Set(queued.filter((op) => op.type === 'delete').map((op) => op.entityId));
-		const created = queued.filter((op) => op.type === 'create').map((op) => op.entityId);
-		const cachedById = new Map((await getCachedPersonalRecords()).map((pr) => [pr.id, pr]));
-		const unsent = created.map((id) => cachedById.get(id)).filter((pr) => pr !== undefined);
-
-		const prs = [...serverPRs.filter((pr) => !deleted.has(pr.id)), ...unsent];
-
-		await clearCachedPersonalRecords();
-		await cachePersonalRecords(prs);
+		await cachePersonalRecords(await response.json());
 		await setCacheFlag(PRS_CACHE_KEY);
 
 		return true;

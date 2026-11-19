@@ -6,10 +6,12 @@ import {
 	getAllSyncQueueOperations,
 	deleteSyncQueueOperation,
 	updateSyncQueueOperation,
-	clearSyncQueueForEntity
+	clearSyncQueueForEntity,
+	type CachedPR
 } from '$lib/db/indexeddb';
 import { generateId } from '$lib/utils';
 import { t } from '$lib/i18n';
+import type { CreatePRInput } from '$lib/types/pr';
 
 /**
  * Outbox for changes made on this device.
@@ -50,17 +52,21 @@ let retryAttempt = 0;
 
 /** Record a change and try to send it. */
 export async function queueOperation(
-	op: Omit<SyncOperation, 'id' | 'createdAt' | 'retries'>
+	op: Omit<SyncOperation, 'id' | 'createdAt' | 'retries'>,
+	pr?: CachedPR | null
 ): Promise<void> {
 	if (!browser) return;
 
-	await addToSyncQueue({
-		...op,
-		id: generateId(),
-		createdAt: Date.now(),
-		retries: 0,
-		status: 'pending'
-	});
+	await addToSyncQueue(
+		{
+			...op,
+			id: generateId(),
+			createdAt: Date.now(),
+			retries: 0,
+			status: 'pending'
+		},
+		pr
+	);
 	await publishState();
 	void processQueue();
 }
@@ -267,7 +273,13 @@ function buildRequest(operation: SyncOperation): { url: string; init: RequestIni
 		if (type === 'delete') return { url: `/api/bank/${entityId}`, init: { method: 'DELETE' } };
 	}
 	if (entity === 'pr') {
-		if (type === 'create') return { url: '/api/prs', init: json('POST', payload) };
+		if (type === 'create') {
+			return {
+				url: '/api/prs',
+				init: json('POST', { ...(payload as CreatePRInput), id: entityId })
+			};
+		}
+		if (type === 'update') return { url: `/api/prs/${entityId}`, init: json('PATCH', payload) };
 		if (type === 'delete') return { url: `/api/prs/${entityId}`, init: { method: 'DELETE' } };
 	}
 	return null;

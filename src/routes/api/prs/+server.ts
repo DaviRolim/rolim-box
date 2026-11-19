@@ -5,7 +5,7 @@ import { db } from '$lib/server/db';
 import { personalRecord, exercise } from '$lib/server/db/schema';
 import { createPRSchema } from '$lib/types/pr';
 import { generateId } from '$lib/server/auth';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
@@ -18,7 +18,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 			exerciseId: personalRecord.exerciseId,
 			value: personalRecord.value,
 			date: personalRecord.date,
-			note: personalRecord.note
+			note: personalRecord.note,
+			videoUrl: personalRecord.videoUrl
 		})
 		.from(personalRecord)
 		.where(eq(personalRecord.userId, locals.user.id));
@@ -63,19 +64,31 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	const now = new Date();
+	const id = data.id ?? generateId();
 	const [newPR] = await db
 		.insert(personalRecord)
 		.values({
-			id: generateId(),
+			id,
 			userId: locals.user.id,
 			exerciseId: data.exerciseId,
 			value: data.value,
 			note: data.note ?? null,
+			videoUrl: data.videoUrl ?? null,
 			date: data.date,
 			createdAt: now,
 			updatedAt: now
 		})
+		.onConflictDoNothing({ target: personalRecord.id })
 		.returning();
 
-	return json(newPR, { status: 201 });
+	if (newPR) return json(newPR, { status: 201 });
+
+	// A queued create may be retried if the first response never reached the device.
+	const [existing] = await db
+		.select()
+		.from(personalRecord)
+		.where(and(eq(personalRecord.id, id), eq(personalRecord.userId, locals.user.id)));
+	if (existing) return json(existing);
+
+	return json({ error: dictFor(locals.locale).prs.api.idConflict }, { status: 409 });
 };

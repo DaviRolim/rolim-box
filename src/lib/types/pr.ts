@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { dictFor } from '$lib/i18n';
-import { currentLocale, intlLocale } from '$lib/i18n/locale';
+import { dictFor } from '../i18n';
+import { currentLocale, intlLocale } from '../i18n/locale';
 
 // ============================================================================
 // Type Definitions
@@ -27,6 +27,7 @@ export interface PersonalRecord {
 	exerciseId: string;
 	value: number; // Base units: grams, seconds, count, centimeters
 	note: string | null;
+	videoUrl: string | null;
 	date: string; // YYYY-MM-DD
 	createdAt: Date;
 	updatedAt: Date;
@@ -96,7 +97,21 @@ export interface ExerciseRankingsResponse {
 // Zod Validation Schemas
 // ============================================================================
 
+export const MAX_PR_VIDEO_URL_LENGTH = 500;
+
+export const prVideoUrlSchema = z
+	.string()
+	.trim()
+	.max(MAX_PR_VIDEO_URL_LENGTH)
+	.pipe(z.union([z.literal(''), z.url({ protocol: /^https?$/ }).regex(/^https?:\/\//i)]))
+	.transform((url) => url || null)
+	.nullable();
+
 export const createPRSchema = z.object({
+	id: z
+		.string()
+		.regex(/^[0-9a-f]{32}$/)
+		.optional(),
 	exerciseId: z.string().min(1, 'Exercise is required'),
 	value: z.number().positive('Value must be positive'),
 	date: z
@@ -110,8 +125,11 @@ export const createPRSchema = z.object({
 				parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day
 			);
 		}, 'Invalid date'),
-	note: z.string().max(500, 'Note too long').nullable().optional()
+	note: z.string().max(500, 'Note too long').nullable().optional(),
+	videoUrl: prVideoUrlSchema.optional()
 });
+
+export const updatePRSchema = z.object({ videoUrl: prVideoUrlSchema });
 
 export const updateUserSettingsSchema = z.object({
 	unitPreference: z.enum(['metric', 'imperial'])
@@ -159,7 +177,8 @@ export const importAnalysisResponseSchema = z.object({
 
 export const bulkImportItemSchema = z.object({
 	exerciseId: z.string().min(1),
-	value: z.number().positive()
+	value: z.number().positive(),
+	videoUrl: prVideoUrlSchema.optional()
 });
 
 export const bulkImportSchema = z.object({

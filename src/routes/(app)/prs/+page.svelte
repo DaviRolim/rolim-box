@@ -126,7 +126,6 @@
 	}
 
 	async function reload() {
-		await invalidatePRCache();
 		exercises = await getExercisesWithPRs();
 		// Keep the open sheet pointing at the fresh copy of its exercise.
 		if (selectedExercise) {
@@ -146,6 +145,7 @@
 	}
 
 	async function handleImportSuccess() {
+		await invalidatePRCache();
 		await reload();
 		toastStore.success(t.prs.page.imported);
 	}

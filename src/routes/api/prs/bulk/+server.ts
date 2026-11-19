@@ -62,6 +62,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		exerciseId: pr.exerciseId,
 		value: pr.value,
 		note: dictFor(locals.locale).prs.api.importedNote,
+		videoUrl: pr.videoUrl ?? null,
 		date: today,
 		createdAt: now,
 		updatedAt: now
