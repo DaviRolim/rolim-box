@@ -4,7 +4,7 @@
 	import { timeAgo } from '$lib/date';
 	import { audioService } from '$lib/services/audio.svelte';
 	import { retrySync } from '$lib/services/sync-queue';
-	import { invalidatePRCache } from '$lib/services/pr';
+	import { invalidatePRCache, refreshPRCache } from '$lib/services/pr';
 	import { syncStore } from '$lib/stores/sync.svelte';
 	import { themeStore, type ThemeChoice } from '$lib/stores/theme.svelte';
 	import { toastStore } from '$lib/stores/toast.svelte';
@@ -70,6 +70,7 @@
 			await retrySync();
 			const ok = await wodStore.refresh();
 			void bankStore.refresh();
+			void refreshPRCache();
 			if (ok) toastStore.success(t.settings.phone.upToDate);
 			else if (syncStore.isOffline) toastStore.info(t.settings.phone.stillOffline);
 			else toastStore.error(t.settings.phone.noAnswer);

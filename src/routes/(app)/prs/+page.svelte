@@ -7,7 +7,8 @@
 		type ExerciseCategory,
 		EXERCISE_CATEGORIES
 	} from '$lib/types/pr';
-	import { getExercisesWithPRs, invalidatePRCache } from '$lib/services/pr';
+	import { getExercisesWithPRs, invalidatePRCache, refreshPRCache } from '$lib/services/pr';
+	import { syncStore } from '$lib/stores/sync.svelte';
 	import { debounce } from '$lib/utils';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import PRModal from './PRModal.svelte';
@@ -36,6 +37,11 @@
 			loadError = true;
 		}
 		loading = false;
+
+		// The cache opens the screen (offline too); then pick up PRs saved on other devices.
+		if (syncStore.isOnline && (await refreshPRCache())) {
+			exercises = await getExercisesWithPRs();
+		}
 	}
 
 	onMount(load);

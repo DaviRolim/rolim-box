@@ -11,7 +11,8 @@ import {
 	clearCachedPersonalRecords,
 	setCacheFlag,
 	hasCacheFlag,
-	clearCacheFlag
+	clearCacheFlag,
+	getAllSyncQueueOperations
 } from '$lib/db/indexeddb';
 import { queueOperation } from '$lib/services/sync-queue';
 import { syncStore } from '$lib/stores/sync.svelte';
@@ -243,11 +244,14 @@ export async function invalidatePRCache(): Promise<void> {
 	await clearCachedPersonalRecords();
 }
 
+/**
+ * Re-read the person's PRs from the server, so records saved on another device show up here.
+ * The cached list is kept if the request fails, and PRs saved offline on this device that have
+ * not reached the server yet stay in it (and ones deleted offline stay out).
+ */
 export async function refreshPRCache(): Promise<boolean> {
 	if (!browser) return false;
 
-	// Fetch fresh data FIRST, only invalidate cache if fetch succeeds
-	// This prevents leaving users with empty cache on network failure
 	try {
 		const response = await fetch('/api/prs');
 		if (!response.ok) {
@@ -255,10 +259,16 @@ export async function refreshPRCache(): Promise<boolean> {
 			throw new Error('Failed to fetch PRs');
 		}
 
-		const prs: CachedPR[] = await response.json();
+		const serverPRs: CachedPR[] = await response.json();
 
-		// Only clear and update cache after successful fetch
-		await clearCacheFlag(PRS_CACHE_KEY);
+		const queued = (await getAllSyncQueueOperations()).filter((op) => op.entity === 'pr');
+		const deleted = new Set(queued.filter((op) => op.type === 'delete').map((op) => op.entityId));
+		const created = queued.filter((op) => op.type === 'create').map((op) => op.entityId);
+		const cachedById = new Map((await getCachedPersonalRecords()).map((pr) => [pr.id, pr]));
+		const unsent = created.map((id) => cachedById.get(id)).filter((pr) => pr !== undefined);
+
+		const prs = [...serverPRs.filter((pr) => !deleted.has(pr.id)), ...unsent];
+
 		await clearCachedPersonalRecords();
 		await cachePersonalRecords(prs);
 		await setCacheFlag(PRS_CACHE_KEY);
@@ -266,7 +276,6 @@ export async function refreshPRCache(): Promise<boolean> {
 		return true;
 	} catch (error) {
 		console.error('Failed to refresh PR cache:', error);
-		// Keep existing cache intact on failure
 		return false;
 	}
 }
